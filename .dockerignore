@@ -1,0 +1,11 @@
+.git
+.gitignore
+.venv_note
+__pycache__
+data/projects/*/venvs/
+documents/
+*.md
+Dockerfile
+docker-compose.yml
+.dockerignore
+.claude

@@ -1,0 +1,112 @@
+/* GraphRebuildMonitorPanel styles. Scoped under .grm- to avoid collisions. */
+
+.grm-card {
+    background: var(--panel-bg, rgba(0, 0, 0, 0.1));
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+}
+
+.grm-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 5px 0;
+    font-size: 12px;
+}
+
+.grm-k {
+    color: var(--text-secondary);
+}
+
+.grm-v {
+    color: var(--text-color);
+    font-variant-numeric: tabular-nums;
+}
+
+.grm-mono {
+    font-family: var(--font-mono, Consolas, monospace);
+    font-size: 11px;
+}
+
+.grm-phase {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: #fff;
+}
+
+.grm-phase-idle { background: #555; color: #bbb; }
+.grm-phase-starting, .grm-phase-scanning, .grm-phase-recluster_loading { background: #1976d2; }
+.grm-phase-extracting, .grm-phase-adding_doc, .grm-phase-removing_doc { background: #ff8800; color: #111; }
+.grm-phase-sameas, .grm-phase-similar_to, .grm-phase-analytics, .grm-phase-summarizing { background: #7b1fa2; }
+.grm-phase-writing, .grm-phase-caching { background: #00838f; }
+.grm-phase-done { background: #8bc34a; color: #111; }
+.grm-phase-error { background: #e57373; color: #111; }
+
+.grm-progress-outer {
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid var(--border-color);
+    height: 16px;
+    border-radius: 2px;
+    overflow: hidden;
+    margin: 8px 0 4px 0;
+}
+
+.grm-progress-inner {
+    height: 100%;
+    background: linear-gradient(90deg, #ff8800, #ffb300);
+    transition: width 0.4s ease;
+    width: 0%;
+}
+
+.grm-progress-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.grm-pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 10px;
+    letter-spacing: 0.3px;
+}
+
+.grm-pill-on { background: #8bc34a; color: #111; }
+.grm-pill-off { background: #444; color: #bbb; }
+
+/* Per-format chip row in the Vector RAG block. One chip per format key
+   from /api/rag/index/format_breakdown ("md", "pdf", "docx", ...). */
+.grm-fmt-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    justify-content: flex-end;
+    max-width: 60%;
+}
+
+.grm-fmt-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 7px;
+    border-radius: 9px;
+    font-size: 10px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    letter-spacing: 0.2px;
+    background: rgba(96, 150, 229, 0.18);
+    border: 0.5px solid rgba(96, 150, 229, 0.45);
+    color: var(--text-color);
+}
+
+.grm-fmt-chip[data-fmt="pdf"]  { background: rgba(229,87,87,0.18);  border-color: rgba(229,87,87,0.45); }
+.grm-fmt-chip[data-fmt="docx"] { background: rgba(82,140,229,0.18); border-color: rgba(82,140,229,0.45); }
+.grm-fmt-chip[data-fmt="pptx"] { background: rgba(229,140,68,0.18); border-color: rgba(229,140,68,0.45); }
+.grm-fmt-chip[data-fmt="html"] { background: rgba(120,120,120,0.18); border-color: rgba(120,120,120,0.45); }

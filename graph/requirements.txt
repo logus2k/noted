@@ -1,0 +1,24 @@
+fastapi>=0.115.0
+uvicorn>=0.34.0
+requests>=2.32.0
+pyyaml>=6.0.0
+# Required by FastAPI for multipart/form-data (file upload endpoint)
+python-multipart>=0.0.9
+
+# GraphRAG analytics (Phase 1D)
+numpy==2.4.4
+networkx==3.6.1
+igraph==1.0.0
+leidenalg==0.11.0
+
+# GPU-accelerated linear algebra for the sameAs pairwise cosine pass.
+# Pinned to CUDA 13.x to match the nvidia/cuda:13.2.1 base image.
+# `cupy-cuda13x` (no [ctk] extra) relies on the CUDA toolkit installed in
+# the base image; this is the lighter footprint vs. wheel-bundled CUDA.
+cupy-cuda13x>=14.0,<15.0
+
+# Docling (PDF / DOCX / PPTX / HTML ingestion). Pulls in TableFormer and a
+# layout model on first use; weights cached in /root/.cache/docling
+# (bind-mounted to data/docling_cache).
+docling>=2.0,<3.0
+docling-core>=2.0

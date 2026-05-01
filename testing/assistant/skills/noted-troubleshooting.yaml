@@ -1,0 +1,89 @@
+# Machine-readable scenarios for the `noted-troubleshooting` skill test doc.
+
+doc_id: noted-troubleshooting
+doc_type: skill
+
+# Scenarios covered: S1, S2, S3, S4, S5, S6 (6 of 8).
+# DEFERRED: S7 (Socket.IO disconnect), S8 (multi-container correlation debugging).
+
+scenarios:
+  - scenario_id: S1
+    title: "Stuck cell"
+    tags: [skill, troubleshooting, notebook]
+    setup:
+      project: noted-testing
+    user_request: "a cell has been running for 10 minutes, how do I stop it?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - point to the stop/interrupt button in the notebook editor
+      - mention that cell interruption stops the kernel task gracefully
+      - if stuck, can restart the kernel from the runtime menu
+
+  - scenario_id: S2
+    title: "Missing MLflow run"
+    tags: [skill, troubleshooting, mlflow]
+    setup:
+      project: noted-testing
+    user_request: "I ran cells but no MLflow run appeared - why?"
+    expected_tools_called: []
+    expected_tools_NOT_called:
+      - get_experiment_runs
+    expected_answer_focus: |
+      - manual cell execution does NOT create MLflow runs (by design)
+      - must use Run Manager to create tracked runs
+      - refer to noted-auto-instrumentation skill behavior
+
+  - scenario_id: S3
+    title: "Serving not responding"
+    tags: [skill, troubleshooting, serving]
+    setup:
+      project: noted-testing
+    user_request: "/api/serving/predict is returning 404"
+    expected_tools_called:
+      - name: get_serving_status
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - check serving status first - 404 likely means no model loaded (idle state)
+      - suggest deploy_model as fix
+
+  - scenario_id: S4
+    title: "Lint pile-up"
+    tags: [skill, troubleshooting, linting]
+    setup:
+      project: noted-testing
+    user_request: "my file has 50+ lint warnings"
+    expected_tools_called: []
+    expected_tools_NOT_called:
+      - get_lint_diagnostics
+    expected_answer_focus: |
+      - recommend calling fix_lint_issues to auto-fix bulk
+      - remaining warnings need manual fixes; describe how to handle common codes
+      - mention get_lint_diagnostics to list specifics
+
+  - scenario_id: S5
+    title: "Lost notebook state"
+    tags: [skill, troubleshooting, notebook]
+    setup:
+      project: noted-testing
+    user_request: "my notebook's kernel died and I lost outputs"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - reassure: cell SOURCE is autosaved; only runtime outputs are lost
+      - re-run from Run Manager if the run was tracked (outputs regenerate)
+      - if not tracked, re-execute individual cells
+
+  - scenario_id: S6
+    title: "DVC out of sync"
+    tags: [skill, troubleshooting, dvc]
+    setup:
+      project: noted-testing
+    user_request: "my DVC-tracked file has a different hash than git"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - likely local modification without dvc add
+      - explain dvc status to see what's drifted
+      - point to dvc-sync-debugging skill for details

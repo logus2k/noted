@@ -1,0 +1,67 @@
+# Machine-readable scenarios for the `hydra-groups` skill test doc.
+
+doc_id: hydra-groups
+doc_type: skill
+
+# Scenarios covered: S1, S2, S3, S4 (4 of 6).
+# DEFERRED: S5 (package-aware groups), S6 (group inheritance).
+
+scenarios:
+  - scenario_id: S1
+    title: "Add a new group option"
+    tags: [skill, hydra, groups]
+    setup:
+      project: noted-testing
+    user_request: "I want to add a new scaler option 'robust'"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - create config/scaler/robust.yaml
+      - select via defaults list or Composer dropdown
+      - creating the file = adding the option automatically
+
+  - scenario_id: S2
+    title: "Inspect available groups"
+    tags: [skill, hydra, groups]
+    setup:
+      project: noted-testing
+    user_request: "what groups does this project have?"
+    expected_tools_called:
+      - name: list_files
+        exact_count: 1
+        args_match:
+          path: "config"
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - directory names under config/ are groups
+      - files inside are the options
+      - get_hydra_config alternative also acceptable
+
+  - scenario_id: S3
+    title: "Default group option"
+    tags: [skill, hydra, groups]
+    setup:
+      project: noted-testing
+    user_request: "what's the default 'model' option for this project?"
+    expected_tools_called:
+      - name: get_file_contents
+        exact_count: 1
+        args_match:
+          path: "config/config.yaml"
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - check the defaults list in config/config.yaml
+      - report the line (e.g. `- model: gru_baseline`)
+
+  - scenario_id: S4
+    title: "Option override"
+    tags: [skill, hydra, groups]
+    setup:
+      project: noted-testing
+    user_request: "switch the model to lstm_large for a test run"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - in Composer: select lstm_large from model dropdown
+      - or override in Run Manager arg
+      - the run's Hydra bundle records lstm_large as selected

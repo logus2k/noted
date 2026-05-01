@@ -1,0 +1,61 @@
+# Machine-readable scenarios for the `dvc-tracking` skill test doc.
+
+doc_id: dvc-tracking
+doc_type: skill
+
+# Scenarios covered: S1, S2, S3, S4 (4 of 6).
+# DEFERRED: S5 (large-file chunking), S6 (dvc remote config).
+
+scenarios:
+  - scenario_id: S1
+    title: "Track a new file"
+    tags: [skill, dvc, tracking]
+    setup:
+      project: noted-testing
+    user_request: "how do I add data/raw.csv to DVC?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - dvc add data/raw.csv
+      - generates data/raw.csv.dvc (tracked in git)
+      - actual file moves to .dvc/cache
+
+  - scenario_id: S2
+    title: "Untrack"
+    tags: [skill, dvc, tracking]
+    setup:
+      project: noted-testing
+    user_request: "how do I stop tracking a DVC file?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - dvc remove foo.csv.dvc
+      - file is removed from DVC; it can stay in workspace
+      - push to remote to propagate
+
+  - scenario_id: S3
+    title: "Inventory"
+    tags: [skill, dvc, tracking]
+    setup:
+      project: noted-testing
+    user_request: "list DVC-tracked files"
+    expected_tools_called:
+      - name: get_dvc_data_overview
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - use get_dvc_data_overview
+      - report per project
+
+  - scenario_id: S4
+    title: "When to track"
+    tags: [skill, dvc, tracking]
+    setup:
+      project: noted-testing
+    user_request: "should I track my model checkpoints in DVC?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - prefer MLflow artifact store for models (deduplicated via Registry)
+      - DVC for raw + derived datasets
+      - no hard rule; think of DVC as the data side, MLflow as the experiment side

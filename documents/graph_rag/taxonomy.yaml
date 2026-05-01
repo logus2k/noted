@@ -1,0 +1,526 @@
+# GraphRAG Entity + Relationship Taxonomy
+#
+# Covers every entity noted currently surfaces through the Explorer tree or
+# any service router. Grouped by domain. Each entry maps 1:1 onto the
+# existing graph/app/models.py::Entity shape:
+#   { id: "{type}:{source_id}", type, label, properties, tags }
+#
+# Sources marked "existing" are already implemented in graph/app/scanners/.
+# Sources marked "new" are added in Phase 1 of GraphRAG integration.
+#
+# TO USE: load this file at scanner boot, validate scanner output against
+# declared types/fields, and use the relationship list as the Cypher
+# schema for ArcadeDB.
+
+entities:
+
+  # ── Filesystem / Projects ────────────────────────────────────────
+  - type: project
+    source: filesystem_scanner        # existing
+    fields: [id, name, path]
+    label: name
+  - type: mount
+    source: filesystem_scanner
+    fields: [name, path, root_type]
+    label: name
+  - type: directory
+    source: filesystem_scanner
+    fields: [path, root_type, root_name]
+    label: path
+  - type: file
+    source: filesystem_scanner
+    fields: [path, project_id, extension, size, mtime]
+    label: path
+  - type: notebook
+    source: filesystem_scanner
+    fields: [path, project_id, kernel_language, cell_count]
+    label: path
+
+  # ── MLflow ────────────────────────────────────────────────────────
+  - type: experiment
+    source: mlflow_scanner            # existing
+    fields: [experiment_id, name, lifecycle_stage, artifact_location]
+    label: name
+  - type: run
+    source: mlflow_scanner
+    fields: [run_id, run_name, experiment_id, status, start_time, end_time, metrics, params, git_commit]
+    label: run_name
+  - type: snapshot
+    source: mlflow_scanner
+    fields: [snapshot_name, snapshot_branch, git_commit, run_id]
+    label: snapshot_name
+  - type: registered_model
+    source: mlflow_scanner
+    fields: [model_name, creation_timestamp]
+    label: model_name
+  - type: model_version
+    source: mlflow_scanner
+    fields: [model_name, version, run_id, source, aliases, creation_timestamp]
+    label: model_name + version
+  - type: logged_model
+    source: mlflow_scanner            # MLflow 3.x m-xxxxx - distinct from model_version
+    fields: [model_id, experiment_id, run_id, artifact_uri, flavor]
+    label: model_id
+  - type: artifact
+    source: mlflow_scanner
+    fields: [run_id, path, file_size, category]     # category: model|image|chart|file
+    label: path
+  - type: metric
+    source: mlflow_scanner                          # proposed by Gemma 2026-04-23 review
+    # Promotes metrics from run.metrics dict to first-class nodes.
+    # Enables Cypher queries like "find runs where MAE < 2.0" and
+    # graph-connects metrics across runs (comparisons, trends).
+    fields: [run_id, key, value, step, timestamp, history]
+    label: key + "@" + run_id short
+
+  # ── DVC ───────────────────────────────────────────────────────────
+  - type: data_file
+    source: dvc_scanner               # existing
+    fields: [path, md5, size, repo_path]
+    label: path
+  - type: data_version
+    source: dvc_scanner
+    fields: [commit_hash, md5, path, message, author, date]
+    label: commit_hash short
+  - type: dvc_remote
+    source: dvc_scanner
+    fields: [name, url, default]
+    label: name
+  - type: dvc_stage
+    source: dvc_scanner               # dvc.yaml stage
+    fields: [name, path, deps, outs, cmd]
+    label: name
+  - type: data_schema
+    source: dvc_scanner               # proposed by Gemma 2026-04-23 review
+    # Structural metadata for a dataset: column names, dtypes, constraints.
+    # Distinct from data_file (bytes) and data_version (pointer in time).
+    # Supports governance queries and drift-vs-schema checks.
+    fields: [data_file_path, columns, dtypes, nullable_columns, constraints, detected_from]
+    label: data_file_path + "#schema"
+
+  # ── Hydra ─────────────────────────────────────────────────────────
+  - type: config
+    source: hydra_scanner             # existing
+    fields: [project_id, config_name, defaults_list]
+    label: config_name
+  - type: config_group
+    source: hydra_scanner
+    fields: [project_id, group_name, default_option]
+    label: group_name
+  - type: config_option
+    source: hydra_scanner
+    fields: [project_id, group_name, option_name, path]
+    label: option_name
+  - type: composed_config
+    source: hydra_scanner             # per-run archived bundle
+    fields: [run_id, hydra_config_hash, selections, resolved_yaml]
+    label: hydra_config_hash short
+
+  # ── Airflow ───────────────────────────────────────────────────────
+  - type: dag
+    source: airflow_scanner           # existing
+    fields: [dag_id, fileloc, schedule, is_paused, tags]
+    label: dag_id
+  - type: dag_task
+    source: airflow_scanner
+    fields: [dag_id, task_id, operator, upstream]
+    label: task_id
+  - type: dag_run
+    source: airflow_scanner
+    fields: [dag_id, dag_run_id, state, start_date, end_date, run_type]
+    label: dag_run_id
+  - type: task_instance
+    source: airflow_scanner
+    fields: [dag_id, dag_run_id, task_id, state, try_number, start_date, end_date]
+    label: task_id at dag_run_id
+  - type: airflow_connection
+    source: airflow_scanner
+    fields: [conn_id, conn_type, host]
+    label: conn_id
+  - type: airflow_variable
+    source: airflow_scanner
+    fields: [key]
+    label: key
+
+  # ── Evidently (monitoring) ────────────────────────────────────────
+  - type: evidently_project
+    source: evidently_scanner         # new (minor — router already exists)
+    fields: [id, name]
+    label: name
+  - type: drift_report
+    source: evidently_scanner
+    fields: [project_id, report_id, timestamp, drift_detected, features_drifted]
+    label: report_id
+  - type: data_quality_report
+    source: evidently_scanner
+    fields: [project_id, report_id, timestamp, issues]
+    label: report_id
+  - type: monitoring_run
+    source: evidently_scanner
+    fields: [project_id, run_id, timestamp, status]
+    label: run_id
+
+  # ── MinIO / Object Storage ────────────────────────────────────────
+  - type: bucket
+    source: minio_scanner             # new
+    fields: [name, region, creation_date]
+    label: name
+  - type: object
+    source: minio_scanner
+    fields: [bucket, key, size, etag, last_modified]
+    label: key
+  - type: bucket_version
+    source: minio_scanner
+    fields: [bucket, key, version_id, size, last_modified]
+    label: version_id short
+
+  # ── Serving ───────────────────────────────────────────────────────
+  - type: serving_endpoint
+    source: serving_scanner           # new
+    fields: [endpoint_url, framework, status]
+    label: endpoint_url
+  - type: deployed_model
+    source: serving_scanner
+    fields: [model_name, version, alias, framework, loaded_at, input_shape, output_shape]
+    label: model_name + version
+
+  # ── Environments / Runtimes ──────────────────────────────────────
+  - type: python_venv
+    source: environments_scanner      # new
+    fields: [name, python_version, path, project_ids]
+    label: name
+  - type: r_env
+    source: environments_scanner
+    fields: [name, r_version, path, project_ids]
+    label: name
+  - type: nodejs_env
+    source: environments_scanner
+    fields: [name, node_version, path]
+    label: name
+  - type: kernel
+    source: environments_scanner
+    fields: [language, runtime_name, display_name]
+    label: display_name
+  - type: package
+    source: environments_scanner
+    fields: [name, version, manager, env_name]    # manager: pip|conda|renv|pnpm
+    label: name + version
+
+  # ── Git ───────────────────────────────────────────────────────────
+  - type: git_repo
+    source: git_scanner               # new
+    fields: [repo_path, root_type, root_name]
+    label: root_name
+  - type: git_branch
+    source: git_scanner
+    fields: [repo_path, name, current, remote_tracking]
+    label: name
+  - type: git_commit
+    source: git_scanner
+    fields: [repo_path, sha, author, date, message, parent_shas]
+    label: sha short
+  - type: git_tag
+    source: git_scanner
+    fields: [repo_path, name, sha, annotated]
+    label: name
+  - type: git_remote
+    source: git_scanner
+    fields: [repo_path, name, url]
+    label: name
+
+  # ── Knowledge Base (docs browsable in Explorer) ──────────────────
+  - type: kb_document
+    source: documents_scanner         # new (router exists, scanner new)
+    fields: [name, category, path, doc_type]       # doc_type: architecture|dev-manual|user-manual|vision|...
+    label: name
+  - type: doc_category
+    source: documents_scanner
+    fields: [name, document_count]
+    label: name
+
+  # ── Assistant (skills + tools + rag) ─────────────────────────────
+  - type: skill
+    source: skills_scanner            # new - per your Q7
+    fields: [name, path, priority, triggers, max_tokens]
+    label: name
+  - type: tool
+    source: tools_scanner             # new - walks the MCP tool registry
+    fields: [name, description, required_args, optional_args, category]
+    label: name
+  - type: rag_source
+    source: rag_scanner               # new - queries noted-rag sidecar
+    fields: [source_path, doc_count, last_indexed]
+    label: source_path
+
+  # ── Testing ──────────────────────────────────────────────────────
+  - type: test_scenario
+    source: test_scenarios_scanner    # new - per your Q7
+    fields: [doc_id, scenario_id, title, tags, user_request, expected_tools_called]
+    label: doc_id + scenario_id
+  - type: test_doc
+    source: test_scenarios_scanner
+    fields: [doc_id, scenario_count, path]
+    label: doc_id
+
+  # ── Notebook internals ───────────────────────────────────────────
+  - type: cell
+    source: notebook_scanner          # new
+    fields: [notebook_path, cell_index, cell_type, source_hash, has_outputs]
+    label: cell_index at notebook_path
+  - type: cell_output
+    source: notebook_scanner
+    fields: [notebook_path, cell_index, output_type, mime_type]
+    label: output_type
+
+  # ── GraphRAG markdown layer (the new thematic entities) ──────────
+  - type: markdown_doc
+    source: md_scanner                # new
+    fields: [path, last_modified, size, chunk_count]
+    label: path
+  - type: markdown_chunk
+    source: md_scanner
+    # TWO POPULATIONS (resolved Q C):
+    #   purpose=embedding  -> produced by noted-rag ingest.py (MAX=1000/MIN=150/TARGET=700,
+    #                         heading-aware level >=2). Goes to ChromaDB. Source of truth
+    #                         for vector retrieval. parent_embedding_chunk_id is NULL.
+    #   purpose=extraction -> produced by md_scanner (MAX=800/MIN=200/TARGET=600,
+    #                         heading-aware level >=3). Feeds Gemma entity extraction.
+    #                         parent_embedding_chunk_id points to the overlapping embedding
+    #                         chunk so the graph can hop "entity -> extraction chunk ->
+    #                         embedding chunk" for retrieval augmentation.
+    fields: [doc_path, chunk_index, text, token_count, embedding_id, purpose, parent_embedding_chunk_id]
+    label: doc_path + chunk_index
+  - type: concept
+    source: gemma_extractor           # new - Gemma-extracted
+    fields: [canonical_name, description, extraction_confidence]
+    label: canonical_name
+  - type: person
+    source: gemma_extractor
+    fields: [canonical_name, aliases, description]
+    label: canonical_name
+  - type: organization
+    source: gemma_extractor
+    fields: [canonical_name, aliases, description]
+    label: canonical_name
+  - type: term
+    source: gemma_extractor
+    fields: [canonical_name, aliases, definition, domain]   # domain: ml|mlops|infra|noted|...
+    label: canonical_name
+  - type: community
+    source: leiden_clusterer          # new - from graphrag lib
+    fields: [community_id, level, member_count, dominant_entity_types]
+    label: community_id
+  - type: community_summary
+    source: gemma_summarizer          # new
+    fields: [community_id, text, generated_at, token_count]
+    label: community_id
+
+relationships:
+
+  # Containment / structure
+  - type: contains
+    from: [project, mount, directory]
+    to: [file, notebook, directory, data_file]
+  - type: belongs_to
+    from: [run, dag_run]
+    to: [experiment, dag]
+  - type: has_task
+    from: [dag]
+    to: [dag_task]
+  - type: depends_on
+    from: [dag_task]
+    to: [dag_task]
+  - type: has_version
+    from: [data_file, registered_model]
+    to: [data_version, model_version]
+
+  # Versioning
+  - type: version_of
+    from: [model_version, data_version]
+    to: [registered_model, data_file]
+  - type: snapshot_of
+    from: [snapshot]
+    to: [run]
+  - type: forked_from
+    from: [run, snapshot]
+    to: [snapshot]
+  - type: promoted_to
+    from: [model_version]
+    to: [alias]                       # alias modeled as property on version; or as own node if preferred
+  - type: is_derived_from
+    # Proposed by Gemma 2026-04-23. DIFFERENT from version_of (structural v2).
+    # Captures TRANSFORMATIONAL lineage: train.csv is_derived_from raw.csv.
+    # Crucial for reproducibility when the derivation is in code/DAGs.
+    from: [data_version, data_file, markdown_doc]
+    to: [data_version, data_file, markdown_doc]
+  - type: is_governed_by
+    # Proposed by Gemma 2026-04-23. Links data/model to its schema or policy.
+    # Supports "which model_versions violate schema X?" and governance queries.
+    from: [data_file, data_version, model_version]
+    to: [data_schema, kb_document]
+
+  # Production / output
+  - type: produces
+    from: [run, dag_run]
+    to: [logged_model, model_version, artifact]
+  - type: logs_to
+    from: [run]
+    to: [experiment]
+  - type: measures
+    # Proposed by Gemma 2026-04-23. Pair for the metric entity.
+    from: [run]
+    to: [metric]
+
+  # Usage / consumption
+  - type: uses_data
+    from: [run, dag_run]
+    to: [data_version, data_file]
+  - type: uses_config
+    from: [run]
+    to: [composed_config]
+  - type: uses_kernel
+    from: [notebook]
+    to: [kernel]
+  - type: uses_venv
+    from: [notebook, project]
+    to: [python_venv, r_env, nodejs_env]
+  - type: uses_package
+    from: [python_venv, r_env, nodejs_env]
+    to: [package]
+
+  # Execution
+  - type: executed_as
+    from: [dag_run]
+    to: [task_instance]
+  - type: triggered_by
+    from: [dag_run]
+    to: [airflow_variable, airflow_connection]
+
+  # Deployment
+  - type: deployed_as
+    from: [model_version]
+    to: [deployed_model]
+  - type: served_by
+    from: [deployed_model]
+    to: [serving_endpoint]
+
+  # Composition (Hydra)
+  - type: composed_from
+    from: [composed_config]
+    to: [config, config_group, config_option]
+  - type: selects
+    from: [config]
+    to: [config_group, config_option]
+
+  # Storage
+  - type: stored_in
+    from: [artifact, object]
+    to: [bucket]
+
+  # Git linkage
+  - type: committed_in
+    from: [git_commit]
+    to: [git_branch]
+  - type: tagged_as
+    from: [git_tag]
+    to: [git_commit]
+  - type: references_commit
+    from: [run, snapshot]
+    to: [git_commit]
+  - type: has_remote
+    from: [git_repo]
+    to: [git_remote]
+
+  # Monitoring
+  - type: monitors
+    from: [evidently_project]
+    to: [data_version, deployed_model]
+  - type: produces_report
+    from: [monitoring_run]
+    to: [drift_report, data_quality_report]
+
+  # Notebook internals
+  - type: has_cell
+    from: [notebook]
+    to: [cell]
+  - type: has_output
+    from: [cell]
+    to: [cell_output]
+
+  # GraphRAG (markdown + thematic)
+  - type: chunked_into
+    from: [markdown_doc]
+    to: [markdown_chunk]
+  - type: mentions
+    from: [markdown_chunk, cell]
+    to: [concept, person, organization, term, run, model_version, dag, data_file]
+  - type: documents
+    from: [markdown_doc, kb_document]
+    to: [concept, term, project, dag, run, model_version]
+  - type: defines
+    from: [markdown_chunk]
+    to: [term, concept]
+  - type: similar_to
+    from: [markdown_chunk, concept, term]
+    to: [markdown_chunk, concept, term]
+  - type: synonymous_with
+    # TEXT-ASSERTED synonymy. Extracted by Gemma from definitional markdown
+    # ("A, also known as B"). Deterministic, no confidence band.
+    from: [term, concept, person, organization]
+    to: [term, concept, person, organization]
+  - type: sameAs
+    # EMBEDDING-COMPUTED equivalence. Non-destructive: both nodes stay in the
+    # graph with their own provenance. Preconditions:
+    #   1. Same entity type.
+    #   2. Normalize (lowercase, trim, collapse whitespace). If equal after
+    #      normalization -> emit confidence=1.0, skip embedding.
+    #   3. Short names (<2 tokens, no description) bump threshold +0.05.
+    # Cosine bands on bge-m3(name + description):
+    #   >= 0.90           -> confidence=high   (always expand in traversal)
+    #   0.80-0.90         -> confidence=medium (expand in 'broad' mode only)
+    #   0.70-0.80         -> confidence=low    (candidate; visible, never expand)
+    #   < 0.70            -> no edge
+    # Low-confidence edges are the review queue — queryable via Cypher.
+    from: [term, concept, person, organization]
+    to: [term, concept, person, organization]
+    edge_properties: [confidence, cosine, extracted_at, source_chunks]
+
+  # Aggregation (communities)
+  - type: member_of
+    from: [concept, person, organization, term, run, model_version, dag, data_file, markdown_chunk]
+    to: [community]
+  - type: summarizes
+    from: [community_summary]
+    to: [community]
+
+  # Skill / tool / test cross-links
+  - type: invokes
+    from: [skill]
+    to: [tool]
+  - type: tests
+    from: [test_scenario]
+    to: [tool]
+  - type: referenced_by
+    from: [tool, skill]
+    to: [kb_document, markdown_doc]
+
+  # RAG layer
+  - type: embedded_in
+    from: [markdown_chunk, doc_chunk]
+    to: [rag_source]
+
+# NOTE ON STORAGE
+# ArcadeDB (Phase 1) stores every entity + relationship above. Embeddings
+# (markdown_chunk.embedding_id, rag_chunk vectors) live in ChromaDB — the
+# graph stores only a foreign-key reference to the ChromaDB chunk id.
+# Phase 2 decision: whether to migrate embeddings into ArcadeDB's vector index.
+
+# NOTE ON BUILD-TIME PROPERTIES
+# The graph builder attaches two properties to every node after scanning:
+#   community_id  (int)    - Leiden cluster membership. NULL for nodes that
+#                            weren't part of the last Leiden run (e.g. new
+#                            auto-update entities awaiting the next full
+#                            rebuild use their dominant neighbor's community).
+#   rank          (float)  - PageRank score over the full graph. Recomputed
+#                            only on full rebuilds; stale between auto-updates.
+# These aren't listed per-entity above to avoid duplication.

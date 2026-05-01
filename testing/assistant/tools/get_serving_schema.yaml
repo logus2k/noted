@@ -1,0 +1,184 @@
+# Machine-readable scenarios for the `get_serving_schema` tool test doc.
+
+doc_id: get_serving_schema
+doc_type: tool
+
+# Scenarios covered: S1, S2, S3, S4, S5, S6, S7, S8 (8 of 10).
+# DEFERRED: S9 (dataframe-format model - needs additional fixture), S10 (signature-less model).
+
+scenarios:
+  - scenario_id: S1
+    title: "Basic schema fetch"
+    tags: [read, mlflow, serving]
+    setup:
+      project: noted-testing
+      prerequisites:
+        - fixture: unload_model
+        - fixture: deploy_model
+          args:
+            model_name: "Sandbox Forecaster"
+            alias: champion
+    user_request: "what input does the deployed model expect?"
+    expected_tools_called:
+      - name: get_serving_schema
+        exact_count: 1
+    expected_tools_NOT_called:
+      - invoke_model
+      - get_serving_status
+    expected_answer_focus: |
+      - report input_format (tensor) and shape ([1, 120, 16])
+      - report dtype (float32)
+      - do NOT call invoke_model unless asked to test
+
+  - scenario_id: S2
+    title: "Pre-flight before invoke_model"
+    tags: [read, mlflow, serving, workflow]
+    setup:
+      project: noted-testing
+      prerequisites:
+        - fixture: unload_model
+        - fixture: deploy_model
+          args:
+            model_name: "Sandbox Forecaster"
+            alias: champion
+    user_request: "I want to send a real request - what shape do I need?"
+    expected_tools_called:
+      - name: get_serving_schema
+        exact_count: 1
+    expected_tools_NOT_called:
+      - invoke_model
+    expected_answer_focus: |
+      - describe required shape and dtype
+      - do NOT execute invoke_model on user's behalf - the user is asking for shape info to construct their own request
+
+  - scenario_id: S3
+    title: "Output shape question"
+    tags: [read, mlflow, serving]
+    setup:
+      project: noted-testing
+      prerequisites:
+        - fixture: unload_model
+        - fixture: deploy_model
+          args:
+            model_name: "Sandbox Forecaster"
+            alias: champion
+    user_request: "what does the model output look like?"
+    expected_tools_called:
+      - name: get_serving_schema
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - report the outputs section as it appears in the get_serving_schema result (whatever shape/name the deployed model actually returns, not an assumed forecast horizon)
+      - do NOT call invoke_model just to show the output
+      - do NOT pitch invoke_model in text either - the user asked about the output, not about running a prediction
+
+  - scenario_id: S4
+    title: "Schema when nothing deployed"
+    tags: [read, mlflow, serving, error]
+    setup:
+      project: noted-testing
+      prerequisites:
+        - fixture: unload_model
+    user_request: "what's the schema of the deployed model?"
+    expected_tools_called:
+      - name: get_serving_schema
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - tool returns error (no model loaded)
+      - report that nothing is deployed; suggest deploying first
+      - do NOT fabricate a schema
+
+  - scenario_id: S5
+    title: "Multi-turn: schema then test"
+    tags: [read, mlflow, serving, workflow]
+    setup:
+      project: noted-testing
+      prerequisites:
+        - fixture: unload_model
+        - fixture: deploy_model
+          args:
+            model_name: "Sandbox Forecaster"
+            alias: champion
+    turns:
+      - user_request: "what shape does the model expect?"
+        expected_tools_called:
+          - name: get_serving_schema
+            exact_count: 1
+        expected_tools_NOT_called:
+          - invoke_model
+        expected_answer_focus: "report shape [1, 120, 16]"
+      - user_request: "now test it"
+        expected_tools_called:
+          - name: invoke_model
+            exact_count: 1
+        expected_tools_NOT_called: []
+        expected_answer_focus: |
+          - call invoke_model({}) for smoke test (backend builds payload from schema)
+          - report prediction from tool result
+
+  - scenario_id: S6
+    title: "Framework lookup"
+    tags: [read, mlflow, serving]
+    setup:
+      project: noted-testing
+      prerequisites:
+        - fixture: unload_model
+        - fixture: deploy_model
+          args:
+            model_name: "Sandbox Forecaster"
+            alias: champion
+    user_request: "which framework is the deployed model in?"
+    expected_tools_called:
+      - name: get_serving_status
+        exact_count: 1
+    expected_tools_NOT_called:
+      - get_serving_schema
+    expected_answer_focus: |
+      - get_serving_status returns framework directly; no need to call get_serving_schema for this
+      - report framework value (python_function)
+      - acceptable variant: get_serving_schema also returns framework, so calling that instead is OK
+
+  - scenario_id: S7
+    title: "Wrong tool guard - external API question"
+    tags: [read, mlflow, serving, documentation]
+    setup:
+      project: noted-testing
+      prerequisites:
+        - fixture: unload_model
+        - fixture: deploy_model
+          args:
+            model_name: "Sandbox Forecaster"
+            alias: champion
+    user_request: "what does the /api/serving/predict endpoint expect in the JSON body?"
+    expected_tools_called:
+      - name: get_serving_schema
+        exact_count: 1
+    expected_tools_NOT_called:
+      - invoke_model
+    expected_answer_focus: |
+      - call get_serving_schema to ground the answer in the actual deployed model's shape
+      - explain the JSON body shape (e.g. {"inputs": [[...]]} for tensor)
+      - do NOT call invoke_model - the user asked HOW, not to run one
+
+  - scenario_id: S8
+    title: "Schema for diagnostics"
+    tags: [read, mlflow, serving, diagnostic]
+    setup:
+      project: noted-testing
+      prerequisites:
+        - fixture: unload_model
+        - fixture: deploy_model
+          args:
+            model_name: "Sandbox Forecaster"
+            alias: champion
+    user_request: "I'm getting a shape error from /predict - what does the model want?"
+    expected_tools_called:
+      - name: get_serving_schema
+        exact_count: 1
+    expected_tools_NOT_called:
+      - invoke_model
+    expected_answer_focus: |
+      - report the expected shape and dtype
+      - explain the user must reshape their input to match
+      - do NOT auto-test by calling invoke_model

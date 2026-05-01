@@ -1,0 +1,84 @@
+# Machine-readable scenarios for the `airflow-task-debugging` skill test doc.
+
+doc_id: airflow-task-debugging
+doc_type: skill
+
+# Scenarios covered: S1, S2, S3, S4, S5 (5 of 7).
+# DEFERRED: S6 (worker-level debugging), S7 (scheduler issues).
+
+scenarios:
+  - scenario_id: S1
+    title: "Check run outcome and identify failed task if any"
+    tags: [skill, airflow, debugging]
+    setup:
+      project: noted-testing
+    user_request: "did jena_training_pipeline's last run fail? if so, which task?"
+    expected_tools_called:
+      - name: get_dag_status
+        exact_count: 1
+        args_match:
+          dag_id: "jena_training_pipeline"
+    expected_tools_NOT_called:
+      - get_task_log
+    expected_answer_focus: |
+      - report the actual outcome of the latest run from get_dag_status
+      - if it was a failure, identify the failed task and offer get_task_log
+      - if it succeeded, say so plainly - do NOT invent a failure
+      - offer to check older runs or a specific dag_run_id if the user wants more history
+
+  - scenario_id: S2
+    title: "Drill into task log"
+    tags: [skill, airflow, debugging]
+    setup:
+      project: noted-testing
+    user_request: "show me the train_model_task log for the latest run of jena_training_pipeline"
+    expected_tools_called:
+      - name: get_dag_status
+      - name: get_task_log
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - discover the latest dag_run_id via get_dag_status
+      - then call get_task_log for train_model_task with that dag_run_id
+      - report errors / traceback verbatim; if large, summarize with quote of key lines
+
+  - scenario_id: S3
+    title: "Retry strategy"
+    tags: [skill, airflow, debugging]
+    setup:
+      project: noted-testing
+    user_request: "should I add retries to this task?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - retries help with transient failures (network, quota)
+      - do NOT retry on logic errors (bad code, bad data)
+      - suggest retries=2 with retry_delay=timedelta(minutes=5) as a starting point
+
+  - scenario_id: S4
+    title: "Task stuck running"
+    tags: [skill, airflow, debugging]
+    setup:
+      project: noted-testing
+    user_request: "a task in my_training_pipeline has been running for 3 hours - is it stuck?"
+    expected_tools_called:
+      - name: get_dag_status
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - report the DAG's authoritative state from get_dag_status - do NOT contradict it
+      - if actually running, suggest get_task_log to check progress
+      - suggest adding execution_timeout=timedelta(hours=N) on the task to cap future hangs
+      - if the DAG is paused or the run already finished, surface that truthfully
+
+  - scenario_id: S5
+    title: "Worker OOM (silent crash)"
+    tags: [skill, airflow, debugging]
+    setup:
+      project: noted-testing
+    user_request: "my training task crashes with no error in the log"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - silent crash with no Python traceback = worker OOM / SIGKILL from the runtime
+      - suggest reducing batch size, increasing worker memory, or scheduling on a GPU worker
+      - check worker resource quotas / container memory limits

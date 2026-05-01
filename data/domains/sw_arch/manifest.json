@@ -1,0 +1,56 @@
+{
+  "domain_id": "sw_arch",
+  "name": "Software Agents",
+  "description": "Software Agents Architecture and Best Practices",
+  "created_at": "2026-04-28T00:38:33.834626+00:00",
+  "embeddings_model": "bge-m3",
+  "pinned": false,
+  "included_files": [
+    {
+      "path": "2512.08769v1.pdf",
+      "mode": "read_store",
+      "added_at": "2026-04-28T00:47:41.190888+00:00",
+      "category": "Software Agents",
+      "display_name": "Practical Guide for Designing Agentic AI"
+    },
+    {
+      "path": "agentic_design_patterns.pdf",
+      "mode": "read_store",
+      "added_at": "2026-04-28T00:54:23.631253+00:00",
+      "category": "Software Agents",
+      "display_name": "Agentic Design Patterns"
+    },
+    {
+      "path": "agentic_design_pattern_catalogue.pdf",
+      "mode": "read_store",
+      "added_at": "2026-04-28T02:31:01.589086+00:00",
+      "category": "Software Agents",
+      "display_name": ""
+    },
+    {
+      "path": "ai-agents-playbook-en.pdf",
+      "mode": "read_store",
+      "added_at": "2026-04-28T02:31:02.494230+00:00",
+      "category": "Software Agents",
+      "display_name": ""
+    },
+    {
+      "path": "2026 Agentic Coding Trends Report.pdf",
+      "mode": "read_store",
+      "added_at": "2026-04-28T02:31:02.670084+00:00",
+      "category": "Software Agents",
+      "display_name": ""
+    },
+    {
+      "path": "The 2026 State of AI Agents Report.pdf",
+      "mode": "read_store",
+      "added_at": "2026-04-28T02:31:02.995201+00:00",
+      "category": "Software Agents",
+      "display_name": ""
+    }
+  ],
+  "arcadedb_database": "sw_arch",
+  "corpus_collection": "sw_arch__corpus",
+  "entity_cache_collection": "sw_arch__gr_entities",
+  "summary_cache_collection": "sw_arch__gr_summaries"
+}

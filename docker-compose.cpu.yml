@@ -1,0 +1,16 @@
+services:
+  notebook:
+    image: logus2k/noted
+    container_name: noted
+    build: .
+    pull_policy: never
+    ports:
+      - "8123:8123"
+    volumes:
+      - ./data:/app/data
+      - noted_renv_cache:/root/.cache/R/renv
+    restart: unless-stopped
+
+volumes:
+  noted_renv_cache:
+    driver: local

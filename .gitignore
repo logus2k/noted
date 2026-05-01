@@ -1,0 +1,38 @@
+.venv_noted/
+__pycache__/
+data/git-credentials.json
+
+data/environments/
+data/.pnpm-store/
+data/.renv-cache/
+services/airflow/logs/
+services/airflow/dags/
+services/airflow/config/
+services/airflow/data/
+services/.env
+
+data/docker-compose.mounts.yml
+
+data/runtimes/**
+data/docker-compose.mounts.yml
+
+data/NOTED.md
+services/airflow/data
+
+data/models/
+
+data/testing/reports/
+
+# Debug instrumentation + per-run probe artifacts. The .py probe scripts
+# in data/probes/ and data/experiments/ stay tracked, along with the
+# .md reports under data/experiments/. JSON outputs from individual runs
+# don't.
+data/rerank_dumps/
+data/probes/*.json
+data/experiments/**/*.json
+
+# Vector store + graph DB state. Regenerated locally from re-ingestion;
+# the live files are too large for GitHub (chroma.sqlite3 routinely
+# crosses the 100 MB hard limit) and have no business in version control.
+data/vectordb/
+data/arcadedb/

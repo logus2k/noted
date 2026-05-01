@@ -1,0 +1,67 @@
+{
+  "sources": [
+    {
+      "source_path": "documents/architecture/noted_technical_architecture.md",
+      "tags": [
+        "architecture"
+      ],
+      "added_utc": "2026-04-22T08:43:24.494687+00:00"
+    },
+    {
+      "source_path": "documents/developer/noted_platform_developer_manual.md",
+      "tags": [
+        "developer-manual"
+      ],
+      "added_utc": "2026-04-22T08:43:24.494697+00:00"
+    },
+    {
+      "source_path": "documents/developer/noted_project_notebook_companion.md",
+      "tags": [
+        "developer-manual"
+      ],
+      "added_utc": "2026-04-22T08:43:24.494699+00:00"
+    },
+    {
+      "source_path": "documents/noted_architecture_principles.md",
+      "tags": [
+        "principles"
+      ],
+      "added_utc": "2026-04-22T08:43:24.494700+00:00"
+    },
+    {
+      "source_path": "documents/noted_vision.md",
+      "tags": [
+        "vision"
+      ],
+      "added_utc": "2026-04-22T08:43:24.494702+00:00"
+    },
+    {
+      "source_path": "data/documents/files/noted_platform_user_manual.md",
+      "tags": [
+        "user-manual"
+      ],
+      "added_utc": "2026-04-22T08:43:24.494703+00:00"
+    },
+    {
+      "source_path": "README.md",
+      "tags": [
+        "readme"
+      ],
+      "added_utc": "2026-04-22T08:43:24.494705+00:00"
+    },
+    {
+      "source_path": "NOTED_SETUP.md",
+      "tags": [
+        "setup-guide"
+      ],
+      "added_utc": "2026-04-22T08:43:24.494706+00:00"
+    },
+    {
+      "source_path": "jena_weather_report/FINAL/noted_platform_final_delivery_project_report.md",
+      "tags": [
+        "project-report"
+      ],
+      "added_utc": "2026-04-22T08:43:24.494708+00:00"
+    }
+  ]
+}

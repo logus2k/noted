@@ -1,0 +1,90 @@
+# Machine-readable scenarios for the `noted-auto-instrumentation` skill test doc.
+
+doc_id: noted-auto-instrumentation
+doc_type: skill
+
+# Scenarios covered: S1, S2, S3, S4, S5, S6 (6 of 8).
+# DEFERRED: S7 (framework autologging detail), S8 (tag-based run filtering).
+
+scenarios:
+  - scenario_id: S1
+    title: "Answer 'how do experiments get tracked?'"
+    tags: [skill, mlflow, instrumentation]
+    setup:
+      project: noted-testing
+    user_request: "how do MLflow runs get created in this notebook?"
+    expected_tools_called: []
+    expected_tools_NOT_called:
+      - get_file_contents
+      - get_notebook_cells
+    expected_answer_focus: |
+      - answer: via the Run Manager, not manual code
+      - Run Manager wraps selected cells in a single run with auto start/end
+      - users do NOT write mlflow.start_run()
+      - individual cell execution has no MLflow overhead
+
+  - scenario_id: S2
+    title: "Reject 'add mlflow.start_run' advice"
+    tags: [skill, mlflow, instrumentation, antipattern]
+    setup:
+      project: noted-testing
+    user_request: "should I add mlflow.start_run() at the top of cell 3?"
+    expected_tools_called: []
+    expected_tools_NOT_called:
+      - update_cell
+    expected_answer_focus: |
+      - NO - noted auto-instruments via Run Manager
+      - manual mlflow.start_run would create a nested/competing run
+      - explain the Run Manager flow as the right alternative
+
+  - scenario_id: S3
+    title: "Explain free execution vs tracked runs"
+    tags: [skill, mlflow, instrumentation]
+    setup:
+      project: noted-testing
+    user_request: "if I just run cells manually, does MLflow record anything?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - NO - manual cell execution has no MLflow overhead
+      - only Run Manager execution creates tracked runs
+      - this separates exploration from experimentation
+
+  - scenario_id: S4
+    title: "Hydra config linkage"
+    tags: [skill, mlflow, instrumentation, hydra]
+    setup:
+      project: noted-testing
+    user_request: "how does a run know which Hydra config was used?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - explain hydra_config_hash param logged on each run
+      - links run to the exact composed Hydra config used
+      - mention the per-run Hydra bundle logged as an artifact
+
+  - scenario_id: S5
+    title: "DVC dataset tagging"
+    tags: [skill, mlflow, instrumentation, dvc]
+    setup:
+      project: noted-testing
+    user_request: "does MLflow record the dataset version a run used?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - YES - DVC dataset hashes are logged when datasets are selected in Run Manager
+      - enables reproducibility: same dataset hash means same data
+
+  - scenario_id: S6
+    title: "Don't suggest tracking code for a question about runs"
+    tags: [skill, mlflow, instrumentation, antipattern]
+    setup:
+      project: noted-testing
+    user_request: "are there experiments tracked for this notebook?"
+    expected_tools_called: []
+    expected_tools_NOT_called:
+      - get_experiment_runs
+    expected_answer_focus: |
+      - check the WORKSPACE CONTEXT's MLFLOW EXPERIMENT block first - if runs are listed, they belong to this project
+      - if none visible, mention the Run Manager as the way to start tracking
+      - do NOT suggest adding mlflow.start_run boilerplate

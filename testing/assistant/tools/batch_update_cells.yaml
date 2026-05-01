@@ -1,0 +1,128 @@
+# Machine-readable scenarios for the `batch_update_cells` tool test doc.
+
+doc_id: batch_update_cells
+doc_type: tool
+
+# Scenarios covered: S1, S2, S3, S4, S5 (5 of 7).
+# DEFERRED: S6 (mixed insert + update + delete in one batch), S7 (large-batch atomic semantics).
+
+scenarios:
+  - scenario_id: S1
+    title: "Multi-cell rename"
+    tags: [write, notebook, rename]
+    setup:
+      project: noted-testing
+      notebook: training_sandbox.ipynb
+    user_request: "rename variable 'X' to 'features' in cells 5, 7, and 12"
+    expected_tools_called:
+      - name: find_replace_in_cells
+        exact_count: 1
+        args_match:
+          pattern: "X"
+          replacement: "features"
+    expected_tools_NOT_called:
+      - update_cell
+      - batch_update_cells
+    expected_answer_focus: |
+      - confirm what was changed and in which cells
+      - be honest about cells where the rename was not applicable (e.g. markdown cells that did not contain X)
+
+  - scenario_id: S2
+    title: "Insert + update in one turn"
+    tags: [write, notebook, batch, mixed]
+    # Separate-calls framing per rule (iii) - canonical per noted's
+    # skill/schema guidance for mixed insert+update. Multi-tool-call
+    # emission supported per Gemma 4's design; UI safety provided by
+    # parser truncation in _prepare_text_for_frontend.
+    setup:
+      project: noted-testing
+      notebook: training_sandbox.ipynb
+    user_request: "add a code cell after cell 12 with content `print('evaluation done')` and update cell 12 to `print(X)`"
+    expected_tools_called:
+      - name: insert_cell
+        exact_count: 1
+        args_match:
+          after_cell_index: 12
+      - name: update_cell
+        exact_count: 1
+        args_match:
+          cell_index: 12
+    expected_tools_NOT_called:
+      - batch_update_cells
+      - find_replace_in_cells
+    expected_answer_focus: |
+      - one insert_cell + one update_cell emitted in the same response
+      - backend collects them into ONE approval
+      - cell 12 rewritten to print(X); new code cell inserted right after with print('evaluation done')
+      - no unrelated cells touched
+
+  - scenario_id: S3
+    title: "Don't batch single change"
+    tags: [write, notebook, scope]
+    setup:
+      project: noted-testing
+      notebook: training_sandbox.ipynb
+    user_request: "add a comment above the print in cell 7 that says 'debug output'"
+    expected_tools_called:
+      - name: update_cell
+        exact_count: 1
+        args_match:
+          cell_index: 7
+    expected_tools_NOT_called:
+      - batch_update_cells
+      - find_replace_in_cells
+    expected_answer_focus: |
+      - single-cell local edit = update_cell, not batch
+      - batch_update_cells is reserved for >=2 cell changes
+      - find_replace_in_cells is for uniform substitutions, not free-form additions
+
+  - scenario_id: S4
+    title: "Refactor across many cells"
+    tags: [write, notebook, batch]
+    setup:
+      project: noted-testing
+      notebook: training_sandbox.ipynb
+    user_request: "convert all data loading cells to use a Dataset class"
+    expected_tools_called:
+      - name: batch_update_cells
+        exact_count: 1
+    expected_tools_NOT_called:
+      - update_cell
+    expected_answer_focus: |
+      - identify the affected cells (may need get_notebook_cells first)
+      - bundle all changes into one batch
+      - each update has COMPLETE cell content (not diffs)
+
+  - scenario_id: S5
+    title: "Discover then batch-edit"
+    tags: [write, notebook, batch, workflow]
+    setup:
+      project: noted-testing
+      notebook: training_sandbox.ipynb
+    turns:
+      - user_request: "find all cells that import tensorflow"
+        # The notebook's cell contents are already inlined in WORKSPACE CONTEXT,
+        # so the Assistant may answer directly from that without a tool call.
+        # If it chooses to call search_files that is also fine.
+        expected_tools_called: []
+        expected_tools_NOT_called:
+          - batch_update_cells
+          - update_cell
+          - find_replace_in_cells
+        expected_answer_focus: |
+          - identify the cells that contain `import tensorflow` (cells 16 and 17 in the fixture)
+          - do not touch anything yet - discovery only
+      - user_request: "add 'as tf' alias to all of them"
+        expected_tools_called:
+          - name: find_replace_in_cells
+            exact_count: 1
+            args_match:
+              pattern: "import tensorflow"
+              replacement: "import tensorflow as tf"
+        expected_tools_NOT_called:
+          - batch_update_cells
+          - update_cell
+        expected_answer_focus: |
+          - use find_replace_in_cells with pattern 'import tensorflow' and replacement 'import tensorflow as tf'
+          - this is an alias-ADD, NOT a rename: the `tensorflow` name stays in the code, we just append `as tf` after the import line
+          - cell_indices targets cells 16 and 17

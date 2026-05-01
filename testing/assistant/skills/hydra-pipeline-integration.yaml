@@ -1,0 +1,47 @@
+# Machine-readable scenarios for the `hydra-pipeline-integration` skill test doc.
+
+doc_id: hydra-pipeline-integration
+doc_type: skill
+
+# Scenarios covered: S1, S2, S3 (3 of 5).
+# DEFERRED: S4 (multi-project config sharing), S5 (versioned config rollback).
+
+scenarios:
+  - scenario_id: S1
+    title: "DAG reads Hydra"
+    tags: [skill, hydra, airflow]
+    setup:
+      project: noted-testing
+    user_request: "how does my Airflow DAG pick up the Hydra config?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - DAG has a compose task that reads config/config.yaml + group files + applies param overrides
+      - resulting cfg passed through tasks
+      - matches noted's HydraManager composition
+
+  - scenario_id: S2
+    title: "Overrides via DAG params"
+    tags: [skill, hydra, airflow]
+    setup:
+      project: noted-testing
+    user_request: "how do I override learning_rate when triggering my DAG?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - trigger with conf {"training.learning_rate": "1e-4"}
+      - DAG's compose task applies the override
+      - run carries the override in its Hydra bundle
+
+  - scenario_id: S3
+    title: "Bundle logging in DAG"
+    tags: [skill, hydra, airflow]
+    setup:
+      project: noted-testing
+    user_request: "does my DAG log the resolved config to the run?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - yes - a dedicated task (e.g. log_hydra_lineage) logs the bundle after training
+      - accessible under hydra/ artifact path on the run
+      - matches Run Manager-produced runs

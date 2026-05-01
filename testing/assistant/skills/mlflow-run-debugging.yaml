@@ -1,0 +1,80 @@
+# Machine-readable scenarios for the `mlflow-run-debugging` skill test doc.
+
+doc_id: mlflow-run-debugging
+doc_type: skill
+
+# Scenarios covered: S1, S2, S3, S4, S5 (5 of 7).
+# DEFERRED: S6 (OOM detection), S7 (GPU-specific debugging).
+
+scenarios:
+  - scenario_id: S1
+    title: "Find failed run"
+    tags: [skill, mlflow, debugging]
+    setup:
+      project: noted-testing
+    user_request: "did any run fail?"
+    expected_tools_called:
+      - name: get_experiment_runs
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - scan for status=FAILED
+      - if any, offer to fetch logs / task logs for Airflow-originated runs
+
+  - scenario_id: S2
+    title: "Inspect a specific run's details"
+    tags: [skill, mlflow, debugging]
+    setup:
+      project: noted-testing
+    user_request: "show me the details of run 03b00e2b8fa041cabddc577446744866"
+    expected_tools_called:
+      - name: get_run_details
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - one get_run_details call with the supplied run_id
+      - report status, params, metrics, tags, and artifact summary verbatim
+      - if status is FAILED or an error tag is present, highlight it and offer task-log follow-up
+
+  - scenario_id: S3
+    title: "Debugging metrics drop"
+    tags: [skill, mlflow, debugging]
+    setup:
+      project: noted-testing
+    user_request: "compare runs 03b00e2b8fa041cabddc577446744866 and 94295f53427c4e4697b27f089eb32328 - why does one have worse val_mae?"
+    expected_tools_called:
+      - name: compare_runs
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - one compare_runs call with both run_ids
+      - look for param / tag / data hash differences explaining the metric delta
+      - note any Hydra override or data version change visible in the comparison
+
+  - scenario_id: S4
+    title: "Inspect a specific run's status / duration"
+    tags: [skill, mlflow, debugging]
+    setup:
+      project: noted-testing
+    user_request: "how long did run 03b00e2b8fa041cabddc577446744866 take and what's its final status?"
+    expected_tools_called:
+      - name: get_run_details
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - one get_run_details call with the supplied run_id
+      - report status and duration from the tool output verbatim
+      - if status is RUNNING but duration is hours without a recent update, diagnose as kernel/worker crashed before end-of-run - suggest killing and restarting; mention the run will end up INCOMPLETE
+
+  - scenario_id: S5
+    title: "Log streaming"
+    tags: [skill, mlflow, debugging, airflow]
+    setup:
+      project: noted-testing
+    user_request: "I want to see what's happening inside a running Airflow task - how?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - point to get_task_log(dag_id, dag_run_id, task_id) as the tool
+      - mention that the task log updates live; refetch to see progress
+      - note that for long-running tasks, the last N chars of the log reveal current step / epoch

@@ -1,0 +1,11 @@
+file: data/dataset.csv
+resample_freq: 1h
+features:
+  - feature_1
+  - feature_2
+  - feature_3
+target: target_col
+split:
+  train: 0.70
+  val: 0.15
+  test: 0.15

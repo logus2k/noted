@@ -1,0 +1,47 @@
+# Machine-readable scenarios for the `evidently-data-quality` skill test doc.
+
+doc_id: evidently-data-quality
+doc_type: skill
+
+# Scenarios covered: S1, S2, S3 (3 of 5).
+# DEFERRED: S4 (custom validation rules), S5 (integration with Great Expectations).
+
+scenarios:
+  - scenario_id: S1
+    title: "What Evidently checks for quality"
+    tags: [skill, evidently, quality]
+    setup:
+      project: noted-testing
+    user_request: "what data quality checks does Evidently run?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - missing values, duplicates, out-of-range, type mismatches
+      - schema validation against reference
+      - summary stats report
+
+  - scenario_id: S2
+    title: "Failing quality gate"
+    tags: [skill, evidently, quality]
+    setup:
+      project: noted-testing
+    user_request: "my pipeline's data quality gate failed - what do I check?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - pull the Evidently report from MLflow artifacts
+      - identify which rule failed (missing / type / range)
+      - fix upstream or adjust rule threshold
+
+  - scenario_id: S3
+    title: "Quality vs drift"
+    tags: [skill, evidently, quality]
+    setup:
+      project: noted-testing
+    user_request: "what's the difference between quality and drift?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - quality = schema-level (missing, type, range)
+      - drift = distribution-level (shift in population)
+      - both monitored, different failure modes

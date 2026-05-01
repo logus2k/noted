@@ -1,0 +1,60 @@
+# Machine-readable scenarios for the `mlflow-snapshots` skill test doc.
+
+doc_id: mlflow-snapshots
+doc_type: skill
+
+# Scenarios covered: S1, S2, S3, S4 (4 of 6).
+# DEFERRED: S5 (automated snapshot retention), S6 (per-epoch checkpointing).
+
+scenarios:
+  - scenario_id: S1
+    title: "What is a snapshot"
+    tags: [skill, mlflow, snapshots]
+    setup:
+      project: noted-testing
+    user_request: "what's an MLflow snapshot?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - mid-training checkpoint logged as a Logged Model
+      - enables resuming / comparing across epochs
+      - mention that noted's autologging captures these automatically for supported frameworks
+
+  - scenario_id: S2
+    title: "Find snapshots for a run"
+    tags: [skill, mlflow, snapshots]
+    setup:
+      project: noted-testing
+    user_request: "how many intermediate checkpoints does run ad190b73dd6147158fc27f1eda9f1637 have?"
+    expected_tools_called:
+      - name: get_run_details
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - look at Logged Models count in artifact summary
+      - if >1, those are likely snapshots
+
+  - scenario_id: S3
+    title: "Register a snapshot"
+    tags: [skill, mlflow, snapshots]
+    setup:
+      project: noted-testing
+    user_request: "can I register a specific snapshot from a run?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - yes - use register_model with the appropriate artifact_path (snapshot path)
+      - explain the flow briefly
+
+  - scenario_id: S4
+    title: "Snapshot vs final model"
+    tags: [skill, mlflow, snapshots]
+    setup:
+      project: noted-testing
+    user_request: "should I deploy a snapshot or the final model?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - typically deploy the final model (best-validation checkpoint in most frameworks)
+      - snapshots are for rollback / analysis
+      - noted's auto-instrumentation marks the best-validation weights as "final" when restore_best_weights is on

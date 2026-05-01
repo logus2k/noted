@@ -1,0 +1,28 @@
+{
+  "domain_id": "eu_ai",
+  "name": "EU Artificial Intelligence",
+  "description": "European Union Artificial Intelligence",
+  "created_at": "2026-04-27T16:20:25.863192+00:00",
+  "embeddings_model": "bge-m3",
+  "pinned": false,
+  "included_files": [
+    {
+      "path": "eu_ai_act.pdf",
+      "mode": "read_store",
+      "added_at": "2026-04-27T16:21:20.044492+00:00",
+      "category": "Legal/EU",
+      "display_name": "EU AI Act - Regulation 2024/1689"
+    },
+    {
+      "path": "CELEX_32016R0679_EN_TXT.pdf",
+      "mode": "read_store",
+      "added_at": "2026-04-29T15:28:33.868561+00:00",
+      "category": "Legal/EU",
+      "display_name": "EU GDPR - Regulation 2016/679"
+    }
+  ],
+  "arcadedb_database": "eu_ai",
+  "corpus_collection": "eu_ai__corpus",
+  "entity_cache_collection": "eu_ai__gr_entities",
+  "summary_cache_collection": "eu_ai__gr_summaries"
+}

@@ -1,0 +1,75 @@
+# Machine-readable scenarios for the `python-linting` skill test doc.
+
+doc_id: python-linting
+doc_type: skill
+
+# Scenarios covered: S1, S2, S3, S4 (4 of 6).
+# DEFERRED: S5 (custom rule config), S6 (inline noqa suppression).
+
+scenarios:
+  - scenario_id: S1
+    title: "Lint tooling"
+    tags: [skill, linting]
+    setup:
+      project: noted-testing
+      file_path: sample_lint.py
+      prerequisites:
+        - fixture: reset_lint_fixture
+    user_request: "what linter does noted use for Python?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - Ruff (fast replacement for flake8 + isort + others)
+      - auto-fix via fix_lint_issues tool
+
+  - scenario_id: S2
+    title: "Common rules"
+    tags: [skill, linting]
+    setup:
+      project: noted-testing
+      file_path: sample_lint.py
+      prerequisites:
+        - fixture: reset_lint_fixture
+    user_request: "what are the most common lint errors I'll hit?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - F401 unused import
+      - F841 unused variable
+      - E501 line too long
+      - I001 import order
+
+  - scenario_id: S3
+    title: "Auto-fix"
+    tags: [skill, linting]
+    setup:
+      project: noted-testing
+      file_path: sample_lint.py
+      prerequisites:
+        - fixture: reset_lint_fixture
+    user_request: "fix all lint issues in the open file"
+    expected_tools_called:
+      - name: fix_lint_issues
+        exact_count: 1
+    expected_tools_NOT_called:
+      - update_file
+    expected_answer_focus: |
+      - use fix_lint_issues (NEVER update_file for lint)
+      - confirm platform shows the diff
+
+  - scenario_id: S4
+    title: "See current issues"
+    tags: [skill, linting]
+    setup:
+      project: noted-testing
+      file_path: sample_lint.py
+      prerequisites:
+        - fixture: reset_lint_fixture
+    user_request: "show me current lint warnings"
+    expected_tools_called:
+      - name: get_lint_diagnostics
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - use get_lint_diagnostics
+      - group by rule if many

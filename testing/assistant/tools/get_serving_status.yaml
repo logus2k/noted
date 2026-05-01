@@ -1,0 +1,237 @@
+# Machine-readable scenarios for the `get_serving_status` tool test doc.
+# Human-readable counterpart: get_serving_status.md.
+
+doc_id: get_serving_status
+doc_type: tool
+
+# Scenarios covered here: S1, S2, S8, S9, S10, S11, S12, S13, S14 (9 of 14).
+# DEFERRED: S3 (loading - timing-sensitive), S4 (error state - needs
+# pre-staged error), S5 (serving down - destructive), S6+S7 (need
+# active_run_id + fixture).
+
+scenarios:
+  - scenario_id: S1
+    title: "Ready state, deployed model"
+    tags: [read, mlflow, serving]
+    setup:
+      project: noted-testing
+      prerequisites:
+        - fixture: unload_model
+        - fixture: deploy_model
+          args:
+            model_name: "Sandbox Forecaster"
+            alias: champion
+    user_request: "is the model deployed?"
+    expected_tools_called:
+      - name: get_serving_status
+        exact_count: 1
+    expected_tools_NOT_called:
+      - list_registered_models
+      - get_run_details
+      - deploy_model
+      - list_model_versions
+    expected_answer_focus: |
+      - confirm yes, deployed
+      - report model name ("Sandbox Forecaster")
+      - report version (1)
+      - optionally mention framework + originating run_id
+      - must not DEFER the answer to the UI
+
+  - scenario_id: S2
+    title: "Idle state (nothing deployed)"
+    tags: [read, mlflow, serving]
+    setup:
+      project: noted-testing
+      prerequisites:
+        - fixture: unload_model
+    user_request: "anything running on the serving container?"
+    expected_tools_called:
+      - name: get_serving_status
+        exact_count: 1
+    expected_tools_NOT_called:
+      - deploy_model
+      - list_registered_models
+    expected_answer_focus: |
+      - report that the serving container is idle / no model is loaded
+      - suggesting deploy_model as a next step is optional
+      - must not call deploy_model proactively
+
+  - scenario_id: S8
+    title: "Natural language variation: 'show me the serving state'"
+    tags: [read, mlflow, serving]
+    setup:
+      project: noted-testing
+      prerequisites:
+        - fixture: unload_model
+        - fixture: deploy_model
+          args:
+            model_name: "Sandbox Forecaster"
+            alias: champion
+    user_request: "show me the serving state"
+    expected_tools_called:
+      - name: get_serving_status
+        exact_count: 1
+    expected_tools_NOT_called:
+      - list_registered_models
+      - list_model_versions
+    expected_answer_focus: |
+      - report the current serving status (model name + version + alias + framework)
+      - do not decline, ask the user to clarify, or reach for list_registered_models
+
+  - scenario_id: S9
+    title: "Follow-up stay-in-context (multi-turn, no re-fetch)"
+    tags: [read, mlflow, serving, workflow]
+    setup:
+      project: noted-testing
+      prerequisites:
+        - fixture: unload_model
+        - fixture: deploy_model
+          args:
+            model_name: "Sandbox Forecaster"
+            alias: champion
+    turns:
+      - user_request: "is a model deployed?"
+        expected_tools_called:
+          - name: get_serving_status
+            exact_count: 1
+        expected_tools_NOT_called:
+          - deploy_model
+        expected_answer_focus: |
+          - confirm yes, deployed
+          - quote name + version
+      - user_request: "and its framework?"
+        expected_tools_called: []
+        expected_tools_NOT_called:
+          - get_serving_status
+        expected_answer_focus: |
+          - framework quoted directly from the prior turn's tool result (no re-fetch)
+          - no new tool call; the transcript already has the answer
+
+  - scenario_id: S10
+    title: "Do not hallucinate the answer"
+    tags: [read, mlflow, serving]
+    setup:
+      project: noted-testing
+      prerequisites:
+        - fixture: unload_model
+        - fixture: deploy_model
+          args:
+            model_name: "Sandbox Forecaster"
+            version: "2"
+    user_request: "what's deployed?"
+    expected_tools_called:
+      - name: get_serving_status
+        exact_count: 1
+    expected_tools_NOT_called:
+      - list_registered_models
+    expected_answer_focus: |
+      - must quote the EXACT version from the tool result (here: v2 with @staging alias)
+      - no fabricated details (if the model says "v1" instead of "v2", FAIL on answer_check)
+
+  - scenario_id: S11
+    title: "Explicit re-fetch on request (multi-turn)"
+    tags: [read, mlflow, serving, workflow]
+    setup:
+      project: noted-testing
+      prerequisites:
+        - fixture: unload_model
+        - fixture: deploy_model
+          args:
+            model_name: "Sandbox Forecaster"
+            alias: champion
+    turns:
+      - user_request: "is the model deployed?"
+        expected_tools_called:
+          - name: get_serving_status
+            exact_count: 1
+        expected_answer_focus: "confirm deployed; quote name + version"
+      - user_request: "confirm it's still up"
+        expected_tools_called:
+          - name: get_serving_status
+            exact_count: 1
+        expected_tools_NOT_called:
+          - deploy_model
+        expected_answer_focus: |
+          - re-fetch is acceptable (and expected) when the user asks for a freshness check
+          - report same status or change if the world changed
+
+  - scenario_id: S12
+    title: "Prefer get_serving_status over list_registered_models for 'is deployed' questions"
+    tags: [read, mlflow, serving]
+    setup:
+      project: noted-testing
+      prerequisites:
+        - fixture: unload_model
+        - fixture: deploy_model
+          args:
+            model_name: "Sandbox Forecaster"
+            alias: champion
+    user_request: "is Sandbox Forecaster currently deployed?"
+    expected_tools_called:
+      - name: get_serving_status
+        exact_count: 1
+    expected_tools_NOT_called:
+      - list_registered_models
+      - list_model_versions
+    expected_answer_focus: |
+      - confirm that THIS specific model is the one loaded
+      - quote model name + version from the tool result
+
+  - scenario_id: S13
+    title: "Workflow: status -> deploy -> status"
+    tags: [read, mlflow, serving, workflow, write]
+    setup:
+      project: noted-testing
+      prerequisites:
+        - fixture: unload_model
+    turns:
+      - user_request: "what's the current serving state?"
+        expected_tools_called:
+          - name: get_serving_status
+            exact_count: 1
+        expected_tools_NOT_called:
+          - deploy_model
+        expected_answer_focus: "report idle / nothing loaded"
+      - user_request: "deploy the champion of Sandbox Forecaster"
+        expected_tools_called:
+          - name: deploy_model
+            exact_count: 1
+            args_match:
+              model_name: "Sandbox Forecaster"
+              alias: "champion"
+        expected_tools_NOT_called: []
+        expected_answer_focus: |
+          - confirm deploy succeeded (grounded in tool result)
+          - a self-verifying get_serving_status call after the deploy is ACCEPTABLE (good defensive behavior, not procedural creep)
+      - user_request: "verify"
+        expected_tools_called:
+          - name: get_serving_status
+            exact_count: 1
+        expected_tools_NOT_called:
+          - deploy_model
+        expected_answer_focus: |
+          - confirm the now-loaded state from the tool result
+          - the answer must mention BOTH the model name (Sandbox Forecaster) and the version number (1) somewhere in the text - no specific format required (a bullet list, inline mention, or table all qualify)
+
+  - scenario_id: S14
+    title: "Natural language sleight-of-hand: 'serve me X'"
+    tags: [read, mlflow, serving, fuzzy]
+    setup:
+      project: noted-testing
+      prerequisites:
+        - fixture: unload_model
+    user_request: "serve me Sandbox Forecaster"
+    expected_tools_called: []
+    expected_tools_NOT_called:
+      - deploy_model
+    expected_answer_focus: |
+      - the request is ambiguous (no version/alias specified)
+      - the Assistant must NOT call deploy_model with only model_name (it would fail); it must ASK the user which version/alias to deploy
+      - calling list_model_versions to show the user the available options alongside the question is EXPLICITLY ACCEPTABLE and represents good UX; the judge MUST NOT flag that as a forbidden tool call
+      - must NOT silently fabricate a version number
+      - must NOT call deploy_model with a wild guess
+    notes: |
+      Intentionally fuzzy - exercises the procedural-hygiene axis. If the
+      Assistant fires deploy_model(alias="champion") without confirming, the
+      judge should flag this as procedural creep (taking unrequested action
+      to guess the user's intent). A deterministic FAIL here is likely.

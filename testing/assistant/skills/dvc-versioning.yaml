@@ -1,0 +1,60 @@
+# Machine-readable scenarios for the `dvc-versioning` skill test doc.
+
+doc_id: dvc-versioning
+doc_type: skill
+
+# Scenarios covered: S1, S2, S3, S4 (4 of 6).
+# DEFERRED: S5 (tagging / branches), S6 (lfs interop).
+
+scenarios:
+  - scenario_id: S1
+    title: "New data version"
+    tags: [skill, dvc, versioning]
+    setup:
+      project: noted-testing
+    user_request: "how do I create a new version of data.csv?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - modify the file, then dvc add data.csv (updates .dvc hash)
+      - commit the updated .dvc file to git
+      - dvc push sends the new version to remote
+
+  - scenario_id: S2
+    title: "Old version rollback"
+    tags: [skill, dvc, versioning]
+    setup:
+      project: noted-testing
+    user_request: "how do I go back to yesterday's version of data.csv?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - git checkout <prior commit> data.csv.dvc; then dvc checkout data.csv
+      - this restores the file to the old state
+
+  - scenario_id: S3
+    title: "View versions"
+    tags: [skill, dvc, versioning]
+    setup:
+      project: Examples
+    user_request: "show me the version history of data/dataset.csv"
+    expected_tools_called:
+      - name: get_dvc_file_history
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - call get_dvc_file_history on the project's DVC-tracked file
+      - report hashes + timestamps from the tool output; if the file has only one version or no history, say so truthfully
+
+  - scenario_id: S4
+    title: "Diff datasets"
+    tags: [skill, dvc, versioning]
+    setup:
+      project: noted-testing
+    user_request: "how do I diff two versions of a dataset?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - dvc doesn't diff file contents; it diffs .dvc metadata (hash changes)
+      - for content diff, use pandas / tabular tools after checking out both
+      - explain the limitation

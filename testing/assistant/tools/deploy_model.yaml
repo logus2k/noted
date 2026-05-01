@@ -1,0 +1,233 @@
+# Machine-readable scenarios for the `deploy_model` tool test doc.
+# Human-readable counterpart: deploy_model.md.
+#
+# deploy_model is NOT in WRITE_TOOLS (per backend inspection) - it executes
+# immediately without a pending_action approval panel. Scenarios here test
+# the call mechanics AND the post-execution answer grounded in the real
+# tool result.
+#
+# Coverage: S1, S2, S5, S6, S7, S10, S11, S12, S15 (9 of 15).
+# DEFERRED: S3 (needs wipe_registered_models fixture), S4 (needs multiple
+# registered models), S8 (destructive serving stop), S9 (needs
+# active_run_id), S13 (mutates aliases - needs a restore fixture), S14
+# (harness-level meta-test about the confirmation panel).
+
+doc_id: deploy_model
+doc_type: tool
+
+scenarios:
+  - scenario_id: S1
+    title: "Deploy by explicit version"
+    tags: [write, mlflow, serving]
+    setup:
+      project: noted-testing
+      prerequisites:
+        - fixture: unload_model
+    user_request: "deploy version 3 of Sandbox Forecaster"
+    expected_tools_called:
+      - name: deploy_model
+        exact_count: 1
+        args_match:
+          model_name: "Sandbox Forecaster"
+          version: "3"
+    expected_tools_NOT_called:
+      - list_registered_models
+      - list_model_versions
+    expected_answer_focus: |
+      - brief pre-call intent statement is fine
+      - must issue deploy_model with model_name + version="3"
+      - must NOT ask "are you sure?" before firing
+
+  - scenario_id: S2
+    title: "Deploy by alias"
+    tags: [write, mlflow, serving]
+    setup:
+      project: noted-testing
+      prerequisites:
+        - fixture: unload_model
+    user_request: "deploy the champion of Sandbox Forecaster"
+    expected_tools_called:
+      - name: deploy_model
+        exact_count: 1
+        args_match:
+          model_name: "Sandbox Forecaster"
+          alias: "champion"
+    expected_tools_NOT_called:
+      - list_model_versions
+      - get_run_details
+    expected_answer_focus: |
+      - deploy call must use alias="champion"
+      - brief intent statement acceptable
+
+  - scenario_id: S5
+    title: "Replace currently-deployed model"
+    tags: [write, mlflow, serving]
+    setup:
+      project: noted-testing
+      prerequisites:
+        - fixture: unload_model
+        - fixture: deploy_model
+          args:
+            model_name: "Sandbox Forecaster"
+            version: "1"
+    user_request: "switch the currently deployed model to v3"
+    expected_tools_called:
+      - name: deploy_model
+        exact_count: 1
+        args_match:
+          model_name: "Sandbox Forecaster"
+          version: "3"
+    expected_tools_NOT_called:
+      - list_model_versions
+    expected_answer_focus: |
+      - Assistant uses project context + prior deployed state to infer "Sandbox Forecaster" model_name
+      - fires deploy_model(version="3"); the backend handles the implicit unload+reload
+      - must NOT make an explicit unload call (no such tool is surfaced)
+      - defensive get_serving_status or list_registered_models calls before the deploy are ACCEPTABLE (discovering what's currently deployed grounds the "switch")
+      - final message confirms v3 is loaded (v1 displaced)
+
+  - scenario_id: S6
+    title: "Version does not exist (expected error path)"
+    tags: [write, mlflow, serving, error]
+    setup:
+      project: noted-testing
+      prerequisites:
+        - fixture: unload_model
+    user_request: "deploy version 99 of Sandbox Forecaster"
+    expected_tools_called:
+      - name: deploy_model
+        exact_count: 1
+        args_match:
+          model_name: "Sandbox Forecaster"
+          version: "99"
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - tool result will be an error (v99 doesn't exist)
+      - Assistant must report the deploy FAILURE clearly: the answer must use the words "fail" / "failed" / "error" / "could not" or similar to make it explicit (paraphrasing the error is fine, exact quoting is not required)
+      - calling list_model_versions afterward to show the user what IS available is EXPLICITLY ACCEPTABLE - the judge MUST NOT flag it as a forbidden tool call
+      - must NOT fabricate a success message
+
+  - scenario_id: S7
+    title: "Load-time failure (poisoned v4)"
+    tags: [write, mlflow, serving, error]
+    setup:
+      project: noted-testing
+      prerequisites:
+        - fixture: unload_model
+    user_request: "deploy version 4 of Sandbox Forecaster"
+    expected_tools_called:
+      - name: deploy_model
+        exact_count: 1
+        args_match:
+          model_name: "Sandbox Forecaster"
+          version: "4"
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - v4 is deliberately poisoned (pyfunc load_context imports a non-existent module)
+      - tool result should surface the ModuleNotFoundError
+      - Assistant must report the failure, quote the error
+      - may explain framework/baseline-image constraint
+      - must NOT silently retry or fabricate success
+
+  - scenario_id: S10
+    title: "Deploy then verify (multi-turn)"
+    tags: [write, mlflow, serving, workflow]
+    setup:
+      project: noted-testing
+      prerequisites:
+        - fixture: unload_model
+    turns:
+      - user_request: "deploy the champion of Sandbox Forecaster"
+        expected_tools_called:
+          - name: deploy_model
+            exact_count: 1
+            args_match:
+              model_name: "Sandbox Forecaster"
+              alias: "champion"
+        expected_tools_NOT_called:
+          - get_serving_status
+        expected_answer_focus: |
+          - confirm success grounded in tool result
+          - may suggest verifying with get_serving_status
+      - user_request: "confirm it"
+        expected_tools_called:
+          - name: get_serving_status
+            exact_count: 1
+        expected_tools_NOT_called:
+          - deploy_model
+        expected_answer_focus: |
+          - confirm the model is loaded; quote name + version
+
+  - scenario_id: S11
+    title: "Deploy-then-test (workflow into invoke_model)"
+    tags: [write, mlflow, serving, workflow]
+    setup:
+      project: noted-testing
+      prerequisites:
+        - fixture: unload_model
+    turns:
+      - user_request: "deploy the staging version of Sandbox Forecaster"
+        expected_tools_called:
+          - name: deploy_model
+            exact_count: 1
+            args_match:
+              model_name: "Sandbox Forecaster"
+              alias: "staging"
+        expected_tools_NOT_called:
+          - invoke_model
+          - get_serving_schema
+        expected_answer_focus: "deploy success grounded in tool result"
+      - user_request: "test it"
+        expected_tools_called:
+          - name: invoke_model
+            exact_count: 1
+        expected_tools_NOT_called:
+          - deploy_model
+        expected_answer_focus: |
+          - real prediction output from the tool result
+          - must NOT hand the user a script
+
+  - scenario_id: S12
+    title: "Do not ask 'are you sure?' before firing"
+    tags: [write, mlflow, serving]
+    setup:
+      project: noted-testing
+      prerequisites:
+        - fixture: unload_model
+    user_request: "deploy version 2 of Sandbox Forecaster"
+    expected_tools_called:
+      - name: deploy_model
+        exact_count: 1
+        args_match:
+          model_name: "Sandbox Forecaster"
+          version: "2"
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - brief pre-call intent + tool call
+      - must NOT emit an extra turn asking "are you sure?" before the tool fires
+      - the platform's approval panel is the user's veto opportunity; the model must not gate it
+
+  - scenario_id: S15
+    title: "Idempotency (deploying what's already loaded)"
+    tags: [write, mlflow, serving]
+    setup:
+      project: noted-testing
+      prerequisites:
+        - fixture: unload_model
+        - fixture: deploy_model
+          args:
+            model_name: "Sandbox Forecaster"
+            version: "3"
+    user_request: "deploy version 3 of Sandbox Forecaster"
+    expected_tools_called: []   # accept either behavior below
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - Two acceptable behaviors:
+          (a) Call get_serving_status first, detect v3 already loaded, answer "already loaded" without redeploying.
+          (b) Call deploy_model(v3) again (idempotent at the serving level).
+      - Either is OK; the judge should flag only if the model invents a DIFFERENT version or an error that did not occur.
+    notes: |
+      This scenario's expected_tools_called is empty because the judge should
+      accept either path. The deterministic check won't enforce either
+      pattern. Failure mode to guard against: model calls deploy_model(v1)
+      or fabricates an error.

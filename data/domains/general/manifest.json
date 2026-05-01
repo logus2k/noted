@@ -1,0 +1,10 @@
+{
+  "domain_id": "general",
+  "name": "General",
+  "description": "Universal Assistant behavior: fairness, honesty, voice format, citation conventions, tool-call discipline, multi-Domain awareness. Pinned-active; cannot be deactivated. Holds general-purpose tools that aren't tied to any other Domain.",
+  "created_at": "2026-04-27T16:03:39.469145+00:00",
+  "embeddings_model": "bge-m3",
+  "pinned": true,
+  "deletable": false,
+  "included_files": []
+}

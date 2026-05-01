@@ -1,0 +1,57 @@
+# Machine-readable scenarios for the `airflow-trigger-config` skill test doc.
+
+doc_id: airflow-trigger-config
+doc_type: skill
+
+# Scenarios covered: S1, S2, S3, S4 (4 of 6).
+# DEFERRED: S5 (conditional triggers), S6 (dataset triggers).
+
+scenarios:
+  - scenario_id: S1
+    title: "Trigger DAG with params"
+    tags: [skill, airflow, trigger]
+    setup:
+      project: noted-testing
+    user_request: "how do I trigger jena_training_pipeline with learning_rate=1e-3?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - Airflow UI: Trigger DAG w/ config, pass {"learning_rate": "1e-3"}
+      - CLI: airflow dags trigger jena_training_pipeline --conf '{"learning_rate": "1e-3"}'
+      - DAG accesses via params
+
+  - scenario_id: S2
+    title: "DAG params definition"
+    tags: [skill, airflow, trigger]
+    setup:
+      project: noted-testing
+    user_request: "how do I let my DAG accept custom parameters?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - params={"learning_rate": Param(1e-3, type="number")}
+      - DAG access: context["params"]["learning_rate"]
+
+  - scenario_id: S3
+    title: "Sweep pattern"
+    tags: [skill, airflow, trigger, sweep]
+    setup:
+      project: noted-testing
+    user_request: "I want to trigger jena_training_pipeline 10 times with different seeds"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - script loop triggering with different conf; or a dedicated sweep DAG that triggers children
+      - point to airflow-sweep-strategy skill
+
+  - scenario_id: S4
+    title: "Where to find triggered run"
+    tags: [skill, airflow, trigger]
+    setup:
+      project: noted-testing
+    user_request: "I triggered a DAG - where do I see its progress?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - primary: the Pipelines panel Grid view shows status and per-task progress
+      - optional follow-up: offer get_dag_status to list recent runs programmatically

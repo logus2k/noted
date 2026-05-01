@@ -1,0 +1,218 @@
+<mxfile host="Electron" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/29.6.6 Chrome/144.0.7559.236 Electron/40.8.4 Safari/537.36" version="29.6.6">
+  <diagram id="graphrag-phase1" name="GraphRAG Phase 1 Architecture">
+    <mxGraphModel dx="2066" dy="1202" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1200" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="lane_ui" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#eef6fc;strokeColor=#6c8ebf;fontSize=13;fontStyle=1;verticalAlign=top;align=left;spacingLeft=12;spacingTop=6" value="Browser / UI" vertex="1">
+          <mxGeometry height="130" width="1520" x="40" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="ui_chat" parent="lane_ui" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf" value="Chat panel&#xa;(research_topic calls)" vertex="1">
+          <mxGeometry height="70" width="220" x="30" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="ui_kb_graph" parent="lane_ui" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf" value="Knowledge Graph 3D viewer&#xa;(Three.js — consumes new types)" vertex="1">
+          <mxGeometry height="70" width="260" x="670" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="ui_explorer" parent="lane_ui" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf" value="Explorer tree&#xa;(unchanged)" vertex="1">
+          <mxGeometry height="70" width="200" x="1240" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="lane_noted" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13;fontStyle=1;verticalAlign=top;align=left;spacingLeft=12;spacingTop=6" value="noted backend (existing)" vertex="1">
+          <mxGeometry height="160" width="1520" x="40" y="190" as="geometry" />
+        </mxCell>
+        <mxCell id="n_assistant" parent="lane_noted" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656" value="llm_manager + llm_tools&#xa;(tool routing)" vertex="1">
+          <mxGeometry height="80" width="220" x="30" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="n_rag_router" parent="lane_noted" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656" value="routers/rag.py&#xa;(search_docs)" vertex="1">
+          <mxGeometry height="70" width="200" x="400" y="10" as="geometry" />
+        </mxCell>
+        <mxCell id="n_graph_proxy" parent="lane_noted" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656" value="routers/graph_proxy.py&#xa;(research_topic + 3D graph)" vertex="1">
+          <mxGeometry height="80" width="240" x="680" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="n_skill" parent="lane_noted" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656" value="docs-rag skill&#xa;(routing rubric:&#xa;search_docs vs research_topic)" vertex="1">
+          <mxGeometry height="50" width="190" x="1020" y="10" as="geometry" />
+        </mxCell>
+        <mxCell id="e_assistant_skill" edge="1" parent="lane_noted" source="n_assistant" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#0066cc;strokeWidth=2;endArrow=classic;dashed=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="n_skill">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="645" y="90" />
+              <mxPoint x="645" y="30" />
+              <mxPoint x="990" y="30" />
+              <mxPoint x="990" y="34" />
+            </Array>
+            <mxPoint x="1010" y="32" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="lane_graphrag" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;fontStyle=1;verticalAlign=top;align=left;spacingLeft=12;spacingTop=6" value="GraphRAG services (NEW)" vertex="1">
+          <mxGeometry height="240" width="1520" x="40" y="370" as="geometry" />
+        </mxCell>
+        <mxCell id="gr_service" parent="lane_graphrag" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontStyle=1;align=left;spacingLeft=8" value="noted-graph-rag sidecar&#xa;(NEW container)&#xa;• ingestion API&#xa;• query API (research_topic)&#xa;• Microsoft graphrag library&#xa;• ArcadeDB client" vertex="1">
+          <mxGeometry height="130" width="280" x="60" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="gr_arcade" parent="lane_graphrag" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontStyle=1;align=left;spacingLeft=8" value="ArcadeDB&#xa;(NEW container)&#xa;• entities, relationships&#xa;• community summaries&#xa;• Cypher queries&#xa;• Apache 2.0 / portable" vertex="1">
+          <mxGeometry height="100" width="240" x="400" y="130" as="geometry" />
+        </mxCell>
+        <mxCell id="gr_graph_existing" parent="lane_graphrag" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;align=left;spacingLeft=8" value="noted-graph&#xa;(existing, extended)&#xa;• scanners cover MLflow/&#xa;  DVC/Hydra/Airflow/FS&#xa;• ADD: md, skill, tool,&#xa;  test, git scanners&#xa;• ADD: ArcadeDB persistence" vertex="1">
+          <mxGeometry height="130" width="210" x="695" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="gr_extract" parent="lane_graphrag" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;align=left;spacingLeft=8" value="Gemma 4 extraction prompts&#xa;(shared agent_server)&#xa;• entity extraction per chunk&#xa;• community summarization&#xa;• final answer synthesis" vertex="1">
+          <mxGeometry height="100" width="280" x="1190" y="65" as="geometry" />
+        </mxCell>
+        <mxCell id="lane_supporting" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=13;fontStyle=1;verticalAlign=top;align=left;spacingLeft=12;spacingTop=6" value="Supporting services (existing)" vertex="1">
+          <mxGeometry height="160" width="1520" x="40" y="630" as="geometry" />
+        </mxCell>
+        <mxCell id="s_agent" parent="lane_supporting" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6" value="agent_server&#xa;Gemma 4 E4B Q4_K_XL&#xa;pool_size=1 (shared)" vertex="1">
+          <mxGeometry height="90" width="220" x="1220" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="e_sidecar_chroma" edge="1" parent="lane_supporting" source="s_rag" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#0066cc;strokeWidth=2;endArrow=classic" target="s_chroma">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="s_rag" parent="lane_supporting" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6" value="noted-rag sidecar&#xa;• bge-m3 embedding&#xa;• reranker" vertex="1">
+          <mxGeometry height="90" width="220" x="80" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="s_chroma" parent="lane_supporting" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6" value="ChromaDB&#xa;(inside noted-rag)&#xa;chunk embeddings stay here" vertex="1">
+          <mxGeometry height="90" width="240" x="360" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="s_mlflow" parent="lane_supporting" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6" value="MLflow tracking" vertex="1">
+          <mxGeometry height="40" width="140" x="660" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="s_airflow" parent="lane_supporting" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6" value="Airflow" vertex="1">
+          <mxGeometry height="40" width="140" x="660" y="90" as="geometry" />
+        </mxCell>
+        <mxCell id="s_minio" parent="lane_supporting" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6" value="MinIO" vertex="1">
+          <mxGeometry height="40" width="110" x="830" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="s_evidently" parent="lane_supporting" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6" value="Evidently" vertex="1">
+          <mxGeometry height="40" width="110" x="960" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="s_serving" parent="lane_supporting" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6" value="noted-serving" vertex="1">
+          <mxGeometry height="40" width="110" x="830" y="90" as="geometry" />
+        </mxCell>
+        <mxCell id="s_postgres" parent="lane_supporting" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6" value="Postgres" vertex="1">
+          <mxGeometry height="40" width="110" x="960" y="90" as="geometry" />
+        </mxCell>
+        <mxCell id="lane_sources" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=13;fontStyle=1;verticalAlign=top;align=left;spacingLeft=12;spacingTop=6" value="Entity sources (existing + NEW scanners)" vertex="1">
+          <mxGeometry height="230" width="1520" x="40" y="810" as="geometry" />
+        </mxCell>
+        <mxCell id="src_fs" parent="lane_sources" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450" value="Filesystem scanner&#xa;(projects, files, notebooks)" vertex="1">
+          <mxGeometry height="60" width="200" x="80" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="src_mlflow" parent="lane_sources" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450" value="MLflow scanner&#xa;(exp, run, model, metric)" vertex="1">
+          <mxGeometry height="60" width="200" x="300" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="src_dvc" parent="lane_sources" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450" value="DVC scanner&#xa;(data_file, data_version, schema)" vertex="1">
+          <mxGeometry height="60" width="220" x="520" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="src_hydra" parent="lane_sources" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450" value="Hydra scanner&#xa;(config, group, option)" vertex="1">
+          <mxGeometry height="60" width="200" x="760" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="src_airflow" parent="lane_sources" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450" value="Airflow scanner&#xa;(dag, task, dag_run)" vertex="1">
+          <mxGeometry height="60" width="200" x="980" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="src_evid" parent="lane_sources" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450" value="Evidently scanner&#xa;(drift, data quality)" vertex="1">
+          <mxGeometry height="60" width="200" x="1200" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="src_md" parent="lane_sources" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;fontStyle=1" value="Markdown scanner (NEW)&#xa;+ Gemma entity extractor" vertex="1">
+          <mxGeometry height="60" width="260" x="80" y="140" as="geometry" />
+        </mxCell>
+        <mxCell id="src_skills" parent="lane_sources" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;fontStyle=1" value="Skills scanner (NEW)&#xa;data/skills/*/SKILL.md" vertex="1">
+          <mxGeometry height="60" width="240" x="360" y="140" as="geometry" />
+        </mxCell>
+        <mxCell id="src_tools" parent="lane_sources" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;fontStyle=1" value="Tools scanner (NEW)&#xa;MCP tool registry" vertex="1">
+          <mxGeometry height="60" width="220" x="620" y="140" as="geometry" />
+        </mxCell>
+        <mxCell id="src_tests" parent="lane_sources" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;fontStyle=1" value="Test scenarios scanner (NEW)&#xa;testing/assistant/**/*.yaml" vertex="1">
+          <mxGeometry height="60" width="260" x="860" y="140" as="geometry" />
+        </mxCell>
+        <mxCell id="src_git" parent="lane_sources" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;fontStyle=1" value="Git scanner (NEW)&#xa;commits, branches, tags" vertex="1">
+          <mxGeometry height="60" width="240" x="1140" y="140" as="geometry" />
+        </mxCell>
+        <mxCell id="e_chat_assistant" edge="1" parent="1" source="ui_chat" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#0066cc;strokeWidth=2;endArrow=classic" target="n_assistant">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_assistant_rag" edge="1" parent="1" source="n_assistant" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#0066cc;strokeWidth=2;endArrow=classic" target="n_rag_router">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_assistant_graph" edge="1" parent="1" source="n_assistant" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#0066cc;strokeWidth=2;endArrow=classic" target="n_graph_proxy">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_graph_grservice" edge="1" parent="1" source="n_graph_proxy" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#0066cc;strokeWidth=2;endArrow=classic;exitX=0.25;exitY=1;exitDx=0;exitDy=0;" target="gr_service">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="780" y="340" />
+              <mxPoint x="240" y="340" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_grservice_arcade" edge="1" parent="1" source="gr_service" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#0066cc;strokeWidth=2;endArrow=classic" target="gr_arcade">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_grservice_extract" edge="1" parent="1" source="gr_service" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#0066cc;strokeWidth=2;endArrow=classic" target="gr_extract">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_extract_agent" edge="1" parent="1" source="gr_extract" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#0066cc;strokeWidth=2;endArrow=classic" target="s_agent">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_rag_sidecar" edge="1" parent="1" source="n_rag_router" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#0066cc;strokeWidth=2;endArrow=classic" target="s_rag">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_graphproxy_existing" edge="1" parent="1" source="n_graph_proxy" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#0066cc;strokeWidth=2;endArrow=classic" target="gr_graph_existing">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_kbviewer_graphproxy" edge="1" parent="1" source="ui_kb_graph" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#0066cc;strokeWidth=2;endArrow=classic" target="n_graph_proxy">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_scan_fs" edge="1" parent="1" source="gr_graph_existing" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#009900;strokeWidth=2;dashed=1;endArrow=classic" target="src_fs">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_scan_mlflow" edge="1" parent="1" source="gr_graph_existing" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#009900;strokeWidth=2;dashed=1;endArrow=classic" target="src_mlflow">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_scan_dvc" edge="1" parent="1" source="gr_graph_existing" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#009900;strokeWidth=2;dashed=1;endArrow=classic" target="src_dvc">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_scan_hydra" edge="1" parent="1" source="gr_graph_existing" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#009900;strokeWidth=2;dashed=1;endArrow=classic" target="src_hydra">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_scan_airflow" edge="1" parent="1" source="gr_graph_existing" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#009900;strokeWidth=2;dashed=1;endArrow=classic" target="src_airflow">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_scan_evid" edge="1" parent="1" source="gr_graph_existing" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#009900;strokeWidth=2;dashed=1;endArrow=classic" target="src_evid">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_scan_md" edge="1" parent="1" source="gr_graph_existing" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#009900;strokeWidth=2;dashed=1;endArrow=classic" target="src_md">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_scan_skills" edge="1" parent="1" source="gr_graph_existing" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#009900;strokeWidth=2;dashed=1;endArrow=classic" target="src_skills">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_scan_tools" edge="1" parent="1" source="gr_graph_existing" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#009900;strokeWidth=2;dashed=1;endArrow=classic" target="src_tools">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_scan_tests" edge="1" parent="1" source="gr_graph_existing" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#009900;strokeWidth=2;dashed=1;endArrow=classic" target="src_tests">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_scan_git" edge="1" parent="1" source="gr_graph_existing" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#009900;strokeWidth=2;dashed=1;endArrow=classic" target="src_git">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_graphexisting_arcade" edge="1" parent="1" source="gr_graph_existing" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#009900;strokeWidth=2;dashed=1;endArrow=classic" target="gr_arcade">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_md_chroma" edge="1" parent="1" source="src_md" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#cc0000;strokeWidth=2;dashed=1;endArrow=classic" target="s_chroma">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="legend_box" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontStyle=1;align=center;verticalAlign=middle" value="Legend" vertex="1">
+          <mxGeometry height="30" width="100" x="40" y="1060" as="geometry" />
+        </mxCell>
+        <mxCell id="legend_q" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontColor=#0066cc;fontSize=11;fontStyle=1" value="━━━ query path (research_topic / search_docs)" vertex="1">
+          <mxGeometry height="30" width="360" x="160" y="1060" as="geometry" />
+        </mxCell>
+        <mxCell id="legend_i" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontColor=#009900;fontSize=11;fontStyle=1" value="╌╌╌ ingestion / scanner (manual trigger)" vertex="1">
+          <mxGeometry height="30" width="340" x="540" y="1060" as="geometry" />
+        </mxCell>
+        <mxCell id="legend_c" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontColor=#cc0000;fontSize=11;fontStyle=1" value="╌╌╌ coherent dual-write (FR-6)" vertex="1">
+          <mxGeometry height="30" width="300" x="900" y="1060" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

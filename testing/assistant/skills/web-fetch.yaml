@@ -1,0 +1,59 @@
+# Machine-readable scenarios for the `web-fetch` skill test doc.
+
+doc_id: web-fetch
+doc_type: skill
+
+# Scenarios covered: S1, S2, S3 (3 of 5).
+# DEFERRED: S4 (authentication headers), S5 (JS-rendered pages).
+
+scenarios:
+  - scenario_id: S1
+    title: "Fetch documentation page"
+    tags: [skill, web]
+    setup:
+      project: noted-testing
+    user_request: "summarize https://example.com"
+    expected_tools_called:
+      - name: fetch_url
+        exact_count: 1
+        args_match:
+          url: "https://example.com"
+    expected_tools_NOT_called:
+      - get_file_contents
+    expected_answer_focus: |
+      - use fetch_url with the URL
+      - if the tool returns content, summarize it concisely
+      - if the tool returns an error (AccessDenied, timeout, etc.), report the error plainly and suggest an alternative URL - do NOT pretend to summarize what wasn't fetched
+      - URLs are NOT project files; do not use get_file_contents
+
+  - scenario_id: S2
+    title: "URL vs local path"
+    tags: [skill, web]
+    setup:
+      project: noted-testing
+    user_request: "fetch the content of my project's src/training/train.py"
+    expected_tools_called:
+      - name: get_file_contents
+        exact_count: 1
+    expected_tools_NOT_called:
+      - fetch_url
+    expected_answer_focus: |
+      - local path = get_file_contents
+      - fetch_url is for http(s):// URLs only
+
+  - scenario_id: S3
+    title: "Max chars"
+    tags: [skill, web]
+    setup:
+      project: noted-testing
+    user_request: "fetch the first 2000 chars of https://example.com"
+    expected_tools_called:
+      - name: fetch_url
+        exact_count: 1
+        args_match:
+          url: "https://example.com"
+          max_chars: 2000
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - pass max_chars=2000
+      - note if truncated

@@ -1,0 +1,58 @@
+# Machine-readable scenarios for the `airflow-scheduling` skill test doc.
+
+doc_id: airflow-scheduling
+doc_type: skill
+
+# Scenarios covered: S1, S2, S3, S4 (4 of 6).
+# DEFERRED: S5 (timezone subtleties), S6 (DST transitions).
+
+scenarios:
+  - scenario_id: S1
+    title: "Schedule syntax"
+    tags: [skill, airflow, scheduling]
+    setup:
+      project: noted-testing
+    user_request: "how do I schedule a DAG to run daily at 2 AM?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - cron: '0 2 * * *'
+      - or Airflow preset: '@daily' + start time control
+      - mention schedule_interval on the @dag decorator
+
+  - scenario_id: S2
+    title: "Manual-only DAGs"
+    tags: [skill, airflow, scheduling]
+    setup:
+      project: noted-testing
+    user_request: "I want a DAG that only runs when I trigger it manually"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - set schedule=None on the DAG
+      - explain how to trigger manually (Airflow UI / gcloud / CLI)
+
+  - scenario_id: S3
+    title: "Catchup behavior"
+    tags: [skill, airflow, scheduling]
+    setup:
+      project: noted-testing
+    user_request: "what's catchup and do I need it?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - catchup=True means Airflow fills in missed runs from start_date
+      - for live ML, usually catchup=False
+      - noted defaults DAGs to catchup=False
+
+  - scenario_id: S4
+    title: "Weekly cadence"
+    tags: [skill, airflow, scheduling]
+    setup:
+      project: noted-testing
+    user_request: "run every Monday at 09:00"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - cron: '0 9 * * 1'
+      - explain day-of-week indexing (0 or 7 = Sunday)

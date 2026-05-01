@@ -1,0 +1,88 @@
+# Machine-readable scenarios for the `get_dvc_data_overview` tool test doc.
+
+doc_id: get_dvc_data_overview
+doc_type: tool
+
+# Scenarios covered: S1, S2, S3, S4, S5 (5 of 7).
+# DEFERRED: S6 (no DVC-tracked files), S7 (cross-project drilldown).
+
+scenarios:
+  - scenario_id: S1
+    title: "Basic overview"
+    tags: [read, dvc]
+    setup:
+      project: noted-testing
+    user_request: "what data files are tracked by DVC?"
+    expected_tools_called:
+      - name: get_dvc_data_overview
+        exact_count: 1
+    expected_tools_NOT_called:
+      - get_dvc_file_history
+    expected_answer_focus: |
+      - list tracked files with size + hash from the tool result
+      - mention which project each file belongs to (when across projects)
+
+  - scenario_id: S2
+    title: "Look up specific file"
+    tags: [read, dvc]
+    setup:
+      project: noted-testing
+    user_request: "is there a tracked file called 'jena_climate_2009_2016.csv'?"
+    expected_tools_called:
+      - name: get_dvc_data_overview
+        exact_count: 1
+    expected_tools_NOT_called:
+      - get_dvc_file_history
+    expected_answer_focus: |
+      - scan the result for the named file
+      - report present (with hash) or not present
+      - do NOT call get_dvc_file_history unless asked for history
+
+  - scenario_id: S3
+    title: "Inventory question"
+    tags: [read, dvc, summary]
+    setup:
+      project: noted-testing
+    user_request: "how many DVC-tracked datasets do we have total?"
+    expected_tools_called:
+      - name: get_dvc_data_overview
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - count the entries in the tool result
+      - briefly group by project if the data spans multiple
+
+  - scenario_id: S4
+    title: "Pre-flight before history"
+    tags: [read, dvc, workflow]
+    setup:
+      project: noted-testing
+    turns:
+      - user_request: "list the DVC files"
+        expected_tools_called:
+          - name: get_dvc_data_overview
+            exact_count: 1
+        expected_tools_NOT_called:
+          - get_dvc_file_history
+        expected_answer_focus: "list tracked files"
+      - user_request: "show history of the first one"
+        expected_tools_called:
+          - name: get_dvc_file_history
+            exact_count: 1
+        expected_tools_NOT_called: []
+        expected_answer_focus: "use repo_path + dvc_file from prior turn"
+
+  - scenario_id: S5
+    title: "Wrong domain redirect"
+    tags: [read, dvc, terminology]
+    setup:
+      project: noted-testing
+    user_request: "what data does the project have?"
+    expected_tools_called:
+      - name: get_dvc_data_overview
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - "data" in noted typically means DVC-tracked datasets
+      - call get_dvc_data_overview
+      - acceptable variant: also mention project files if no DVC entries

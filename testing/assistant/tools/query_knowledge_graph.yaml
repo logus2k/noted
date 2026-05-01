@@ -1,0 +1,96 @@
+# Machine-readable scenarios for the `query_knowledge_graph` tool test doc.
+
+doc_id: query_knowledge_graph
+doc_type: tool
+
+# Scenarios covered: S1, S2, S3, S4, S5 (5 of 7).
+# DEFERRED: S6 (project without graph), S7 (very-large graph pagination).
+
+scenarios:
+  - scenario_id: S1
+    title: "Basic graph query"
+    tags: [read, knowledge_graph]
+    setup:
+      project: noted-testing
+    user_request: "what entities and relationships does the project have?"
+    expected_tools_called:
+      - name: query_knowledge_graph
+        exact_count: 1
+        args_match:
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - if the tool returned graph data, report the actual nodes and relationships from that output
+      - if the tool reported "No knowledge graph data found", say so plainly (optionally mentioning the conceptual lineage chain Data -> Config -> Code -> Pipeline -> Run -> Model so the user knows what the graph would show once populated)
+      - never fabricate nodes or edges that were not in the tool output
+
+  - scenario_id: S2
+    title: "Lineage chain question"
+    tags: [read, knowledge_graph, lineage]
+    setup:
+      project: noted-testing
+    user_request: "trace the lineage from data to model"
+    expected_tools_called:
+      - name: query_knowledge_graph
+        exact_count: 1
+        args_match:
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - present the lineage chain
+      - if graph is empty, mention the conceptual chain (Data→Config→Code→Pipeline→Run→Model)
+
+  - scenario_id: S3
+    title: "Empty graph"
+    tags: [read, knowledge_graph, edge]
+    setup:
+      project: noted-testing
+    user_request: "what's in the knowledge graph?"
+    expected_tools_called:
+      - name: query_knowledge_graph
+        exact_count: 1
+        args_match:
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - if tool returns empty, report and explain the graph populates as runs/models accrue
+      - do NOT fabricate entities
+
+  - scenario_id: S4
+    title: "Don't use for conceptual questions"
+    tags: [read, knowledge_graph, scope]
+    setup:
+      project: noted-testing
+    user_request: "how does noted track lineage in general?"
+    expected_tools_called: []
+    expected_tools_NOT_called:
+      - query_knowledge_graph
+    expected_answer_focus: |
+      - this is a CONCEPTUAL question - answer from the noted-platform-overview skill
+      - do NOT call query_knowledge_graph for theoretical questions
+      - the graph is for inspecting actual project state, not the platform's design
+
+  - scenario_id: S5
+    title: "Combined with run lookup"
+    tags: [read, knowledge_graph, workflow]
+    setup:
+      project: noted-testing
+    turns:
+      - user_request: "what does the knowledge graph show?"
+        expected_tools_called:
+          - name: query_knowledge_graph
+            exact_count: 1
+        expected_tools_NOT_called: []
+        expected_answer_focus: "summarize graph entities/relationships"
+      - user_request: "give me details for any run shown"
+        # When turn 1's graph was empty no run_id was surfaced, so the only
+        # way to satisfy the user is to discover runs (via get_experiment_runs
+        # or equivalent) and then fetch details for one. When turn 1 did
+        # surface a run_id, the discovery step is unnecessary but still
+        # reasonable. We require both tools here so the multi-step path is
+        # validated; the single-step path (reusing a graph run_id) is covered
+        # by other scenarios.
+        expected_tools_called:
+          - name: get_experiment_runs
+            exact_count: 1
+          - name: get_run_details
+            exact_count: 1
+        expected_tools_NOT_called: []
+        expected_answer_focus: "report the run's key fields (status, metrics, params) from get_run_details output"

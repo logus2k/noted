@@ -1,0 +1,82 @@
+# Machine-readable scenarios for the `mlflow-reporting` skill test doc.
+
+doc_id: mlflow-reporting
+doc_type: skill
+
+# Scenarios covered: S1, S2, S3, S4, S5 (5 of 7).
+# DEFERRED: S6 (automated report export), S7 (multi-experiment summary).
+
+scenarios:
+  - scenario_id: S1
+    title: "Experiment summary"
+    tags: [skill, mlflow, reporting]
+    setup:
+      project: noted-testing
+    user_request: "give me a summary of the noted-testing experiment"
+    expected_tools_called:
+      - name: get_experiment_runs
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - count of runs, status mix, most-recent run
+      - identify best run by primary metric if obvious
+
+  - scenario_id: S2
+    title: "Metrics table"
+    tags: [skill, mlflow, reporting]
+    setup:
+      project: noted-testing
+    user_request: "produce a metrics table across the runs"
+    expected_tools_called:
+      - name: get_experiment_runs
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - may need get_run_details per run for metrics
+      - present as markdown table; columns: run_id (short), key metrics
+      - note which row is best
+
+  - scenario_id: S3
+    title: "Report on a specific run"
+    tags: [skill, mlflow, reporting]
+    setup:
+      project: noted-testing
+    user_request: "write a brief report on run ad190b73dd6147158fc27f1eda9f1637"
+    expected_tools_called:
+      - name: get_run_details
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - cover: params, metrics, tags, artifact summary
+      - grounded entirely in tool output
+      - no fabrication
+
+  - scenario_id: S4
+    title: "Comparison report"
+    tags: [skill, mlflow, reporting, compare]
+    setup:
+      project: noted-testing
+    user_request: "write a comparison between runs ad190b73dd6147158fc27f1eda9f1637 and 8921d48aca9b4f328910bceb66778c7c"
+    expected_tools_called:
+      - name: compare_runs
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - present side-by-side table
+      - identify winner per metric
+      - conclude with an overall recommendation
+
+  - scenario_id: S5
+    title: "Long-form narrative"
+    tags: [skill, mlflow, reporting]
+    setup:
+      project: noted-testing
+    user_request: "write a paragraph explaining what this experiment tried"
+    expected_tools_called:
+      - name: get_experiment_runs
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - paragraph form (not bullet list)
+      - ground in actual run params / tags
+      - honest about limits if info is sparse

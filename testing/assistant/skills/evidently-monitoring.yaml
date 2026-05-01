@@ -1,0 +1,49 @@
+# Machine-readable scenarios for the `evidently-monitoring` skill test doc.
+
+doc_id: evidently-monitoring
+doc_type: skill
+
+# Scenarios covered: S1, S2, S3 (3 of 5).
+# DEFERRED: S4 (alerting / notification channels), S5 (multi-model monitoring dashboards).
+
+scenarios:
+  - scenario_id: S1
+    title: "What Evidently monitors"
+    tags: [skill, evidently, monitoring]
+    setup:
+      project: noted-testing
+    user_request: "what does Evidently monitor in noted?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - drift, data quality, prediction performance over time
+      - reports generated periodically; stored in MLflow artifacts
+      - UI accessible via noted-evidently container
+
+  - scenario_id: S2
+    title: "Report frequency"
+    tags: [skill, evidently, monitoring]
+    setup:
+      project: noted-testing
+    user_request: "how often do monitoring reports run?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - configurable - default daily
+      - scheduled by Airflow drift_check DAG
+      - also on-demand when a new run is promoted
+
+  - scenario_id: S3
+    title: "Find latest report"
+    tags: [skill, evidently, monitoring]
+    setup:
+      project: noted-testing
+    user_request: "where's the latest monitoring report?"
+    expected_tools_called:
+      - name: get_experiment_runs
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - look in the evidently-reports experiment (or the one tagged monitoring)
+      - then get_run_details for report artifacts
+      - or open noted-evidently UI directly

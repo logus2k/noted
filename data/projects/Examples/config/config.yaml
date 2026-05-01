@@ -1,0 +1,15 @@
+defaults:
+  - model: linear
+  - data: default
+
+training:
+  epochs: 50
+  batch_size: 32
+  learning_rate: 0.001
+  seed: 42
+
+evaluation:
+  metrics:
+    - mae
+    - rmse
+    - r2

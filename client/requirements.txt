@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+mlflow
+numpy
+pandas
+tensorflow[and-cuda]
+torch
+pytorch-lightning
+scikit-learn
+xgboost
+lightgbm
+boto3

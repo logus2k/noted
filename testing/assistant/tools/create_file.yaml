@@ -1,0 +1,81 @@
+# Machine-readable scenarios for the `create_file` tool test doc.
+
+doc_id: create_file
+doc_type: tool
+
+# Scenarios covered: S1, S2, S3, S4, S5 (5 of 7).
+# DEFERRED: S6 (file in deeply-nested non-existent path), S7 (binary file creation).
+
+scenarios:
+  - scenario_id: S1
+    title: "New Python file"
+    tags: [write, files]
+    setup:
+      project: noted-testing
+    user_request: "create src/utils/helpers.py with a sigmoid function"
+    expected_tools_called:
+      - name: create_file
+        exact_count: 1
+    expected_tools_NOT_called:
+      - update_file
+    expected_answer_focus: |
+      - create_file with COMPLETE initial content
+      - description arg explains what the file is for
+      - confirmation handled by platform
+
+  - scenario_id: S2
+    title: "Don't use for existing"
+    tags: [write, files, scope]
+    setup:
+      project: noted-testing
+    user_request: "create src/training/train.py"
+    expected_tools_called: []
+    expected_tools_NOT_called:
+      - create_file
+    expected_answer_focus: |
+      - check whether the file already exists (list_files or get_file_contents)
+      - if it does, ASK whether the user wants to overwrite or modify
+      - do NOT create_file over an existing path
+
+  - scenario_id: S3
+    title: "New config file"
+    tags: [write, files, config]
+    setup:
+      project: noted-testing
+    user_request: "create config/scaler/minmax.yaml with min and max scaler params"
+    expected_tools_called:
+      - name: create_file
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - create the yaml file with appropriate Hydra-compatible content
+      - mention that the user can now select 'minmax' in the scaler group
+
+  - scenario_id: S4
+    title: "Don't use for notebook"
+    tags: [write, files, scope]
+    setup:
+      project: noted-testing
+    user_request: "create a new notebook called experiments.ipynb"
+    expected_tools_called: []
+    expected_tools_NOT_called:
+      - create_file
+    expected_answer_focus: |
+      - create_file is unsafe for .ipynb (needs proper JSON structure)
+      - explain that notebooks should be created via the noted UI (Explorer panel) which builds correct cell structure
+      - or create_file with a minimal valid .ipynb skeleton if explicitly requested
+
+  - scenario_id: S5
+    title: "Description arg matters"
+    tags: [write, files]
+    setup:
+      project: noted-testing
+    user_request: "create src/preprocessing.py with a normalize function"
+    expected_tools_called:
+      - name: create_file
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - description arg explains the purpose ("preprocessing utilities for training pipeline")
+      - content arg has the COMPLETE initial code
+      - confirmation panel handled by platform

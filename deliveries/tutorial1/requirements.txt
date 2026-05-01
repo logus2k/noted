@@ -1,0 +1,10 @@
+pandas
+numpy
+scikit-learn
+tqdm
+mlflow
+pyyaml
+tensorflow[and-cuda]
+dvc[s3]
+hydra-core
+omegaconf

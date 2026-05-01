@@ -1,0 +1,78 @@
+# Machine-readable scenarios for the `mlflow-run-interpretation` skill test doc.
+
+doc_id: mlflow-run-interpretation
+doc_type: skill
+
+# Scenarios covered: S1, S2, S3, S4, S5 (5 of 7).
+# DEFERRED: S6 (classification-metric explanations), S7 (NLP-metric explanations).
+
+scenarios:
+  - scenario_id: S1
+    title: "Explain metrics of a run"
+    tags: [skill, mlflow, interpretation]
+    setup:
+      project: noted-testing
+    user_request: "what do the metrics of run ad190b73dd6147158fc27f1eda9f1637 tell me?"
+    expected_tools_called:
+      - name: get_run_details
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - fetch metrics; explain each (val_mae, val_rmse, val_r2)
+      - quantitative interpretation relative to target (inverse transform if needed)
+      - mention context-appropriate thresholds
+
+  - scenario_id: S2
+    title: "Inverse transform advice"
+    tags: [skill, mlflow, interpretation, transform]
+    setup:
+      project: noted-testing
+    user_request: "my predictions look like values near zero - are they in real units?"
+    expected_tools_called:
+      - name: get_run_details
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - likely predictions are in scaled space
+      - apply inverse: y_real = y_scaled * target_std + target_mean
+      - fetch target_mean / target_std from run params
+
+  - scenario_id: S3
+    title: "Are metrics good or bad?"
+    tags: [skill, mlflow, interpretation]
+    setup:
+      project: noted-testing
+    user_request: "is a val_mae of 2.15 degC good for run 03b00e2b8fa041cabddc577446744866?"
+    expected_tools_called:
+      - name: get_run_details
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - one get_run_details call to read the run's target_mean / target_std params (context for judging the metric)
+      - compare 2.15 against the target's scale; for Jena temperature prediction, 2.15 degC MAE on a multi-day horizon is reasonable
+      - honest about limits if data range unknown
+
+  - scenario_id: S4
+    title: "Training curve shape"
+    tags: [skill, mlflow, interpretation]
+    setup:
+      project: noted-testing
+    user_request: "how should I read my loss curve?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - point to mlflow-training-curves skill
+      - brief: loss should decrease; gap train-vs-val hints at overfitting
+      - plateau suggests lr too high or model capacity reached
+
+  - scenario_id: S5
+    title: "Compare to paper baseline"
+    tags: [skill, mlflow, interpretation]
+    setup:
+      project: noted-testing
+    user_request: "is my model competitive with published baselines?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - compare requires knowing the paper's metric + dataset match
+      - if uncertain, say so; suggest the user share the paper's reported numbers

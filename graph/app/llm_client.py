@@ -1,0 +1,222 @@
+"""Synchronous client for agent_server's OpenAI-compatible chat API.
+
+noted-graph uses this from inside long rebuild loops, one chunk at a time,
+so we stay synchronous (the shared Gemma pool serializes calls anyway).
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+from typing import Any
+
+import requests
+
+from app.config import LLM_BASE_URL, LLM_MODEL_ID, LLM_TIMEOUT
+
+logger = logging.getLogger(__name__)
+
+
+class LLMError(RuntimeError):
+    pass
+
+
+class LLMClient:
+    """Thin wrapper around /v1/chat/completions (non-streaming)."""
+
+    def __init__(self):
+        self._base = LLM_BASE_URL.rstrip('/')
+        self._model = LLM_MODEL_ID
+        self._timeout = LLM_TIMEOUT
+
+    def chat_text(
+        self,
+        user_prompt: str,
+        *,
+        system_prompt: str | None = None,
+        temperature: float = 0.2,
+        max_tokens: int = 2048,
+    ) -> str:
+        """Ask the model for free-form text and return the raw content.
+
+        Used by the synthesis step where we want markdown, not JSON. Avoids
+        the JSON-extraction wrapping that mangles plain answers.
+
+        `system_prompt` is optional. When omitted, only the user message is
+        sent and the agent_server preset's own system prompt (loaded server-
+        side from the agent's prompt file) is the single source of truth -
+        avoids the dual-system-message conflict where two prompts give
+        contradictory citation/output rules.
+        """
+        messages: list[dict[str, Any]] = []
+        if system_prompt:
+            messages.append({'role': 'system', 'content': system_prompt})
+        messages.append({'role': 'user', 'content': user_prompt})
+        payload: dict[str, Any] = {
+            'model': self._model,
+            'messages': messages,
+            'stream': False,
+            'temperature': temperature,
+            'max_tokens': max_tokens,
+        }
+        try:
+            r = requests.post(
+                f'{self._base}/v1/chat/completions',
+                json=payload,
+                timeout=self._timeout,
+            )
+        except requests.RequestException as e:
+            raise LLMError(f'LLM request failed: {e}') from e
+        if not r.ok:
+            raise LLMError(f'LLM HTTP {r.status_code}: {r.text[:500]}')
+        data = r.json()
+        content = (
+            (data.get('choices') or [{}])[0]
+            .get('message', {})
+            .get('content', '')
+        )
+        return (content or '').strip()
+
+    def chat_text_stream(
+        self,
+        user_prompt: str,
+        *,
+        system_prompt: str | None = None,
+        temperature: float = 0.2,
+        max_tokens: int = 2048,
+        model: str | None = None,
+    ):
+        """Streaming variant of chat_text. Yields content delta strings as
+        they arrive. Used by /research/query/stream so the user sees
+        synthesis tokens flowing rather than waiting for the full answer.
+
+        `system_prompt` is optional - see `chat_text` docstring for why.
+        `model` overrides the default LLM_MODEL_ID for this single call -
+        synthesize_stream uses it to route through the noted_graph_answer
+        preset (prose) while the chat tool flow keeps using the
+        analyst-style noted_graph preset.
+        """
+        messages: list[dict[str, Any]] = []
+        if system_prompt:
+            messages.append({'role': 'system', 'content': system_prompt})
+        messages.append({'role': 'user', 'content': user_prompt})
+        payload: dict[str, Any] = {
+            'model': model or self._model,
+            'messages': messages,
+            'stream': True,
+            'temperature': temperature,
+            'max_tokens': max_tokens,
+        }
+        try:
+            r = requests.post(
+                f'{self._base}/v1/chat/completions',
+                json=payload,
+                timeout=self._timeout,
+                stream=True,
+            )
+        except requests.RequestException as e:
+            raise LLMError(f'LLM request failed: {e}') from e
+        if not r.ok:
+            raise LLMError(f'LLM HTTP {r.status_code}: {r.text[:500]}')
+        # Iterate SSE lines from the agent_server
+        for raw in r.iter_lines(decode_unicode=True):
+            if not raw or not raw.startswith('data:'):
+                continue
+            data = raw[5:].strip()
+            if data == '[DONE]':
+                break
+            try:
+                obj = json.loads(data)
+            except json.JSONDecodeError:
+                continue
+            choices = obj.get('choices') or []
+            if not choices:
+                continue
+            delta = choices[0].get('delta') or {}
+            content = delta.get('content')
+            if content:
+                yield content
+
+    def chat_json(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        *,
+        temperature: float = 0.1,
+        max_tokens: int = 2048,
+    ) -> dict:
+        """Ask the model for a JSON object. Returns parsed dict.
+
+        Uses response_format={"type": "json_object"} where supported. Falls
+        back to extracting the first balanced {...} span from raw content
+        if the server ignores the format hint.
+        """
+        payload: dict[str, Any] = {
+            'model': self._model,
+            'messages': [
+                {'role': 'system', 'content': system_prompt},
+                {'role': 'user', 'content': user_prompt},
+            ],
+            'stream': False,
+            'temperature': temperature,
+            'max_tokens': max_tokens,
+            'response_format': {'type': 'json_object'},
+        }
+        try:
+            r = requests.post(
+                f'{self._base}/v1/chat/completions',
+                json=payload,
+                timeout=self._timeout,
+            )
+        except requests.RequestException as e:
+            raise LLMError(f'LLM request failed: {e}') from e
+        if not r.ok:
+            raise LLMError(f'LLM HTTP {r.status_code}: {r.text[:500]}')
+
+        data = r.json()
+        content = (
+            (data.get('choices') or [{}])[0]
+            .get('message', {})
+            .get('content', '')
+        )
+        if not content:
+            raise LLMError(f'Empty LLM response: {data}')
+        return _extract_json(content)
+
+
+def _extract_json(text: str) -> dict:
+    """Try direct parse, then fall back to first balanced {...} span."""
+    text = text.strip()
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+    start = text.find('{')
+    if start < 0:
+        raise LLMError(f'No JSON object in response: {text[:200]}')
+    depth = 0
+    in_str = False
+    esc = False
+    for i in range(start, len(text)):
+        ch = text[i]
+        if esc:
+            esc = False
+            continue
+        if ch == '\\':
+            esc = True
+            continue
+        if ch == '"':
+            in_str = not in_str
+            continue
+        if in_str:
+            continue
+        if ch == '{':
+            depth += 1
+        elif ch == '}':
+            depth -= 1
+            if depth == 0:
+                try:
+                    return json.loads(text[start:i + 1])
+                except json.JSONDecodeError as e:
+                    raise LLMError(f'Malformed JSON span: {e}') from e
+    raise LLMError(f'Unbalanced JSON in response: {text[:200]}')

@@ -1,0 +1,82 @@
+# Machine-readable scenarios for the `mlflow-hyperparameter-analysis` skill test doc.
+
+doc_id: mlflow-hyperparameter-analysis
+doc_type: skill
+
+# Scenarios covered: S1, S2, S3, S4, S5 (5 of 7).
+# DEFERRED: S6 (parallel-coordinate chart interpretation), S7 (sweep with failed runs).
+
+scenarios:
+  - scenario_id: S1
+    title: "Best hyperparams in an experiment"
+    tags: [skill, mlflow, hyperparameters]
+    setup:
+      project: noted-testing
+    user_request: "which hyperparameters gave the best val_mae in noted-testing?"
+    expected_tools_called:
+      - name: get_experiment_runs
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - list runs to find the winner by metric
+      - then get_run_details on the winner to report its params
+      - may be multi-turn if Assistant drills; one-shot is also acceptable
+
+  - scenario_id: S2
+    title: "Sweep summary"
+    tags: [skill, mlflow, sweep]
+    setup:
+      project: noted-testing
+    user_request: "summarize the hyperparameter sweep"
+    expected_tools_called:
+      - name: get_experiment_runs
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - list runs; group by sweep tag if present
+      - identify the best run by primary metric
+      - comment on the hyperparameter range explored
+
+  - scenario_id: S3
+    title: "Identify winning parameter configuration"
+    tags: [skill, mlflow, hyperparameters]
+    setup:
+      project: noted-testing
+    user_request: "which run in the noted-testing experiment had the lowest val_mae? what params drove it?"
+    expected_tools_called:
+      - name: get_experiment_runs
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - ONE get_experiment_runs call returns every run with params and metrics
+      - find min-val_mae run, report the run_name and its params verbatim from the listing
+      - do NOT chain get_run_details - the list already has everything
+
+  - scenario_id: S4
+    title: "Compare parameter choices when only one value exists"
+    tags: [skill, mlflow, hyperparameters, compare]
+    setup:
+      project: noted-testing
+    user_request: "do runs in this experiment use different learning_rate values? if so, which one performed best?"
+    expected_tools_called:
+      - name: get_experiment_runs
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - ONE get_experiment_runs call
+      - report whether learning_rate varies across runs
+      - if it varies, identify the best-performing value; if it does not, say so plainly
+
+  - scenario_id: S5
+    title: "Seed sensitivity"
+    tags: [skill, mlflow, hyperparameters]
+    setup:
+      project: noted-testing
+    user_request: "how much variance do we see across seeds?"
+    expected_tools_called:
+      - name: get_experiment_runs
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - group runs by non-seed params; report metric variance within each group
+      - if single run per config, say variance can't be measured

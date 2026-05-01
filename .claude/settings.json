@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//home/logus/env/iscte/jena_weather/notebooks/**)",
+      "Read(//home/logus/env/iscte/jena_weather/**)",
+      "Bash(jupyter nbconvert:*)",
+      "WebFetch(domain:docs.evidentlyai.com)",
+      "Read(//tmp/**)",
+      "Read(//home/logus/env/assets/agent_server/app/**)",
+      "Read(//home/logus/env/assets/tts_server/**)",
+      "WebSearch",
+      "Read(//home/logus/env/**)",
+      "Bash(grep -E \"\\\\.\\(js|ts|tsx\\)$\")",
+      "Bash(sed -n:*)",
+      "Bash(curl *)",
+      "Bash(mkdir *)",
+      "Bash(awk *)",
+      "Bash(esbuild *)",
+      "Bash(docker inspect *)",
+      "Bash(docker image inspect *)",
+      "Bash(docker logs *)",
+      "Bash(docker ps *)",
+      "Bash(docker port *)",
+      "Bash(docker history *)",
+      "Bash(docker compose *)"
+    ],
+    "additionalDirectories": [
+      "/home/logus/env/iscte/jena_weather/config",
+      "/home/logus/env/iscte/jena_weather/src/training",
+      "/home/logus/env/iscte/jena_weather/src/evaluation"
+    ]
+  }
+}

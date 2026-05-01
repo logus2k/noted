@@ -1,0 +1,8 @@
+{
+  "auto_tracking": false,
+  "default_venv": {
+    "name": "welcome_env",
+    "runtime_id": "python/3.12"
+  },
+  "hydra_view": true
+}

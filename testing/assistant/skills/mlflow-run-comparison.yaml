@@ -1,0 +1,85 @@
+# Machine-readable scenarios for the `mlflow-run-comparison` skill test doc.
+
+doc_id: mlflow-run-comparison
+doc_type: skill
+
+# Scenarios covered: S1, S2, S3, S4, S5 (5 of 7).
+# DEFERRED: S6 (3+ way comparison), S7 (comparisons across non-overlapping metric schemas).
+
+scenarios:
+  - scenario_id: S1
+    title: "Compare two runs"
+    tags: [skill, mlflow, compare]
+    setup:
+      project: noted-testing
+    user_request: "compare runs ad190b73dd6147158fc27f1eda9f1637 and 8921d48aca9b4f328910bceb66778c7c"
+    expected_tools_called:
+      - name: compare_runs
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - side-by-side table with metrics + params
+      - identify winner per metric (lower-better vs higher-better semantics)
+      - final grounded conclusion
+
+  - scenario_id: S2
+    title: "Infer runs from versions"
+    tags: [skill, mlflow, compare, workflow]
+    setup:
+      project: noted-testing
+    turns:
+      - user_request: "list versions of Sandbox Forecaster"
+        expected_tools_called:
+          - name: list_model_versions
+            exact_count: 1
+        expected_tools_NOT_called: []
+        expected_answer_focus: "list versions with run_ids"
+      - user_request: "is v2 better than v1?"
+        expected_tools_called:
+          - name: compare_runs
+            exact_count: 1
+        expected_tools_NOT_called:
+          - list_model_versions
+        expected_answer_focus: "reuse run_ids from prior turn"
+
+  - scenario_id: S3
+    title: "Partial info"
+    tags: [skill, mlflow, compare, edge]
+    setup:
+      project: noted-testing
+    user_request: "compare my last 2 runs"
+    expected_tools_called:
+      - name: get_experiment_runs
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - Assistant needs run_ids first - get_experiment_runs
+      - then compare_runs with the two most recent
+      - may be one-shot or multi-turn
+
+  - scenario_id: S4
+    title: "Primary metric selection"
+    tags: [skill, mlflow, compare]
+    setup:
+      project: noted-testing
+    user_request: "which of my recent runs has the best val_r2?"
+    expected_tools_called:
+      - name: get_experiment_runs
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - find the run with highest val_r2
+      - may need get_run_details for precise values
+      - report the winner
+
+  - scenario_id: S5
+    title: "No metric overlap"
+    tags: [skill, mlflow, compare, edge]
+    setup:
+      project: noted-testing
+    user_request: "compare two runs that have totally different metric sets"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - explain compare_runs shows both sides; missing metrics show as blank
+      - if no overlap, direct comparison is not meaningful; suggest aligning what's logged

@@ -1,0 +1,107 @@
+# Machine-readable scenarios for the `update_cell` tool test doc.
+
+doc_id: update_cell
+doc_type: tool
+
+# Scenarios covered: S1, S2, S3, S4, S5 (5 of 7).
+# DEFERRED: S6 (cell with widgets/HTML output), S7 (very-large cell).
+
+scenarios:
+  - scenario_id: S1
+    title: "Rewrite a cell's full body"
+    tags: [write, notebook]
+    setup:
+      project: noted-testing
+      notebook: training_sandbox.ipynb
+    user_request: "rewrite cell 7 of training_sandbox.ipynb to be a single line: `print('cell 7 placeholder')`. Drop everything else in that cell."
+    expected_tools_called:
+      - name: update_cell
+        exact_count: 1
+        args_match:
+          cell_index: 7
+    expected_tools_NOT_called:
+      - get_notebook_cells
+      - fix_lint_issues
+      - find_replace_in_cells
+      - batch_update_cells
+    expected_answer_focus: |
+      - full-cell rewrite: update_cell with the COMPLETE new body
+      - not find_replace_in_cells (the user wants the WHOLE cell replaced, not a substitution)
+      - report that cell 7 has been rewritten
+
+  - scenario_id: S2
+    title: "Refactor"
+    tags: [write, notebook]
+    setup:
+      project: noted-testing
+      notebook: training_sandbox.ipynb
+    user_request: "refactor cell 7 of training_sandbox.ipynb to use a dictionary instead of multiple variables"
+    expected_tools_called:
+      - name: update_cell
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - read the cell content first if not already known (get_notebook_cells)
+      - then update_cell with the COMPLETE refactored content
+      - do not produce a partial diff
+
+  - scenario_id: S3
+    title: "Read then update"
+    tags: [write, notebook, workflow]
+    setup:
+      project: noted-testing
+      notebook: training_sandbox.ipynb
+    turns:
+      - user_request: "show cell 3 of training_sandbox.ipynb"
+        expected_tools_called:
+          - name: get_notebook_cells
+            exact_count: 1
+        expected_tools_NOT_called:
+          - update_cell
+        expected_answer_focus: "show content"
+      - user_request: "add a docstring to that cell"
+        expected_tools_called:
+          - name: update_cell
+            exact_count: 1
+        expected_tools_NOT_called:
+          - get_notebook_cells
+        expected_answer_focus: "update with COMPLETE content including new docstring; reuse cell content from prior turn"
+
+  - scenario_id: S4
+    title: "Don't update for navigation request"
+    tags: [write, notebook, scope]
+    setup:
+      project: noted-testing
+      notebook: training_sandbox.ipynb
+    user_request: "go to cell 5 of training_sandbox.ipynb"
+    expected_tools_called:
+      - name: scroll_to_cell
+        exact_count: 1
+    expected_tools_NOT_called:
+      - update_cell
+    expected_answer_focus: |
+      - "go to" = navigation; use scroll_to_cell
+      - update_cell mutates content - never call without explicit edit intent
+
+  - scenario_id: S5
+    title: "Multi-cell uniform rename -> find_replace_in_cells"
+    tags: [write, notebook, rename]
+    setup:
+      project: noted-testing
+      notebook: training_sandbox.ipynb
+    user_request: "rename variable X to Y in cells 5, 7, and 12"
+    expected_tools_called:
+      - name: find_replace_in_cells
+        exact_count: 1
+        args_match:
+          pattern: "X"
+          replacement: "Y"
+    expected_tools_NOT_called:
+      - update_cell
+      - batch_update_cells
+    expected_answer_focus: |
+      - confirm what was changed and in which cells
+      - be honest about cells where the rename was not applicable (e.g. markdown cells that did not contain X)
+    expected_answer_focus: |
+      - multiple cells = use batch_update_cells (single confirm)
+      - update_cell is for one cell at a time

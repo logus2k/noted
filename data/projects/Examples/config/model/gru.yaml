@@ -1,0 +1,6 @@
+type: GRU
+params:
+  units1: 128
+  units2: 64
+  n_layers: 2
+  dropout: 0.2

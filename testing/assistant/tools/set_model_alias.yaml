@@ -1,0 +1,111 @@
+# Machine-readable scenarios for the `set_model_alias` tool test doc.
+
+doc_id: set_model_alias
+doc_type: tool
+
+# Scenarios covered: S1, S2, S3, S4, S5 (5 of 7).
+# DEFERRED: S6 (concurrent alias mutations), S7 (alias on a deleted version).
+
+scenarios:
+  - scenario_id: S1
+    title: "Set @champion to a new version"
+    tags: [write, mlflow, registry, alias]
+    setup:
+      project: noted-testing
+    user_request: "promote v3 of Sandbox Forecaster to @champion"
+    expected_tools_called:
+      - name: set_model_alias
+        exact_count: 1
+        args_match:
+          model_name: "Sandbox Forecaster"
+          version: "3"
+          alias: "champion"
+    expected_tools_NOT_called:
+      - deploy_model
+    expected_answer_focus: |
+      - call set_model_alias with version="3" and alias="champion"
+      - in MLflow 3.x, this MOVES the alias (does not delete the old champion)
+      - report the alias is now on v3
+      - do NOT auto-deploy
+
+  - scenario_id: S2
+    title: "Set new alias name"
+    tags: [write, mlflow, registry, alias]
+    setup:
+      project: noted-testing
+    user_request: "tag v3 of Sandbox Forecaster as @experimental"
+    expected_tools_called:
+      - name: set_model_alias
+        exact_count: 1
+        args_match:
+          model_name: "Sandbox Forecaster"
+          version: "3"
+          alias: "experimental"
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - new alias names work the same as standard ones
+      - confirm the alias is set
+
+  - scenario_id: S3
+    title: "Move alias to itself (no-op)"
+    tags: [write, mlflow, registry, alias, edge]
+    setup:
+      project: noted-testing
+    user_request: "promote v1 of Sandbox Forecaster to @champion"
+    expected_tools_called:
+      - name: set_model_alias
+        exact_count: 1
+        args_match:
+          model_name: "Sandbox Forecaster"
+          version: "1"
+          alias: "champion"
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - tool succeeds (no-op since v1 already has @champion)
+      - report success or "already champion" gracefully
+
+  - scenario_id: S4
+    title: "Bad version"
+    tags: [write, mlflow, registry, alias, error]
+    setup:
+      project: noted-testing
+    user_request: "promote v99 of Sandbox Forecaster to @champion"
+    expected_tools_called:
+      - name: set_model_alias
+        exact_count: 1
+        args_match:
+          model_name: "Sandbox Forecaster"
+          # Backend tolerates both "v99" and "99" (it strips a leading v),
+          # so the model may emit either - regex accepts both forms.
+          version: "/^v?99$/"
+          alias: "champion"
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - communicate that version 99 does not exist for this model (the tool's RESOURCE_DOES_NOT_EXIST message can be paraphrased; do not invent a different reason)
+      - it is acceptable to follow up with list_model_versions and present the actual available versions to help the user pick a real one
+      - calling list_model_versions to show available versions is acceptable
+
+  - scenario_id: S5
+    title: "Promote then deploy"
+    tags: [write, mlflow, registry, alias, workflow]
+    setup:
+      project: noted-testing
+      prerequisites:
+        - fixture: unload_model
+    turns:
+      - user_request: "promote v3 of Sandbox Forecaster to @champion"
+        expected_tools_called:
+          - name: set_model_alias
+            exact_count: 1
+        expected_tools_NOT_called:
+          - deploy_model
+        expected_answer_focus: "alias moved to v3"
+      - user_request: "deploy the champion"
+        expected_tools_called:
+          - name: deploy_model
+            exact_count: 1
+            args_match:
+              model_name: "Sandbox Forecaster"
+              alias: "champion"
+        expected_tools_NOT_called: []
+        expected_answer_focus: "deploys v3 (which now carries @champion)"

@@ -1,0 +1,121 @@
+sameAs merge POST-rebuild snapshot: 2026-04-29T07:58:45.381924
+
+========== sw_arch ==========
+
+Entity counts by type:
+  concept                      2069
+  markdown_chunk                999
+  term                          444
+  person                        262
+  organization                  132
+  community_summary              32
+  community                      32
+  markdown_doc                    6
+  TOTAL                        3976
+
+Thematic entities: 2907
+
+Edge counts by type:
+  similar_to                   6612
+  mentions                     5155
+  member_of                    2907
+  chunked_into                  999
+  summarizes                     32
+  sameAs                          7
+
+Remaining sameAs edges: 7
+
+Entities with absorbed aliases: 44
+
+Sample 12 (label <- aliases):
+  "agentic workflows"  <-  ['agentic workflow', 'agent workflows']
+  "Large Language Models"  <-  ['large language model']
+  "Responsible-AI"  <-  ['Responsible AI']
+  "agentic AI workflows"  <-  ['Agentic AI Workflow']
+  "AI agents"  <-  ['AI agent']
+  "tool calls"  <-  ['Tool call']
+  "MCP servers"  <-  ['MCP Server']
+  "tool integrations"  <-  ['tool integration']
+  "LlmAgent"  <-  ['LLM agents', 'LLM Agent']
+  "MCP server"  <-  ['MCP servers']
+  "MCP client"  <-  ['MCP clients']
+  "Language models"  <-  ['language model']
+
+========== eu_ai ==========
+
+Entity counts by type:
+  concept                       671
+  markdown_chunk                327
+  term                          122
+  organization                   48
+  community_summary              13
+  community                      13
+  markdown_doc                    1
+  TOTAL                        1195
+
+Thematic entities: 841
+
+Edge counts by type:
+  similar_to                   3179
+  mentions                     1944
+  member_of                     841
+  chunked_into                  327
+  sameAs                         45
+  summarizes                     13
+
+Remaining sameAs edges: 45
+
+Entities with absorbed aliases: 52
+
+Sample 12 (label <- aliases):
+  "Artificial Intelligence Act"  <-  ['artificial intelligence']
+  "high-risk AI systems"  <-  ['high-risk AI system']
+  "AI systems"  <-  ['AI system']
+  "deployer"  <-  ['deployers']
+  "remote biometric identification system"  <-  ['post-remote biometric identification systems', 'post-remote biometric identification system', 'remote biometric identification systems']
+  "emotion recognition system"  <-  ['emotion recognition systems']
+  "AI regulatory sandboxes"  <-  ['AI regulatory sandbox']
+  "transparency obligations"  <-  ['transparency obligation']
+  "Biometric categorisation systems"  <-  ['biometric categorisation system']
+  "real-time remote biometric identification systems"  <-  ['real-time remote biometric identification', 'real-time biometric identification system', 'real-time remote biometric identification system']
+  "fundamental rights impact assessment"  <-  ['fundamental rights impact assessments']
+  "Member State"  <-  ['Member States']
+
+========== noted ==========
+
+Entity counts by type:
+  term                          257
+  concept                       246
+  markdown_chunk                225
+  community_summary              16
+  community                      16
+  organization                    5
+  markdown_doc                    3
+  TOTAL                         768
+
+Thematic entities: 508
+
+Edge counts by type:
+  mentions                      971
+  member_of                     508
+  similar_to                    424
+  chunked_into                  225
+  summarizes                     16
+
+Remaining sameAs edges: 0
+
+Entities with absorbed aliases: 15
+
+Sample 12 (label <- aliases):
+  "DVC"  <-  ['.dvc']
+  "MLflow run"  <-  ['MLflow runs']
+  "dvc.data_hash"  <-  ['dvc_data_hash']
+  "Metrics"  <-  ['METRIC']
+  "run_id"  <-  ['Run ID']
+  "drift snapshot"  <-  ['drift snapshots']
+  "run_id"  <-  ['Run ID']
+  "AIRFLOW_WWW_USER_USERNAME"  <-  ['_AIRFLOW_WWW_USER_USERNAME']
+  "AIRFLOW_WWW_USER_PASSWORD"  <-  ['_AIRFLOW_WWW_USER_PASSWORD']
+  "Projects"  <-  ['project']
+  "Environments"  <-  ['environment']
+  "MCP tools"  <-  ['MCPtools']

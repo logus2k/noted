@@ -1,0 +1,111 @@
+# Machine-readable scenarios for the `search_files` tool test doc.
+
+doc_id: search_files
+doc_type: tool
+
+# Scenarios covered: S1, S2, S3, S4, S5, S6 (6 of 8).
+# DEFERRED: S7 (regex special chars), S8 (max_results overflow).
+
+scenarios:
+  - scenario_id: S1
+    title: "Find function definition"
+    tags: [read, files, search]
+    setup:
+      project: noted-testing
+    user_request: "where is the train_model function defined?"
+    expected_tools_called:
+      - name: search_files
+        exact_count: 1
+        args_match:
+          query: "def train_model"
+    expected_tools_NOT_called:
+      - get_file_contents
+    expected_answer_focus: |
+      - report file paths and matching line(s)
+      - if multiple matches, list them; do NOT auto-open all
+
+  - scenario_id: S2
+    title: "Find string usage"
+    tags: [read, files, search]
+    setup:
+      project: noted-testing
+    user_request: "search for 'mlflow.start_run' across the project"
+    expected_tools_called:
+      - name: search_files
+        exact_count: 1
+        args_match:
+          query: "mlflow.start_run"
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - report files and matching lines
+      - if zero matches, say so explicitly
+
+  - scenario_id: S3
+    title: "Restrict by file pattern"
+    tags: [read, files, search]
+    setup:
+      project: noted-testing
+    user_request: "search 'def predict' only in python files"
+    expected_tools_called:
+      - name: search_files
+        exact_count: 1
+        args_match:
+          query: "def predict"
+          file_pattern: "*.py"
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - apply file_pattern filter
+      - report matches in .py files only
+
+  - scenario_id: S4
+    title: "Restrict by path"
+    tags: [read, files, search]
+    setup:
+      project: noted-testing
+    user_request: "search for 'TODO' in the src/ directory"
+    expected_tools_called:
+      - name: search_files
+        exact_count: 1
+        args_match:
+          query: "TODO"
+          path: "src"
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - scope to src/
+      - list TODOs found
+
+  - scenario_id: S5
+    title: "Then read the matched file"
+    tags: [read, files, search, workflow]
+    setup:
+      project: noted-testing
+    turns:
+      - user_request: "search for 'class TrainingPipeline'"
+        expected_tools_called:
+          - name: search_files
+            exact_count: 1
+        expected_tools_NOT_called:
+          - get_file_contents
+        expected_answer_focus: "report file + line of match"
+      - user_request: "open that file"
+        expected_tools_called:
+          - name: get_file_contents
+            exact_count: 1
+        expected_tools_NOT_called:
+          - search_files
+        expected_answer_focus: "use path from prior turn"
+
+  - scenario_id: S6
+    title: "Empty result"
+    tags: [read, files, search]
+    setup:
+      project: noted-testing
+    user_request: "search for 'absolutely_unique_string_xyz_123'"
+    expected_tools_called:
+      - name: search_files
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - report zero matches explicitly
+      - do NOT fabricate matches
+      - may suggest the user try a different query

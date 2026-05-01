@@ -1,0 +1,83 @@
+# Machine-readable scenarios for the `mlflow-artifacts` skill test doc.
+
+doc_id: mlflow-artifacts
+doc_type: skill
+
+# Scenarios covered: S1, S2, S3, S4, S5 (5 of 7).
+# DEFERRED: S6 (cross-run artifact comparison), S7 (artifact retention policy).
+
+scenarios:
+  - scenario_id: S1
+    title: "Inspect artifacts of a run"
+    tags: [skill, mlflow, artifacts]
+    setup:
+      project: noted-testing
+    user_request: "what artifacts does run ad190b73dd6147158fc27f1eda9f1637 have?"
+    expected_tools_called:
+      - name: get_run_details
+        exact_count: 1
+    expected_tools_NOT_called:
+      - list_run_artifacts
+    expected_answer_focus: |
+      - get_run_details returns a classified artifact summary (Models/Images/Charts/Files)
+      - report the summary; do NOT drill via list_run_artifacts unless the user asks for a specific path
+
+  - scenario_id: S2
+    title: "Drill into model/"
+    tags: [skill, mlflow, artifacts]
+    setup:
+      project: noted-testing
+    user_request: "open the model directory of run ad190b73dd6147158fc27f1eda9f1637"
+    expected_tools_called:
+      - name: list_run_artifacts
+        exact_count: 1
+        args_match:
+          path: "model"
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - call list_run_artifacts with path='model'
+      - report contents (MLmodel, conda.yaml, python_model.pkl, etc.)
+
+  - scenario_id: S3
+    title: "Hydra bundle artifact"
+    tags: [skill, mlflow, artifacts, hydra]
+    setup:
+      project: noted-testing
+      active_run_id: ad190b73dd6147158fc27f1eda9f1637
+    user_request: "does the run carry a Hydra config bundle?"
+    expected_tools_called:
+      - name: list_run_artifacts
+        exact_count: 1
+        args_match:
+          path: "hydra"
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - check for hydra/ subdirectory in artifact tree
+      - if present, mention config/, selections.json, resolved.yaml
+      - tie to noted's per-run Hydra bundle feature
+
+  - scenario_id: S4
+    title: "Model vs Logged Model terminology"
+    tags: [skill, mlflow, artifacts, terminology]
+    setup:
+      project: noted-testing
+    user_request: "what's the difference between classic MLflow artifacts and Logged Models?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - classic artifacts = the run's artifact tree (files under model/, charts/, etc.)
+      - MLflow 3.x Logged Models = first-class model entities linked to the run
+      - the registered-model version points at a Logged Model
+
+  - scenario_id: S5
+    title: "Downloading an artifact"
+    tags: [skill, mlflow, artifacts]
+    setup:
+      project: noted-testing
+    user_request: "how do I download the trained model locally?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - use MLflow's built-in download (mlflow.artifacts.download_artifacts)
+      - or through the UI's artifact viewer in the Run panel
+      - noted's registered models are stored in MinIO behind MLflow

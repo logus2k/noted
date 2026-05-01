@@ -1,0 +1,60 @@
+# Machine-readable scenarios for the `hydra-setup` skill test doc.
+
+doc_id: hydra-setup
+doc_type: skill
+
+# Scenarios covered: S1, S2, S3, S4 (4 of 6).
+# DEFERRED: S5 (migrating from non-Hydra), S6 (advanced defaults list semantics).
+
+scenarios:
+  - scenario_id: S1
+    title: "Add Hydra to a project"
+    tags: [skill, hydra, setup]
+    setup:
+      project: noted-testing
+    user_request: "how do I set up Hydra in a new project?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - config/config.yaml as the main composition entry
+      - config/<group>/ subdirectories for option groups
+      - defaults: list at the top of config.yaml
+      - mention that noted auto-discovers config/ and exposes it in the Composer
+
+  - scenario_id: S2
+    title: "First config file"
+    tags: [skill, hydra, setup]
+    setup:
+      project: noted-testing
+    user_request: "show me a minimal config.yaml example"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - inline defaults section + training block
+      - explain how to add a data/model group
+
+  - scenario_id: S3
+    title: "Groups directory"
+    tags: [skill, hydra, setup]
+    setup:
+      project: noted-testing
+    user_request: "where do group files live?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - config/<group>/<option>.yaml
+      - e.g. config/data/default.yaml, config/model/lstm.yaml
+      - select via defaults list (e.g. - data: default)
+
+  - scenario_id: S4
+    title: "Group vs inline"
+    tags: [skill, hydra, setup]
+    setup:
+      project: noted-testing
+    user_request: "should I put training as a group or inline?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - inline if single-option (training knobs)
+      - group if multi-option (choose among data: jena_full / jena_2012)
+      - noted's Composer exposes inline blocks as override fields, groups as dropdowns

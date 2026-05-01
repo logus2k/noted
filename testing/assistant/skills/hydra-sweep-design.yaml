@@ -1,0 +1,47 @@
+# Machine-readable scenarios for the `hydra-sweep-design` skill test doc.
+
+doc_id: hydra-sweep-design
+doc_type: skill
+
+# Scenarios covered: S1, S2, S3 (3 of 5).
+# DEFERRED: S4 (Optuna sweeper), S5 (Ax sweeper).
+
+scenarios:
+  - scenario_id: S1
+    title: "Grid sweep syntax"
+    tags: [skill, hydra, sweep]
+    setup:
+      project: noted-testing
+    user_request: "how do I design a Hydra grid sweep over lr and batch size?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - Hydra sweep syntax: --multirun lr=1e-3,1e-4 batch_size=32,64
+      - runs cartesian product
+      - noted's standard approach is Airflow-orchestrated; Hydra multirun is an alternative
+
+  - scenario_id: S2
+    title: "Random sweep"
+    tags: [skill, hydra, sweep]
+    setup:
+      project: noted-testing
+    user_request: "how to do random sampling instead of grid?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - install hydra-optuna-sweeper (or similar)
+      - configure in hydra.sweeper
+      - mention that noted prefers Airflow sweep DAGs for production use
+
+  - scenario_id: S3
+    title: "Sweep output organization"
+    tags: [skill, hydra, sweep]
+    setup:
+      project: noted-testing
+    user_request: "where do sweep results go?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - each trial is a separate MLflow run (auto-instrumented)
+      - tag with sweep_id for grouping
+      - analyze via get_experiment_runs + filter

@@ -1,0 +1,71 @@
+# Machine-readable scenarios for the `noted-coding-conventions` skill test doc.
+
+doc_id: noted-coding-conventions
+doc_type: skill
+
+# Scenarios covered: S1, S2, S3, S4, S5 (5 of 7).
+# DEFERRED: S6 (R-specific conventions), S7 (team-specific style overrides).
+
+scenarios:
+  - scenario_id: S1
+    title: "Cell structure advice"
+    tags: [skill, conventions]
+    setup:
+      project: noted-testing
+    user_request: "any conventions for how to structure my notebook cells?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - summarize the noted conventions (one logical step per cell, markdown headers, imports separated, etc.)
+      - mention that noted's Run Manager ties cell-groupings to MLflow runs, which rewards clean boundaries
+
+  - scenario_id: S2
+    title: "Naming conventions"
+    tags: [skill, conventions]
+    setup:
+      project: noted-testing
+    user_request: "what variable naming does the project use?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - snake_case for variables / functions
+      - UPPER_SNAKE for constants
+      - explain the rationale briefly
+
+  - scenario_id: S3
+    title: "Import organization"
+    tags: [skill, conventions, linting]
+    setup:
+      project: noted-testing
+    user_request: "how should I organize imports in my cells?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - stdlib first, third-party next, local last
+      - mention that Ruff (I001) enforces this automatically
+      - call fix_lint_issues when user asks to enforce
+
+  - scenario_id: S4
+    title: "Docstrings expectation"
+    tags: [skill, conventions]
+    setup:
+      project: noted-testing
+    user_request: "should I add docstrings to functions in my cells?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - brief google-style docstrings recommended for public functions
+      - not required for trivial single-line helpers
+
+  - scenario_id: S5
+    title: "Cell length"
+    tags: [skill, conventions]
+    setup:
+      project: noted-testing
+    user_request: "is it OK to have a 200-line cell?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - long cells hurt Run Manager usability (can't include subset)
+      - recommend splitting at natural boundaries
+      - no hard rule; guidance only

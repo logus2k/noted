@@ -1,0 +1,93 @@
+# Machine-readable scenarios for the `noted-notebook-resolution` skill test doc.
+
+doc_id: noted-notebook-resolution
+doc_type: skill
+
+# Scenarios covered: S1, S2, S3, S4, S5, S6 (6 of 8).
+# DEFERRED: S7 (notebook in mount), S8 (notebook_uid migration).
+
+scenarios:
+  - scenario_id: S1
+    title: "Selected cell resolution"
+    tags: [skill, notebook]
+    setup:
+      project: noted-testing
+      notebook: training_sandbox.ipynb
+      selected_cell_indices: [3]
+    user_request: "explain this cell"
+    expected_tools_called: []
+    expected_tools_NOT_called:
+      - get_notebook_cells
+    expected_answer_focus: |
+      - the WORKSPACE CONTEXT's SELECTED marker identifies which cell the user means
+      - read the cell content from the context block, do NOT re-fetch unless content is absent
+      - answer based on the selected cell
+
+  - scenario_id: S2
+    title: "'This' pronoun resolution"
+    tags: [skill, notebook]
+    setup:
+      project: noted-testing
+      notebook: training_sandbox.ipynb
+      selected_cell_indices: [3]
+    user_request: "what does this do?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - "this" = the cell marked SELECTED in WORKSPACE CONTEXT
+      - answer based on the selected cell content
+      - if multiple cells are selected, address them collectively
+
+  - scenario_id: S3
+    title: "Selection changes between turns"
+    tags: [skill, notebook, multi_turn]
+    setup:
+      project: noted-testing
+      notebook: training_sandbox.ipynb
+    user_request: "what does this cell do?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - always use the LATEST WORKSPACE CONTEXT for current selection
+      - do not assume the same cell as a prior turn
+      - prior conversation context is NOT the source of truth for which cell is selected
+
+  - scenario_id: S4
+    title: "No selection + specific cell request"
+    tags: [skill, notebook]
+    setup:
+      project: noted-testing
+      notebook: training_sandbox.ipynb
+    user_request: "show me cell 7"
+    expected_tools_called:
+      - name: get_notebook_cells
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - specific cell number given - fetch with get_notebook_cells
+      - report content
+
+  - scenario_id: S5
+    title: "No selection + generic 'this'"
+    tags: [skill, notebook, ambiguity]
+    setup:
+      project: noted-testing
+    user_request: "what's this?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - if no cell is marked SELECTED in context, ASK the user what "this" refers to
+      - do NOT guess or pick a cell arbitrarily
+
+  - scenario_id: S6
+    title: "notebook_uid stability"
+    tags: [skill, notebook]
+    setup:
+      project: noted-testing
+    user_request: "how does noted identify my notebook across renames?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - each notebook has a persistent UUID (notebook_uid) stored in the .ipynb metadata
+      - survives renames and moves
+      - lineage (Hydra bundles, DVC tracking) uses notebook_uid as the stable key

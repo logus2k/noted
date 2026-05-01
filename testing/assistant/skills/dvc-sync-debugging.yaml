@@ -1,0 +1,60 @@
+# Machine-readable scenarios for the `dvc-sync-debugging` skill test doc.
+
+doc_id: dvc-sync-debugging
+doc_type: skill
+
+# Scenarios covered: S1, S2, S3, S4 (4 of 6).
+# DEFERRED: S5 (remote auth issues), S6 (partial pull recovery).
+
+scenarios:
+  - scenario_id: S1
+    title: "Out-of-sync hash"
+    tags: [skill, dvc, debugging]
+    setup:
+      project: noted-testing
+    user_request: "dvc says my data.csv is modified but I didn't change it"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - likely file touched (mtime changed) or re-saved with different encoding
+      - dvc checksum compares hashes; if mismatch, dvc thinks it's modified
+      - fix: dvc checkout to restore canonical version, OR dvc add if intentional
+
+  - scenario_id: S2
+    title: "Push fails"
+    tags: [skill, dvc, debugging]
+    setup:
+      project: noted-testing
+    user_request: "dvc push failed - now what?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - check remote connectivity (dvc remote list)
+      - check minio availability / credentials
+      - retry with dvc push -v for verbose output
+
+  - scenario_id: S3
+    title: "Pull gets no data"
+    tags: [skill, dvc, debugging]
+    setup:
+      project: noted-testing
+    user_request: "dvc pull says 'everything is up to date' but I don't see the file"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - likely the .dvc file is missing from git (file not truly DVC-tracked)
+      - run dvc status to see
+      - if no .dvc file, the data isn't in DVC; use get_dvc_data_overview
+
+  - scenario_id: S4
+    title: ".dvc file conflict"
+    tags: [skill, dvc, debugging]
+    setup:
+      project: noted-testing
+    user_request: "I have a merge conflict on data.csv.dvc"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - choose which md5 is correct; resolve conflict in the .dvc YAML
+      - then dvc checkout to sync local file
+      - explain the risk: wrong resolution = wrong file loaded

@@ -1,0 +1,62 @@
+# Machine-readable scenarios for the `airflow-sweep-strategy` skill test doc.
+
+doc_id: airflow-sweep-strategy
+doc_type: skill
+
+# Scenarios covered: S1, S2, S3, S4 (4 of 6).
+# DEFERRED: S5 (Bayesian optimization integration), S6 (multi-objective).
+
+scenarios:
+  - scenario_id: S1
+    title: "Grid sweep"
+    tags: [skill, airflow, sweep]
+    setup:
+      project: noted-testing
+    user_request: "how do I set up a grid sweep over learning rate and batch size?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - sweep DAG with dynamic task mapping or nested loop
+      - each leaf task runs a full training with a parameter combo
+      - MLflow runs tagged with sweep_id for later group analysis
+
+  - scenario_id: S2
+    title: "Random sweep"
+    tags: [skill, airflow, sweep]
+    setup:
+      project: noted-testing
+    user_request: "I want 30 random-search trials"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - sweep DAG samples N param combos
+      - triggers training sub-runs
+      - log sweep_id tag on each for grouping
+
+  - scenario_id: S3
+    title: "Sweep analysis"
+    tags: [skill, airflow, sweep]
+    setup:
+      project: noted-testing
+    user_request: "my sweep has finished - how do I find the best combo?"
+    expected_tools_called:
+      - name: get_experiment_runs
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - filter by sweep_id tag
+      - sort by primary metric
+      - may use compare_runs for top 2
+
+  - scenario_id: S4
+    title: "Runaway cost guard"
+    tags: [skill, airflow, sweep, cost]
+    setup:
+      project: noted-testing
+    user_request: "my sweep is too expensive - how do I stop early?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - early-stopping in each sub-run (via callback)
+      - or DAG-level: cap max concurrent runs / trial budget
+      - suggest halving epochs for sweep, using best for final long run

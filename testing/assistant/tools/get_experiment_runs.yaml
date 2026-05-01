@@ -1,0 +1,154 @@
+# Machine-readable scenarios for the `get_experiment_runs` tool test doc.
+# Human-readable counterpart: get_experiment_runs.md.
+
+doc_id: get_experiment_runs
+doc_type: tool
+
+# Scenarios covered: S1, S2, S3, S4, S5, S6, S7, S8 (8 of 10).
+# DEFERRED: S9 (very-large run set - synthetic), S10 (failed-run-only experiment).
+
+scenarios:
+  - scenario_id: S1
+    title: "Basic listing"
+    tags: [read, mlflow, runs]
+    setup:
+      project: noted-testing
+    user_request: "what runs are in the noted-testing experiment?"
+    expected_tools_called:
+      - name: get_experiment_runs
+        exact_count: 1
+        args_match:
+          experiment_name: "noted-testing"
+    expected_tools_NOT_called:
+      - get_run_details
+    expected_answer_focus: |
+      - report the recent runs from the tool result
+      - mention status (FINISHED / FAILED) where shown
+      - do NOT call get_run_details unless asked for a specific run
+
+  - scenario_id: S2
+    title: "Find a specific named run"
+    tags: [read, mlflow, runs, search]
+    setup:
+      project: noted-testing
+    user_request: "is there a run called 'baseline-eval' in noted-testing?"
+    expected_tools_called:
+      - name: get_experiment_runs
+        exact_count: 1
+        args_match:
+          experiment_name: "noted-testing"
+    expected_tools_NOT_called:
+      - get_run_details
+    expected_answer_focus: |
+      - scan the result for 'baseline-eval'
+      - if not present, report not found and list the actual run names
+      - do NOT fabricate the existence of the named run
+
+  - scenario_id: S3
+    title: "Most recent run pickup"
+    tags: [read, mlflow, runs]
+    setup:
+      project: noted-testing
+    user_request: "what's the latest run in noted-testing?"
+    expected_tools_called:
+      - name: get_experiment_runs
+        exact_count: 1
+        args_match:
+          experiment_name: "noted-testing"
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - identify the first (newest-first) run from the tool output
+      - report its run_id and status
+      - do NOT also call get_run_details proactively
+
+  - scenario_id: S4
+    title: "Failed-run identification"
+    tags: [read, mlflow, runs, debugging]
+    setup:
+      project: noted-testing
+    user_request: "did anything fail recently in noted-testing?"
+    expected_tools_called:
+      - name: get_experiment_runs
+        exact_count: 1
+        args_match:
+          experiment_name: "noted-testing"
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - scan for runs with status=FAILED in the tool output
+      - if none, report no failed runs
+      - if present, list them and offer to drill via get_run_details
+
+  - scenario_id: S5
+    title: "Nonexistent experiment"
+    tags: [read, mlflow, runs, error]
+    setup:
+      project: noted-testing
+    user_request: "list runs in the absent-experiment-xyz experiment"
+    expected_tools_called:
+      - name: get_experiment_runs
+        exact_count: 1
+        args_match:
+          experiment_name: "absent-experiment-xyz"
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - the tool returns an error or empty result
+      - report that the experiment is not found
+      - do NOT fabricate runs; suggest the user check the experiment name
+
+  - scenario_id: S6
+    title: "Workspace inference (no name given)"
+    tags: [read, mlflow, runs, context]
+    setup:
+      project: noted-testing
+    user_request: "show me the recent runs"
+    expected_tools_called:
+      - name: get_experiment_runs
+        exact_count: 1
+        args_match:
+          experiment_name: "noted-testing"
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - infer experiment_name from the workspace context (project_id implies experiment 'noted-testing')
+      - report the runs
+      - do NOT ask the user for the experiment name when context provides it
+
+  - scenario_id: S7
+    title: "Multi-turn: list then drill into one"
+    tags: [read, mlflow, runs, workflow]
+    setup:
+      project: noted-testing
+    turns:
+      - user_request: "what runs are in noted-testing?"
+        expected_tools_called:
+          - name: get_experiment_runs
+            exact_count: 1
+        expected_tools_NOT_called:
+          - get_run_details
+        expected_answer_focus: "list recent runs"
+      - user_request: "give me details for the first one"
+        expected_tools_called:
+          - name: get_run_details
+            exact_count: 1
+        expected_tools_NOT_called:
+          - get_experiment_runs
+        expected_answer_focus: |
+          - reuse the run_id of the first run from the previous turn
+          - call get_run_details with that run_id
+          - do NOT re-fetch the experiment list
+
+  - scenario_id: S8
+    title: "Counts + summary"
+    tags: [read, mlflow, runs, summary]
+    setup:
+      project: noted-testing
+    user_request: "how many runs are in noted-testing?"
+    expected_tools_called:
+      - name: get_experiment_runs
+        exact_count: 1
+        args_match:
+          experiment_name: "noted-testing"
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - report the count of runs returned
+      - briefly summarize their status mix (e.g. "5 runs, all FINISHED")
+      - do NOT enumerate all runs unless explicitly asked

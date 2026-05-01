@@ -1,0 +1,18 @@
+{
+  "language": "python",
+  "version": "3.12",
+  "display_name": "Python 3.12",
+  "executable": "/usr/bin/python3.12",
+  "env_create_cmd": ["{executable}", "-m", "venv", "{env_path}"],
+  "env_post_create_cmds": [
+    ["uv", "pip", "install", "--python", "{env_path}/bin/python", "ipykernel", "mlflow", "hydra-core"]
+  ],
+  "kernel_cmd": ["{env_path}/bin/python", "-m", "ipykernel_launcher", "-f", "{connection_file}"],
+  "kernel_language": "python",
+  "package_manager": {
+    "list_cmd": ["{env_path}/bin/pip", "list", "--format=json"],
+    "install_cmd": ["{env_path}/bin/pip", "install"],
+    "remove_cmd": ["{env_path}/bin/pip", "uninstall", "-y"],
+    "uv_install_cmd": ["uv", "pip", "install", "--python", "{env_path}/bin/python"]
+  }
+}

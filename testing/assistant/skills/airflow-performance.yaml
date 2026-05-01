@@ -1,0 +1,61 @@
+# Machine-readable scenarios for the `airflow-performance` skill test doc.
+
+doc_id: airflow-performance
+doc_type: skill
+
+# Scenarios covered: S1, S2, S3, S4 (4 of 6).
+# DEFERRED: S5 (executor tuning), S6 (database perf).
+
+scenarios:
+  - scenario_id: S1
+    title: "Slow DAG diagnosis"
+    tags: [skill, airflow, performance]
+    setup:
+      project: noted-testing
+    user_request: "my DAG takes 30 minutes to run - can I speed it up?"
+    expected_tools_called:
+      - name: list_dags
+      - name: get_dag_status
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - discover the project DAG via list_dags, then get_dag_status for task durations
+      - common wins: parallelize independent tasks, skip redundant re-compute, cache intermediate artifacts
+
+  - scenario_id: S2
+    title: "Parallel tasks"
+    tags: [skill, airflow, performance]
+    setup:
+      project: noted-testing
+    user_request: "I have two independent evaluation tasks - can they run in parallel?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - yes - don't chain them with >>; use `train >> [eval_a, eval_b]`
+      - confirm pool size / concurrency on Airflow allows parallelism
+
+  - scenario_id: S3
+    title: "Reuse cached artifacts"
+    tags: [skill, airflow, performance]
+    setup:
+      project: noted-testing
+    user_request: "my preprocessing runs from scratch every time even when data hasn't changed"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - cache preprocessed data in MinIO / artifact store keyed by DVC hash
+      - check hash in the task; skip if cached
+      - reduces sweep cost dramatically
+
+  - scenario_id: S4
+    title: "Heavy task tuning"
+    tags: [skill, airflow, performance]
+    setup:
+      project: noted-testing
+    user_request: "training dominates the runtime"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - profile with MLflow per-epoch metrics + lr schedule
+      - consider smaller model / early stopping / mixed precision
+      - separate concern: DAG orchestration vs actual training loop perf

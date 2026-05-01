@@ -1,0 +1,113 @@
+# Machine-readable scenarios for the `get_dag_status` tool test doc.
+
+doc_id: get_dag_status
+doc_type: tool
+
+# Scenarios covered: S1, S2, S3, S4, S5, S6 (6 of 8).
+# DEFERRED: S7 (DAG with 100+ runs), S8 (DAG with task-level granularity).
+
+scenarios:
+  - scenario_id: S1
+    title: "Basic DAG status"
+    tags: [read, airflow]
+    setup:
+      project: noted-testing
+    user_request: "what's the status of jena_training_pipeline?"
+    expected_tools_called:
+      - name: get_dag_status
+        exact_count: 1
+        args_match:
+          dag_id: "jena_training_pipeline"
+    expected_tools_NOT_called:
+      - list_dags
+      - get_task_log
+    expected_answer_focus: |
+      - report active/paused state and recent runs from the tool result
+      - mention the most recent run's outcome
+      - do NOT call get_task_log unless the user asks about a specific failed task
+
+  - scenario_id: S2
+    title: "Recent runs question"
+    tags: [read, airflow]
+    setup:
+      project: noted-testing
+    user_request: "show recent runs of jena_training_pipeline"
+    expected_tools_called:
+      - name: get_dag_status
+        exact_count: 1
+        args_match:
+          dag_id: "jena_training_pipeline"
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - list recent dag_run_ids and their states (success/failed/running)
+
+  - scenario_id: S3
+    title: "Failure detection"
+    tags: [read, airflow, debugging]
+    setup:
+      project: noted-testing
+    user_request: "did jena_training_pipeline fail recently?"
+    expected_tools_called:
+      - name: get_dag_status
+        exact_count: 1
+        args_match:
+          dag_id: "jena_training_pipeline"
+    expected_tools_NOT_called:
+      - get_task_log
+    expected_answer_focus: |
+      - scan for failed run states
+      - if any, name the run_id; offer to fetch task logs
+      - do NOT auto-fetch task_log; user needs to confirm they want it
+
+  - scenario_id: S4
+    title: "Nonexistent DAG"
+    tags: [read, airflow, error]
+    setup:
+      project: noted-testing
+    user_request: "what's the status of imaginary_dag_xyz?"
+    expected_tools_called:
+      - name: get_dag_status
+        exact_count: 1
+        args_match:
+          dag_id: "imaginary_dag_xyz"
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - tool returns error
+      - report not found; suggest list_dags to see what IS available
+
+  - scenario_id: S5
+    title: "Multi-turn list then status"
+    tags: [read, airflow, workflow]
+    setup:
+      project: noted-testing
+    turns:
+      - user_request: "list the DAGs"
+        expected_tools_called:
+          - name: list_dags
+            exact_count: 1
+        expected_tools_NOT_called: []
+        expected_answer_focus: "list DAGs"
+      - user_request: "details on the first one"
+        expected_tools_called:
+          - name: get_dag_status
+            exact_count: 1
+        expected_tools_NOT_called:
+          - list_dags
+        expected_answer_focus: "use the dag_id from prior turn"
+
+  - scenario_id: S6
+    title: "Last run outcome"
+    tags: [read, airflow]
+    setup:
+      project: noted-testing
+    user_request: "what was the outcome of the last jena_training_pipeline run?"
+    expected_tools_called:
+      - name: get_dag_status
+        exact_count: 1
+        args_match:
+          dag_id: "jena_training_pipeline"
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - identify the most recent run
+      - report its state and any visible error indicator
+      - if failed, offer to fetch task log on request

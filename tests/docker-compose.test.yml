@@ -1,0 +1,22 @@
+services:
+  noted-test:
+    build:
+      context: ../tests
+      dockerfile: Dockerfile
+    container_name: noted-test
+    volumes:
+      - ../tests/results:/tests/results
+    environment:
+      - NOTED_URL=http://noted:8123
+      - NOTED_PROJECT=noted-testing
+      - NOTED_TIMEOUT=180
+    depends_on:
+      noted:
+        condition: service_started
+    networks:
+      - default
+
+networks:
+  default:
+    name: noted-network
+    external: true

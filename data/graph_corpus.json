@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "documents": [
+    { "path": "documents/architecture/noted_technical_architecture.md", "uploaded": false },
+    { "path": "documents/noted_architecture_principles.md", "uploaded": false },
+    { "path": "documents/developer/noted_platform_developer_manual.md", "uploaded": false },
+    { "path": "documents/developer/noted_project_notebook_companion.md", "uploaded": false },
+    { "path": "documents/noted_vision.md", "uploaded": false },
+    { "path": "documents/noted_scope.md", "uploaded": false },
+    { "path": "documents/noted_integrations_reference.md", "uploaded": false },
+    { "path": "data/documents/files/noted_platform_user_manual.md", "uploaded": false },
+    { "path": "jena_weather_report/FINAL/noted_platform_final_delivery_project_report.md", "uploaded": false }
+  ]
+}

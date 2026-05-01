@@ -1,0 +1,60 @@
+# Machine-readable scenarios for the `evidently-drift-detection` skill test doc.
+
+doc_id: evidently-drift-detection
+doc_type: skill
+
+# Scenarios covered: S1, S2, S3, S4 (4 of 6).
+# DEFERRED: S5 (categorical drift test), S6 (drift on nested features).
+
+scenarios:
+  - scenario_id: S1
+    title: "What is drift"
+    tags: [skill, evidently, drift]
+    setup:
+      project: noted-testing
+    user_request: "what does data drift mean?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - shift in feature distributions between training data and production data
+      - can degrade model accuracy silently; needs monitoring
+      - Evidently computes drift via statistical tests (KS, Wasserstein) per feature
+
+  - scenario_id: S2
+    title: "How noted runs drift"
+    tags: [skill, evidently, drift]
+    setup:
+      project: noted-testing
+    user_request: "how does noted check for drift?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - Evidently container runs a scheduled drift report per project
+      - noted's standard training DAG also runs drift_check task after training
+      - results stored as MLflow artifacts
+
+  - scenario_id: S3
+    title: "Detected drift - now what"
+    tags: [skill, evidently, drift]
+    setup:
+      project: noted-testing
+    user_request: "Evidently flagged drift - what should I do?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - investigate which features drifted + magnitude
+      - likely retrain on newer data (triggers a DAG run with fresh DVC snapshot)
+      - consider whether it's real concept drift or an input-pipeline bug
+
+  - scenario_id: S4
+    title: "Baseline choice"
+    tags: [skill, evidently, drift]
+    setup:
+      project: noted-testing
+    user_request: "what reference data does drift detection compare against?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - default baseline = training dataset used for the current @champion model
+      - compared against incoming production data window
+      - configurable per project

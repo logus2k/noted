@@ -1,0 +1,88 @@
+# Machine-readable scenarios for the `get_hydra_config` tool test doc.
+
+doc_id: get_hydra_config
+doc_type: tool
+
+# Scenarios covered: S1, S2, S3, S4, S5 (5 of 7).
+# DEFERRED: S6 (project without Hydra), S7 (deeply-nested override resolution).
+
+scenarios:
+  - scenario_id: S1
+    title: "Basic resolved config"
+    tags: [read, hydra]
+    setup:
+      project: noted-testing
+    user_request: "show me the resolved Hydra config for this project"
+    expected_tools_called:
+      - name: get_hydra_config
+        exact_count: 1
+        args_match:
+    expected_tools_NOT_called:
+      - get_file_contents
+    expected_answer_focus: |
+      - report the resolved (composed + overridden) configuration
+      - mention the data/model/scaler group selections
+      - do NOT call get_file_contents on config.yaml - that returns the RAW config
+
+  - scenario_id: S2
+    title: "Specific section query"
+    tags: [read, hydra]
+    setup:
+      project: noted-testing
+    user_request: "what's in the training section of the config?"
+    expected_tools_called:
+      - name: get_hydra_config
+        exact_count: 1
+        args_match:
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - extract and report the training subsection
+      - include epochs, batch_size, learning_rate
+
+  - scenario_id: S3
+    title: "Active group selection"
+    tags: [read, hydra]
+    setup:
+      project: noted-testing
+    user_request: "which data option is currently active?"
+    expected_tools_called:
+      - name: get_hydra_config
+        exact_count: 1
+        args_match:
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - report the active data group selection
+      - mention the file path the data block resolved from
+
+  - scenario_id: S4
+    title: "Difference RAW vs RESOLVED"
+    tags: [read, hydra, terminology]
+    setup:
+      project: noted-testing
+    user_request: "open config.yaml"
+    expected_tools_called:
+      - name: get_file_contents
+        exact_count: 1
+        args_match:
+          path: "config/config.yaml"
+    expected_tools_NOT_called:
+      - get_hydra_config
+    expected_answer_focus: |
+      - "open config.yaml" = raw file read; use get_file_contents
+      - get_hydra_config returns the COMPOSED + OVERRIDDEN result, not the source file
+      - acceptable to mention this distinction
+
+  - scenario_id: S5
+    title: "Override visibility"
+    tags: [read, hydra]
+    setup:
+      project: noted-testing
+    user_request: "are there any overrides applied right now?"
+    expected_tools_called:
+      - name: get_hydra_config
+        exact_count: 1
+        args_match:
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - report active overrides if present
+      - if none, say "no overrides applied; using defaults"

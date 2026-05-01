@@ -1,0 +1,51 @@
+# Machine-readable scenarios for the `dvc-lineage` skill test doc.
+
+doc_id: dvc-lineage
+doc_type: skill
+
+# Scenarios covered: S1, S2, S3 (3 of 5).
+# DEFERRED: S4 (dvc dag visualization), S5 (stages vs simple tracking).
+
+scenarios:
+  - scenario_id: S1
+    title: "DVC in the lineage chain"
+    tags: [skill, dvc, lineage]
+    setup:
+      project: noted-testing
+    user_request: "how does DVC tie into noted's lineage?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - DVC hashes are logged per MLflow run (dataset_hashes param)
+      - this proves which data version trained a given model
+      - point to noted-lineage skill
+
+  - scenario_id: S2
+    title: "Reconstruct a run's data"
+    tags: [skill, dvc, lineage, workflow]
+    setup:
+      project: noted-testing
+    user_request: "how do I get the exact data that trained run ad190b73dd6147158fc27f1eda9f1637?"
+    expected_tools_called:
+      - name: get_run_details
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - fetch run params - look for dataset_hashes
+      - find the git commit that had those hashes in .dvc files
+      - dvc checkout at that commit
+
+  - scenario_id: S3
+    title: "Data vs metrics"
+    tags: [skill, dvc, lineage]
+    setup:
+      project: noted-testing
+    user_request: "compare runs 03b00e2b8fa041cabddc577446744866 and 94295f53427c4e4697b27f089eb32328 - were they trained on the same data?"
+    expected_tools_called:
+      - name: compare_runs
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - call compare_runs with both run_ids
+      - inspect the dataset_hashes column; equal hashes = same data; different = coincidental metrics
+      - report what the tool actually shows, even if dataset_hashes is missing on these runs

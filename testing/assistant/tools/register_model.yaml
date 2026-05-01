@@ -1,0 +1,116 @@
+# Machine-readable scenarios for the `register_model` tool test doc.
+
+doc_id: register_model
+doc_type: tool
+
+# Scenarios covered: S1, S2, S3, S4, S5, S6 (6 of 8).
+# DEFERRED: S7 (concurrent registration), S8 (very-large artifact).
+
+scenarios:
+  - scenario_id: S1
+    title: "Register from existing run"
+    tags: [write, mlflow, registry]
+    setup:
+      project: noted-testing
+    user_request: "register the model from run ad190b73dd6147158fc27f1eda9f1637 as 'My Forecaster'"
+    expected_tools_called:
+      - name: register_model
+        exact_count: 1
+        args_match:
+          run_id: "ad190b73dd6147158fc27f1eda9f1637"
+          model_name: "My Forecaster"
+    expected_tools_NOT_called:
+      - deploy_model
+    expected_answer_focus: |
+      - call register_model with FULL 32-char run_id
+      - report the new version number from tool result
+      - do NOT auto-deploy after registration
+
+  - scenario_id: S2
+    title: "Reuse existing model_name"
+    tags: [write, mlflow, registry]
+    setup:
+      project: noted-testing
+    user_request: "register run ad190b73dd6147158fc27f1eda9f1637 under Sandbox Forecaster"
+    expected_tools_called:
+      - name: register_model
+        exact_count: 1
+        args_match:
+          run_id: "ad190b73dd6147158fc27f1eda9f1637"
+          model_name: "Sandbox Forecaster"
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - registering under an existing name appends a NEW version
+      - report the new version number
+      - do not warn about overwrite (it doesn't overwrite)
+
+  - scenario_id: S3
+    title: "Custom artifact_path"
+    tags: [write, mlflow, registry]
+    setup:
+      project: noted-testing
+    user_request: "register the model at artifact path 'best_model' from run ad190b73dd6147158fc27f1eda9f1637 as TestModel"
+    expected_tools_called:
+      - name: register_model
+        exact_count: 1
+        args_match:
+          run_id: "ad190b73dd6147158fc27f1eda9f1637"
+          model_name: "TestModel"
+          artifact_path: "best_model"
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - pass artifact_path="best_model"
+      - report new version number
+
+  - scenario_id: S4
+    title: "Then promote to @champion"
+    tags: [write, mlflow, registry, workflow]
+    setup:
+      project: noted-testing
+    turns:
+      - user_request: "register run ad190b73dd6147158fc27f1eda9f1637 as 'My Forecaster'"
+        expected_tools_called:
+          - name: register_model
+            exact_count: 1
+        expected_tools_NOT_called:
+          - set_model_alias
+          - deploy_model
+        expected_answer_focus: "report new version N"
+      - user_request: "make it the champion"
+        expected_tools_called:
+          - name: set_model_alias
+            exact_count: 1
+            args_match:
+              alias: "champion"
+        expected_tools_NOT_called:
+          - register_model
+        expected_answer_focus: "set @champion to version N from prior turn"
+
+  - scenario_id: S5
+    title: "Missing model_name - ask"
+    tags: [write, mlflow, registry, ambiguity]
+    setup:
+      project: noted-testing
+    user_request: "register run ad190b73dd6147158fc27f1eda9f1637 as a new model"
+    expected_tools_called: []
+    expected_tools_NOT_called:
+      - register_model
+    expected_answer_focus: |
+      - ASK user for the model_name
+      - calling list_registered_models alongside (to show existing names) is acceptable
+      - do NOT pick a name yourself
+
+  - scenario_id: S6
+    title: "Bad run_id"
+    tags: [write, mlflow, registry, error]
+    setup:
+      project: noted-testing
+    user_request: "register run 0000000000000000000000000000abcd as TestModel"
+    expected_tools_called:
+      - name: register_model
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - tool errors (run not found)
+      - report the failure clearly
+      - do NOT fabricate a success

@@ -1,0 +1,101 @@
+# Machine-readable scenarios for the `insert_cell` tool test doc.
+
+doc_id: insert_cell
+doc_type: tool
+
+# Scenarios covered: S1, S2, S3, S4, S5 (5 of 7).
+# DEFERRED: S6 (insert at non-existent index), S7 (markdown vs code variants).
+
+scenarios:
+  - scenario_id: S1
+    title: "Add new cell"
+    tags: [write, notebook]
+    setup:
+      project: noted-testing
+      notebook: training_sandbox.ipynb
+    user_request: "add a new cell after cell 5 in training_sandbox.ipynb that prints 'hello'"
+    expected_tools_called:
+      - name: insert_cell
+        exact_count: 1
+    expected_tools_NOT_called:
+      - update_cell
+    expected_answer_focus: |
+      - "add new cell" = insert_cell
+      - confirmation handled by platform
+      - report inserted
+
+  - scenario_id: S2
+    title: "Don't use update for new content"
+    tags: [write, notebook, scope]
+    setup:
+      project: noted-testing
+      notebook: training_sandbox.ipynb
+    user_request: "create a new cell at the end with a plot"
+    expected_tools_called:
+      - name: insert_cell
+        exact_count: 1
+    expected_tools_NOT_called:
+      - update_cell
+    expected_answer_focus: |
+      - "create" or "add new" → insert_cell
+      - update_cell is for modifying EXISTING cells
+
+  - scenario_id: S3
+    title: "Markdown cell"
+    tags: [write, notebook]
+    setup:
+      project: noted-testing
+      notebook: training_sandbox.ipynb
+    user_request: "add a markdown cell with a section header before cell 1 of training_sandbox.ipynb"
+    expected_tools_called:
+      - name: insert_cell
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - insert markdown cell
+      - report success
+
+  - scenario_id: S4
+    title: "Multiple inserts in one turn"
+    tags: [write, notebook, scope]
+    # Separate-calls framing per rule (iii) - multi-tool-call emission
+    # is supported per Gemma 4's design; noted's backend batches multi-
+    # write-call turns into one approval. UI safety is provided by the
+    # parser truncation in _prepare_text_for_frontend (drops anything
+    # after the last <tool_call|> close).
+    setup:
+      project: noted-testing
+      notebook: training_sandbox.ipynb
+    user_request: "add three new cells: a header, an import, and a load step"
+    expected_tools_called:
+      - name: insert_cell
+        exact_count: 3
+    expected_tools_NOT_called:
+      - batch_update_cells
+    expected_answer_focus: |
+      - three insert_cell calls emitted in the same response (header markdown, import code, load-step code)
+      - all three reach the user as one approval (backend batches multi-write-call turns)
+
+  - scenario_id: S5
+    title: "Insert template after find"
+    tags: [write, notebook, workflow]
+    setup:
+      project: noted-testing
+      notebook: training_sandbox.ipynb
+    turns:
+      - user_request: "find the cell that defines the model"
+        # Notebook is inlined; either path is acceptable: just say "Cell N
+        # defines the model" in text, or actively scroll the user to it via
+        # scroll_to_cell. Forbidden: get_notebook_cells (already inlined,
+        # would be redundant fetch) and insert_cell (premature edit).
+        expected_tools_called: []
+        expected_tools_NOT_called:
+          - insert_cell
+          - get_notebook_cells
+        expected_answer_focus: "identify the cell index that defines the model (text or via scroll_to_cell, both fine)"
+      - user_request: "add an evaluation cell right after that"
+        expected_tools_called:
+          - name: insert_cell
+            exact_count: 1
+        expected_tools_NOT_called: []
+        expected_answer_focus: "insert after the cell index from prior turn"

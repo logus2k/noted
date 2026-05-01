@@ -1,0 +1,109 @@
+# Machine-readable scenarios for the `get_notebook_cells` tool test doc.
+
+doc_id: get_notebook_cells
+doc_type: tool
+
+# Scenarios covered: S1, S2, S3, S4, S5, S6 (6 of 8).
+# DEFERRED: S7 (notebook with > 80K char cells - truncation), S8 (notebooks with rich outputs).
+
+scenarios:
+  - scenario_id: S1
+    title: "Read a different notebook than the one open"
+    tags: [read, notebook]
+    setup:
+      project: Examples
+      notebook: mlflow_test.ipynb
+    user_request: "show me the contents of notebooks/Welcome.ipynb"
+    expected_tools_called:
+      - name: get_notebook_cells
+        exact_count: 1
+        args_match:
+          notebook_path: "notebooks/Welcome.ipynb"
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - read all cells from the named notebook (different from the currently-open one) via get_notebook_cells
+      - report cells in order with type (code/markdown)
+      - if truncated, mention the from_index for resume
+
+  - scenario_id: S2
+    title: "Read specific cells"
+    tags: [read, notebook]
+    setup:
+      project: noted-testing
+    user_request: "show me cells 1, 5, and 10 of training_sandbox.ipynb"
+    expected_tools_called:
+      - name: get_notebook_cells
+        exact_count: 1
+        args_match:
+          notebook_path: "training_sandbox.ipynb"
+          indices: [1, 5, 10]
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - report only the requested cells
+      - preserve 1-based indexing in the output
+
+  - scenario_id: S3
+    title: "Range read"
+    tags: [read, notebook]
+    setup:
+      project: noted-testing
+    user_request: "show me cells 5 through 10 of training_sandbox.ipynb"
+    expected_tools_called:
+      - name: get_notebook_cells
+        exact_count: 1
+        args_match:
+          notebook_path: "training_sandbox.ipynb"
+          from_index: 5
+          to_index: 10
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - report cells 5-10 inclusive
+      - preserve 1-based indexing
+
+  - scenario_id: S4
+    title: "Include outputs"
+    tags: [read, notebook, outputs]
+    setup:
+      project: noted-testing
+    user_request: "show me cell 3 of training_sandbox.ipynb with its output"
+    expected_tools_called:
+      - name: get_notebook_cells
+        exact_count: 1
+        args_match:
+          notebook_path: "training_sandbox.ipynb"
+          indices: [3]
+          include_outputs: true
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - include cell output (text / image / error) in the report
+      - quote the output verbatim
+
+  - scenario_id: S5
+    title: "Find specific cell"
+    tags: [read, notebook, search]
+    setup:
+      project: noted-testing
+    user_request: "which cell in training_sandbox.ipynb defines the model?"
+    expected_tools_called:
+      - name: get_notebook_cells
+        exact_count: 1
+    expected_tools_NOT_called:
+      - search_files
+    expected_answer_focus: |
+      - read the notebook (full or scanned)
+      - identify the cell index that defines the model
+      - report the cell number (1-based) and a brief excerpt
+
+  - scenario_id: S6
+    title: "Notebook not found"
+    tags: [read, notebook, error]
+    setup:
+      project: noted-testing
+    user_request: "show me imaginary_notebook.ipynb"
+    expected_tools_called:
+      - name: get_notebook_cells
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - tool returns error
+      - report not found; suggest list_files

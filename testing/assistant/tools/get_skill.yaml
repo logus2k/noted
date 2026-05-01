@@ -1,0 +1,85 @@
+# Machine-readable scenarios for the `get_skill` tool test doc.
+
+doc_id: get_skill
+doc_type: tool
+
+# Scenarios covered: S1, S2, S3, S4, S5 (5 of 7).
+# DEFERRED: S6 (skill with reference doc), S7 (very-large skill content).
+
+scenarios:
+  - scenario_id: S1
+    title: "Fetch a non-active skill"
+    tags: [read, skills]
+    setup:
+      project: noted-testing
+    user_request: "load the dvc-versioning skill"
+    expected_tools_called:
+      - name: get_skill
+        exact_count: 1
+        args_match:
+          skill_name: "dvc-versioning"
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - load the named skill content
+      - confirm it's now in scope; offer to apply it to the user's question
+
+  - scenario_id: S2
+    title: "DON'T fetch already-active skill"
+    tags: [read, skills, redundancy]
+    setup:
+      project: noted-testing
+    user_request: "what does the noted-platform-overview skill say?"
+    expected_tools_called: []
+    expected_tools_NOT_called:
+      - get_skill
+    expected_answer_focus: |
+      - noted-platform-overview is auto-injected (priority 1) - already in scope
+      - answer from the skill content already in context
+      - calling get_skill for an already-active skill is redundant and wastes tokens
+      - the platform redirects already-active fetches with a warning
+
+  - scenario_id: S3
+    title: "Skill not found"
+    tags: [read, skills, error]
+    setup:
+      project: noted-testing
+    user_request: "load the imaginary-skill-xyz"
+    expected_tools_called:
+      - name: get_skill
+        exact_count: 1
+        args_match:
+          skill_name: "imaginary-skill-xyz"
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - tool returns error
+      - report not found
+
+  - scenario_id: S4
+    title: "Already-active skill, no redundant fetch"
+    tags: [read, skills, redundancy]
+    setup:
+      project: noted-testing
+    user_request: "I want to set up Hydra in a new project"
+    expected_tools_called: []
+    expected_tools_NOT_called:
+      - get_skill
+    expected_answer_focus: |
+      - hydra-setup is auto-injected (priority 1, hydra_in_context) - its content is already in scope
+      - answer directly from that content; do NOT call get_skill for an already-active skill
+      - platform redirects already-active fetches with a warning so the correct behaviour is to skip the tool entirely
+
+  - scenario_id: S5
+    title: "Load reference doc"
+    tags: [read, skills]
+    setup:
+      project: noted-testing
+    user_request: "show me the airflow-task-debugging skill"
+    expected_tools_called:
+      - name: get_skill
+        exact_count: 1
+        args_match:
+          skill_name: "airflow-task-debugging"
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - load the named skill
+      - report the skill content or summarize it

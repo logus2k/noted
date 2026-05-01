@@ -1,0 +1,22 @@
+{
+  "language": "javascript",
+  "version": "22",
+  "display_name": "Node.js 22",
+  "executable": "/root/.local/share/fnm/node-versions/v22.22.2/installation/bin/node",
+  "env_create_cmd": ["mkdir", "-p", "{env_path}"],
+  "env_post_create_cmds": [
+    ["cp", "-n", "/app/data/templates/javascript/package.json", "{env_path}/package.json"],
+    ["/usr/local/bin/pnpm", "install", "--dir", "{env_path}"]
+  ],
+  "kernel_cmd": [
+    "{env_path}/node_modules/.bin/ijskernel",
+    "--protocol=5.1",
+    "{connection_file}"
+  ],
+  "kernel_language": "javascript",
+  "package_manager": {
+    "list_cmd": ["/usr/local/bin/pnpm", "list", "--json", "--dir", "{env_path}"],
+    "install_cmd": ["/usr/local/bin/pnpm", "add", "--dir", "{env_path}"],
+    "remove_cmd": ["/usr/local/bin/pnpm", "remove", "--dir", "{env_path}"]
+  }
+}

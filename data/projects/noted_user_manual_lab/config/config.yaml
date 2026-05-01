@@ -1,0 +1,6 @@
+defaults:
+  - model: gru_baseline
+  - data: default
+  - training: default
+
+seed: 42

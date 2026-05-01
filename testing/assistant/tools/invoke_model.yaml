@@ -1,0 +1,190 @@
+# Machine-readable scenarios for the `invoke_model` tool test doc.
+
+doc_id: invoke_model
+doc_type: tool
+
+# Scenarios covered: S1, S2, S3, S4, S5, S6, S7, S8 (8 of 10).
+# DEFERRED: S9 (custom payload from CSV - needs file fixture), S10 (batch prediction).
+
+scenarios:
+  - scenario_id: S1
+    title: "Smoke test (no data)"
+    tags: [read, mlflow, serving, invoke]
+    setup:
+      project: noted-testing
+      prerequisites:
+        - fixture: unload_model
+        - fixture: deploy_model
+          args:
+            model_name: "Sandbox Forecaster"
+            alias: champion
+    user_request: "smoke test the deployed model"
+    expected_tools_called:
+      - name: invoke_model
+        exact_count: 1
+        args_match: {}
+    expected_tools_NOT_called:
+      - get_serving_schema
+      - get_serving_status
+    expected_answer_focus: |
+      - call invoke_model() with no data argument (backend builds payload from schema)
+      - report prediction values verbatim from tool result
+      - do NOT hand-type a payload
+
+  - scenario_id: S2
+    title: "Test with sample"
+    tags: [read, mlflow, serving, invoke]
+    setup:
+      project: noted-testing
+      prerequisites:
+        - fixture: unload_model
+        - fixture: deploy_model
+          args:
+            model_name: "Sandbox Forecaster"
+            alias: champion
+    user_request: "test it with a sample input"
+    expected_tools_called:
+      - name: invoke_model
+        exact_count: 1
+        args_match: {}
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - "test it with a sample" maps to invoke_model({}) - the backend uses the MLflow signature's example_input
+      - never hand-type 1920 floats for the [1,120,16] tensor
+      - report prediction from tool result
+
+  - scenario_id: S3
+    title: "Verify after deploy"
+    tags: [read, mlflow, serving, invoke, workflow]
+    setup:
+      project: noted-testing
+      prerequisites:
+        - fixture: unload_model
+    turns:
+      - user_request: "deploy the champion of Sandbox Forecaster"
+        expected_tools_called:
+          - name: deploy_model
+            exact_count: 1
+            args_match:
+              model_name: "Sandbox Forecaster"
+              alias: "champion"
+        expected_tools_NOT_called: []
+        expected_answer_focus: "confirm deploy succeeded"
+      - user_request: "now run a quick prediction to verify"
+        expected_tools_called:
+          - name: invoke_model
+            exact_count: 1
+        expected_tools_NOT_called: []
+        expected_answer_focus: "smoke test via invoke_model({}); report prediction"
+
+  - scenario_id: S4
+    title: "Nothing deployed"
+    tags: [read, mlflow, serving, invoke, error]
+    setup:
+      project: noted-testing
+      prerequisites:
+        - fixture: unload_model
+    user_request: "test the deployed model"
+    expected_tools_called:
+      - name: invoke_model
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - tool returns error (no model loaded)
+      - report the failure; suggest deploy_model first
+      - do NOT fabricate a prediction
+
+  - scenario_id: S5
+    title: "Show then test"
+    tags: [read, mlflow, serving, invoke, workflow]
+    setup:
+      project: noted-testing
+      prerequisites:
+        - fixture: unload_model
+        - fixture: deploy_model
+          args:
+            model_name: "Sandbox Forecaster"
+            alias: champion
+    turns:
+      - user_request: "what shape does the loaded model expect?"
+        expected_tools_called:
+          - name: get_serving_schema
+            exact_count: 1
+        expected_tools_NOT_called:
+          - invoke_model
+        expected_answer_focus: "report shape [1, 120, 16]"
+      - user_request: "test it"
+        expected_tools_called:
+          - name: invoke_model
+            exact_count: 1
+            args_match: {}
+        expected_tools_NOT_called: []
+        expected_answer_focus: "smoke test; report prediction"
+
+  - scenario_id: S6
+    title: "Verify deployed wiring (zero-fill smoke)"
+    tags: [read, mlflow, serving, invoke]
+    setup:
+      project: noted-testing
+      prerequisites:
+        - fixture: unload_model
+        - fixture: deploy_model
+          args:
+            model_name: "Sandbox Forecaster"
+            alias: champion
+    user_request: "is the prediction endpoint wired up correctly?"
+    expected_tools_called:
+      - name: invoke_model
+        exact_count: 1
+        args_match: {}
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - call invoke_model({}) to verify end-to-end wiring
+      - report success / failure based on the tool result
+      - mention the prediction shape as evidence of correct wiring
+
+  - scenario_id: S7
+    title: "User asks for a script"
+    tags: [read, mlflow, serving, invoke, no_script]
+    setup:
+      project: noted-testing
+      prerequisites:
+        - fixture: unload_model
+        - fixture: deploy_model
+          args:
+            model_name: "Sandbox Forecaster"
+            alias: champion
+    user_request: "test the model"
+    expected_tools_called:
+      - name: invoke_model
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - call invoke_model directly; do NOT generate a Python or curl script for the user to run
+      - the backend can hit the serving container; users do not need to script externally
+
+  - scenario_id: S8
+    title: "Reuse smoke result"
+    tags: [read, mlflow, serving, invoke, multi_turn]
+    setup:
+      project: noted-testing
+      prerequisites:
+        - fixture: unload_model
+        - fixture: deploy_model
+          args:
+            model_name: "Sandbox Forecaster"
+            alias: champion
+    turns:
+      - user_request: "smoke test the model"
+        expected_tools_called:
+          - name: invoke_model
+            exact_count: 1
+        expected_tools_NOT_called: []
+        expected_answer_focus: "report smoke test prediction"
+      - user_request: "what was the prediction shape again?"
+        expected_tools_called: []
+        expected_tools_NOT_called:
+          - invoke_model
+        expected_answer_focus: |
+          - reuse the prediction shape from the prior turn's tool result
+          - do NOT re-call invoke_model

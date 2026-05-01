@@ -1,0 +1,69 @@
+# Machine-readable scenarios for the `run_agent` tool test doc.
+
+doc_id: run_agent
+doc_type: tool
+
+# Scenarios covered: S1, S2, S3, S4 (4 of 6).
+# DEFERRED: S5 (subagent fails to return), S6 (cross-agent chaining).
+
+scenarios:
+  - scenario_id: S1
+    title: "Delegate notebook exploration"
+    tags: [read, agent, delegation]
+    setup:
+      project: noted-testing
+    user_request: "use the notebook-explorer subagent to summarize training_sandbox.ipynb"
+    expected_tools_called:
+      - name: run_agent
+        exact_count: 1
+        args_match:
+          agent_name: "notebook-explorer"
+    expected_tools_NOT_called:
+      - get_notebook_cells
+    expected_answer_focus: |
+      - delegate to subagent with a clear task
+      - report subagent's summary
+
+  - scenario_id: S2
+    title: "Don't delegate trivial work"
+    tags: [read, agent, scope]
+    setup:
+      project: noted-testing
+    user_request: "what's in cell 5 of training_sandbox.ipynb?"
+    expected_tools_called:
+      - name: get_notebook_cells
+        exact_count: 1
+    expected_tools_NOT_called:
+      - run_agent
+    expected_answer_focus: |
+      - simple cell read - use get_notebook_cells directly
+      - run_agent is for multi-step exploration in a fresh context, not single-cell reads
+
+  - scenario_id: S3
+    title: "Multi-file research"
+    tags: [read, agent, exploration]
+    setup:
+      project: noted-testing
+    user_request: "give me a summary of how the project trains and evaluates models, across all relevant files"
+    expected_tools_called:
+      - name: run_agent
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - cross-file research best handled by subagent
+      - report subagent's findings
+
+  - scenario_id: S4
+    title: "Specify task clearly"
+    tags: [read, agent, prompting]
+    setup:
+      project: noted-testing
+    user_request: "run a subagent to find every place mlflow is imported in src/"
+    expected_tools_called:
+      - name: run_agent
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - delegate with a concrete, actionable task
+      - the task arg should describe what to find, not just "look at src/"
+      - report the subagent's findings

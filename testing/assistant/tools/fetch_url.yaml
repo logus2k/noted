@@ -1,0 +1,89 @@
+# Machine-readable scenarios for the `fetch_url` tool test doc.
+
+doc_id: fetch_url
+doc_type: tool
+
+# Scenarios covered: S1, S2, S3, S4, S5 (5 of 7).
+# DEFERRED: S6 (binary/PDF URL), S7 (rate-limited domain).
+
+scenarios:
+  - scenario_id: S1
+    title: "Fetch a doc URL"
+    tags: [read, web]
+    setup:
+      project: noted-testing
+    user_request: "summarize https://mlflow.org/docs/latest/index.html"
+    expected_tools_called:
+      - name: fetch_url
+        exact_count: 1
+        args_match:
+          url: "https://mlflow.org/docs/latest/index.html"
+    expected_tools_NOT_called:
+      - get_file_contents
+    expected_answer_focus: |
+      - fetch the URL and summarize content
+      - do NOT use get_file_contents (that's for project files)
+
+  - scenario_id: S2
+    title: "Limit chars"
+    tags: [read, web]
+    setup:
+      project: noted-testing
+    user_request: "fetch the first 5000 chars of https://example.com"
+    expected_tools_called:
+      - name: fetch_url
+        exact_count: 1
+        args_match:
+          url: "https://example.com"
+          max_chars: 5000
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - pass max_chars=5000
+      - report content; mention if truncated
+
+  - scenario_id: S3
+    title: "Bad URL"
+    tags: [read, web, error]
+    setup:
+      project: noted-testing
+    user_request: "fetch http://nonexistent-xyz-12345.invalid"
+    expected_tools_called:
+      - name: fetch_url
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - tool errors (DNS / 404 / connection)
+      - report failure clearly; do not fabricate page content
+
+  - scenario_id: S4
+    title: "Wrong tool: project file path"
+    tags: [read, web, scope]
+    setup:
+      project: noted-testing
+    user_request: "fetch src/training/train.py"
+    expected_tools_called:
+      - name: get_file_contents
+        exact_count: 1
+    expected_tools_NOT_called:
+      - fetch_url
+    expected_answer_focus: |
+      - "src/training/train.py" is a project file path, not a URL
+      - use get_file_contents
+      - fetch_url is for http(s) URLs
+
+  - scenario_id: S5
+    title: "URL in user shared link"
+    tags: [read, web, workflow]
+    setup:
+      project: noted-testing
+    user_request: "I read about a technique here: https://blog.example.com/lstm-tricks - what does it say?"
+    expected_tools_called:
+      - name: fetch_url
+        exact_count: 1
+        args_match:
+          url: "https://blog.example.com/lstm-tricks"
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - fetch the URL
+      - summarize the content
+      - if fetch fails, report and ask the user to paste relevant excerpts

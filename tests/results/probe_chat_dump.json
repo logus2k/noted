@@ -1,0 +1,30 @@
+[
+  {
+    "i": 0,
+    "tag": "div",
+    "cls": "chat-message chat-message-assistant",
+    "text": "Hi, I'm noted's AI assistant. I have access to your notebooks, MLflow experiments, Hydra configurations, DVC datasets, and Airflow DAGs. I can navigate cells, explain code, query run metrics, search files, and help you modify notebooks. Ask me anything about your project.",
+    "inner_html_first_500": "<div><p>Hi, I'm noted's AI assistant. I have access to your notebooks, MLflow experiments, Hydra configurations, DVC datasets, and Airflow DAGs. I can navigate cells, explain code, query run metrics, search files, and help you modify notebooks. Ask me anything about your project.</p>\n</div>"
+  },
+  {
+    "i": 1,
+    "tag": "div",
+    "cls": "chat-message chat-message-user",
+    "text": "what is this whole app about",
+    "inner_html_first_500": "<div><p>what is this whole app about</p>\n</div>"
+  },
+  {
+    "i": 2,
+    "tag": "div",
+    "cls": "chat-message chat-message-assistant",
+    "text": "The noted platform is an integrated MLOps Platform . Its purpose is to provide a comprehensive environment for ML workflows, which includes:\n\nModel Serving: Model serving is a main component of the platform .\nConnectivity and Intelligence: It features a Knowledge Graph, which serves as the platform's way of showing how everything connects . It also includes an AI Assistant .\nFunctionality: The platform integrates various tools and concepts, such as:\nMLflow for experiment data .\nAirflow for pipeline state .\nDVC and Git for data and code versioning and .\nEvidently for profiling and drift detection .\nMinIO for storage .\n\nThe platform is built using components like FastAPI for its backend, and it utilizes technologies like Socket.IO for event emission. The noted organization provides a purpose-built interface that communicates with backend services via APIs .",
+    "inner_html_first_500": "<div class=\"chat-tool-bar\"></div><div class=\"\"><p>The noted platform is an integrated MLOps Platform  . Its purpose is to provide a comprehensive environment for ML workflows, which includes:</p>\n<ul>\n<li><strong>Model Serving:</strong> Model serving is a main component of the platform  .</li>\n<li><strong>Connectivity and Intelligence:</strong> It features a Knowledge Graph, which serves as the platform's way of showing how everything connects  . It also includes an AI Assistant  .</li>\n<li><str"
+  },
+  {
+    "i": 3,
+    "tag": "div",
+    "cls": "chat-typing-indicator",
+    "text": "",
+    "inner_html_first_500": "<span></span><span></span><span></span>"
+  }
+]

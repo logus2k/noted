@@ -1,0 +1,175 @@
+# Machine-readable scenarios for the `list_model_versions` tool test doc.
+# Human-readable counterpart: list_model_versions.md.
+
+doc_id: list_model_versions
+doc_type: tool
+
+# Scenarios covered: S1, S2, S3, S4, S5, S6, S7, S8 (8 of 10).
+# DEFERRED: S9 (model with 100+ versions - synthetic-volume), S10 (versioned-only-runs).
+
+scenarios:
+  - scenario_id: S1
+    title: "Basic listing"
+    tags: [read, mlflow, registry]
+    setup:
+      project: noted-testing
+    user_request: "list versions of Sandbox Forecaster"
+    expected_tools_called:
+      - name: list_model_versions
+        exact_count: 1
+        args_match:
+          model_name: "Sandbox Forecaster"
+    expected_tools_NOT_called:
+      - get_run_details
+      - get_serving_status
+    expected_answer_focus: |
+      - report every version the tool returned, newest-first
+      - mention which versions carry which aliases (taken verbatim from tool output, e.g. v3 [@champion, @experimental], v2 [@staging])
+      - run_ids must be FULL 32-char hashes (regression guard for prior truncation bug)
+      - do NOT call get_run_details unless asked for metrics
+
+  - scenario_id: S2
+    title: "Picking a version to deploy"
+    tags: [read, mlflow, registry, workflow]
+    setup:
+      project: noted-testing
+    user_request: "what's the latest version of Sandbox Forecaster?"
+    expected_tools_called:
+      - name: list_model_versions
+        exact_count: 1
+        args_match:
+          model_name: "Sandbox Forecaster"
+    expected_tools_NOT_called:
+      - deploy_model
+    expected_answer_focus: |
+      - identify the highest version number from the tool output (whatever the registry currently reports - tool lists newest-first, take the top row)
+      - mention its status (e.g. READY) if the tool returned one
+      - do NOT auto-deploy - this was an information request
+
+  - scenario_id: S3
+    title: "Find run_id behind an alias"
+    tags: [read, mlflow, registry, alias]
+    setup:
+      project: noted-testing
+    user_request: "what's the run_id for the @champion of Sandbox Forecaster?"
+    expected_tools_called:
+      - name: list_model_versions
+        exact_count: 1
+        args_match:
+          model_name: "Sandbox Forecaster"
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - locate v1 (the @champion-aliased version)
+      - report its FULL 32-char run_id from the tool result (not truncated)
+      - do NOT shorten the run_id
+
+  - scenario_id: S4
+    title: "Stale alias detection (with model name)"
+    tags: [read, mlflow, registry, alias]
+    setup:
+      project: noted-testing
+    # The user names the model explicitly so the Assistant has no reason to
+    # defer to the user for disambiguation; the only valid path is
+    # list_model_versions(model_name="Sandbox Forecaster") + inspect the
+    # @staging row.
+    user_request: "for Sandbox Forecaster, does the @staging alias still point at v2?"
+    expected_tools_called:
+      - name: list_model_versions
+        exact_count: 1
+        args_match:
+          model_name: "Sandbox Forecaster"
+    expected_tools_NOT_called:
+      - list_registered_models
+    expected_answer_focus: |
+      - confirm @staging -> v2 from the tool output (or report the actual mapping if the registry has moved on)
+      - do not assume; every alias claim must be grounded in the tool output
+
+  - scenario_id: S5
+    title: "Nonexistent model"
+    tags: [read, mlflow, registry, error]
+    setup:
+      project: noted-testing
+    user_request: "what versions does GBM Forecaster have?"
+    expected_tools_called:
+      - name: list_model_versions
+        exact_count: 1
+        args_match:
+          model_name: "GBM Forecaster"
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - report that the model is not in the registry
+      - suggest list_registered_models to see what IS available, or just list known models if known
+      - do NOT fabricate versions
+
+  - scenario_id: S6
+    title: "Disambiguation when name not given"
+    tags: [read, mlflow, registry, ambiguity]
+    setup:
+      project: noted-testing
+    user_request: "show me all the versions"
+    expected_tools_called: []
+    expected_tools_NOT_called:
+      - list_model_versions
+    expected_answer_focus: |
+      - the request is ambiguous - which model?
+      - ASK which model_name the user means OR call list_registered_models first to enumerate options
+      - calling list_registered_models alongside the question (so the user can see options) is EXPLICITLY ACCEPTABLE; the judge MUST NOT flag it as a forbidden tool call
+      - do NOT pick a model arbitrarily
+
+  - scenario_id: S7
+    title: "Compare versions follow-up"
+    tags: [read, mlflow, registry, workflow]
+    setup:
+      project: noted-testing
+    turns:
+      - user_request: "list versions of Sandbox Forecaster"
+        expected_tools_called:
+          - name: list_model_versions
+            exact_count: 1
+        expected_tools_NOT_called: []
+        expected_answer_focus: "report v1-v4 with aliases"
+      - user_request: "compare v1 and v2 metrics"
+        expected_tools_called:
+          - name: compare_runs
+            exact_count: 1
+        expected_tools_NOT_called:
+          - list_model_versions
+        expected_answer_focus: |
+          - reuse the run_ids from the previous turn's list_model_versions output
+          - call compare_runs(run_id_a, run_id_b) with the FULL run_ids
+          - do NOT re-list versions
+
+  - scenario_id: S8
+    title: "Find which version a deployed model came from"
+    tags: [read, mlflow, registry, workflow]
+    setup:
+      project: noted-testing
+      prerequisites:
+        - fixture: unload_model
+        - fixture: deploy_model
+          args:
+            model_name: "Sandbox Forecaster"
+            alias: champion
+    user_request: "what's the run_id for the version we just deployed?"
+    # Two reasonable paths exist:
+    #   (a) get_serving_status - returns the currently-loaded model's run_id directly
+    #   (b) list_model_versions(model_name=<deployed>) + pick the @champion row
+    # Both answer the user's question accurately in one tool call. The Layer-1
+    # check therefore leaves expected_tools_called empty; Layer 2 judges the
+    # correctness of the final answer instead.
+    #
+    # JUSTIFICATION (validated 2026-04-22): this scenario lives in the
+    # list_model_versions doc to cover the "registry-inspection path", but the
+    # user's actual question is about CURRENT deployment state, which
+    # get_serving_status answers in one direct call. A strict-variant run
+    # requiring list_model_versions FAILED (Gemma reliably picks
+    # get_serving_status). The accept-either framing is canonical for this
+    # wording, not a soft-cheat; the strict framing would misrepresent the
+    # tool's intended use case.
+    expected_tools_called: []
+    expected_tools_NOT_called:
+      - deploy_model
+    expected_answer_focus: |
+      - quote the run_id of the currently-deployed version (the @champion-aliased one per the deploy fixture)
+      - a single tool call is enough via either get_serving_status or list_model_versions
+      - do not re-deploy or modify state

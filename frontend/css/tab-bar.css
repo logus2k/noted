@@ -1,0 +1,225 @@
+/* Tab bar — first child of #center-column, fills toolbar zone */
+.tab-bar {
+    display: flex;
+    flex-wrap: wrap;
+    /* Align with notebook top bars: left = 10px padding + 36px margin, right = 10px padding + 8px scrollbar */
+    margin: 0 20px 0 45px;
+    padding: 0 6px;
+    gap: 0px;
+    align-items: flex-end;
+    font-size: 0.85em;
+    flex-shrink: 0;
+    z-index: 4;
+    height: var(--toolbar-height, 37px);
+}
+
+.tab-bar .tab {
+    position: relative;
+    padding: 2px 13px 1px 13px !important;
+    background-color: #ffecb9;
+    cursor: pointer;
+    border-radius: 5px 5px 0 0;
+    white-space: nowrap;
+    color: #1a1a1a;
+    border: 0.5px solid #666666;
+    border-bottom: 0.5px solid #1d1d1d;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 180px;
+    user-select: none;
+    -webkit-user-select: none;
+    font-size: 11px;
+    font-family: var(--font-sans);
+    line-height: 1.8;
+}
+
+.tab-bar .tab.active {
+    background-color: #ffe39e;
+    color: #1a1a1a;
+    z-index: 1;
+    padding: 3px 13px 1px 13px !important;
+    margin-bottom: -1px;
+    border-bottom: none;
+    line-height: 1.8;
+}
+
+.tab-bar .tab.sticky {
+    border-top: 2px solid #ffc630;
+}
+
+/* Close button */
+.tab-bar .tab-close-btn {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    width: 13px;
+    height: 13px;
+    border-radius: 50%;
+    background-color: #333333;
+    color: #fafafa;
+    font-size: 15px;
+    line-height: 12px;
+    font-weight: 400;
+    text-align: center;
+    cursor: pointer;
+    display: none;
+    border: none;
+    padding: 1px 0px 0px 0px;
+    font-family: Arial, sans-serif;
+}
+
+.tab-bar .tab:hover .tab-close-btn {
+    display: block;
+}
+
+/* Preview (transient) tab — italic label */
+.tab-bar .tab.tab-preview {
+    font-style: italic;
+}
+
+/* Tab with icon (service tabs) */
+.tab-bar .tab .tab-icon {
+    width: 13px;
+    height: 13px;
+    margin-right: 5px;
+    vertical-align: text-top;
+    /* border-radius: 2px; */
+}
+
+/* Service iframe container (inside center-column) */
+#service-tab-container {
+    flex: 1;
+    display: none;
+    flex-direction: column;
+    overflow: hidden;
+    min-width: 0;
+    min-height: 0;
+    background: var(--bg-primary);
+    border-radius: 5px 5px 0px 0px;
+}
+
+#service-tab-container iframe {
+    flex: 1;
+    width: 100%;
+    border: none;
+    border-left: 0.5px solid #666666;
+    border-right: 0.5px solid #666666;
+    display: block;
+    min-height: 0;
+    box-sizing: border-box;
+}
+
+/* Disable iframe pointer events during splitter drag to prevent mouse capture */
+body.resizing #service-tab-container iframe {
+    pointer-events: none;
+}
+
+/* Service top bar — mirrors notebook top bar */
+.service-top-bar {
+    height: 25px;
+    background: #ffe39e;
+    display: flex;
+    align-items: center;
+    padding: 2px 6px 0px 12px;
+    gap: 8px;
+    font-size: 11px;
+    font-family: var(--font-sans);
+    flex-shrink: 0;
+    border-bottom: 0.5px solid #666666;
+    border-left: 0.5px solid #666666;
+    border-right: 0.5px solid #666666;
+}
+
+.service-top-bar-title {
+    color: #1a1a1a;
+}
+
+.service-top-bar-spacer {
+    flex: 1;
+}
+
+/* Second bar below service top bar */
+.service-second-bar {
+    height: 26px;
+    background: #fff2bc;
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    gap: 8px;
+    font-size: 11px;
+    font-family: var(--font-sans);
+    flex-shrink: 0;
+    border-bottom: 0.5px solid #aeaeae;
+    border-left: 0.5px solid #666666;
+    border-right: 0.5px solid #666666;
+    position: relative;
+}
+
+.service-second-bar-left {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-right: auto;
+}
+
+.service-second-bar-right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+}
+
+/* Connection status LED */
+.service-status-led {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background-color: #999999;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
+    transition: background-color 0.3s;
+}
+
+.service-status-led.connected {
+    background-color: #4caf50;
+    box-shadow: 0 0 4px rgba(76, 175, 80, 0.5), 0 0 0 1px rgba(0, 0, 0, 0.1);
+}
+
+.service-status-led.disconnected {
+    background-color: #f44336;
+    box-shadow: 0 0 4px rgba(244, 67, 54, 0.4), 0 0 0 1px rgba(0, 0, 0, 0.1);
+}
+
+.service-status-label {
+    font-size: 10px;
+    color: #555555;
+    font-family: var(--font-sans);
+}
+
+/* Breadcrumb segments in second bar */
+.breadcrumb-segment {
+    font-size: 11px;
+    font-family: var(--font-sans);
+    color: #333333;
+}
+
+.breadcrumb-segment.breadcrumb-current {
+    color: #333333;
+}
+
+.breadcrumb-sep {
+    font-size: 11px;
+    color: #999999;
+    margin: 0 2px;
+    font-family: var(--font-sans);
+}
+
+@media (max-width: 900px) {
+    .tab-bar .tab {
+        max-width: 120px;
+        padding: 3px 10px 3px 10px;
+    }
+    .tab-bar .tab.active {
+        padding: 5px 10px 3px 10px;
+    }
+}

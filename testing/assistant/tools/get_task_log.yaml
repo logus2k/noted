@@ -1,0 +1,133 @@
+# Machine-readable scenarios for the `get_task_log` tool test doc.
+
+doc_id: get_task_log
+doc_type: tool
+
+# Scenarios covered: S1, S2, S3, S4, S5, S6 (6 of 8).
+# DEFERRED: S7 (multi-MB log truncation), S8 (running task with streaming log).
+
+scenarios:
+  - scenario_id: S1
+    title: "Fetch a task log"
+    tags: [read, airflow, debugging]
+    setup:
+      project: noted-testing
+    user_request: "show me the train_model_task log for jena_training_pipeline run abc123"
+    expected_tools_called:
+      - name: get_task_log
+        exact_count: 1
+        args_match:
+          dag_id: "jena_training_pipeline"
+          dag_run_id: "abc123"
+          task_id: "train_model_task"
+    expected_tools_NOT_called:
+      - get_dag_status
+    expected_answer_focus: |
+      - report log content from the tool result
+      - if the log is large, summarize and quote relevant tail
+
+  - scenario_id: S2
+    title: "Drill from DAG status into a task log"
+    tags: [read, airflow, debugging, workflow]
+    setup:
+      project: noted-testing
+    turns:
+      - user_request: "did jena_training_pipeline fail?"
+        expected_tools_called:
+          - name: get_dag_status
+            exact_count: 1
+        expected_tools_NOT_called:
+          - get_task_log
+        expected_answer_focus: "report the latest run's status (success/failure) from the tool output"
+      - user_request: "show me the train_model_task log for that run"
+        expected_tools_called:
+          - name: get_task_log
+            exact_count: 1
+        expected_tools_NOT_called: []
+        expected_answer_focus: "use the dag_run_id from the prior get_dag_status, call get_task_log for train_model_task, quote any error or final summary lines"
+
+  - scenario_id: S3
+    title: "Nonexistent task"
+    tags: [read, airflow, error]
+    setup:
+      project: noted-testing
+    user_request: "fetch the imaginary_task log for jena_training_pipeline run abc123"
+    expected_tools_called:
+      - name: get_task_log
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - tool errors (task not found)
+      - report not found; suggest get_dag_status to see actual task ids
+
+  - scenario_id: S4
+    title: "Missing dag_run_id"
+    tags: [read, airflow, ambiguity]
+    setup:
+      project: noted-testing
+    user_request: "show me the train_model_task log"
+    # The request omits dag_run_id AND doesn't give a DAG id (the project has
+    # exactly one DAG). Assistant must discover via list_dags, then get the
+    # runs for that DAG, then ask the user which run to fetch. It must NOT
+    # fabricate a dag_run_id and fire get_task_log blindly.
+    expected_tools_called:
+      - name: list_dags
+        exact_count: 1
+      - name: get_dag_status
+        exact_count: 1
+    expected_tools_NOT_called:
+      - get_task_log
+    expected_answer_focus: |
+      LAYER 1 ALREADY VERIFIED that list_dags and get_dag_status were both
+      called and get_task_log was not. Do NOT re-judge tool-call correctness
+      here - if you find yourself thinking "model didn't call list_dags first",
+      stop: that is wrong, Layer 1 has confirmed it. Judge ONLY the answer
+      text, against this checklist:
+
+      PASS criteria (ALL must hold):
+      1. The final answer asks the user for a dag_run_id. Look for a "?" character
+         and any phrasing variant: "which run_id", "what dag_run_id", "please
+         provide a run id", "which run should I", "specify the run", etc.
+      2. The final answer does NOT contain a fabricated run_id. The tool result
+         said "Recent runs: (none)" - any concrete id like "manual__2024-...",
+         "run_abc", or any other specific id is fabricated and disqualifies.
+      3. The final answer does NOT offer to trigger, unpause, schedule, or
+         otherwise modify the DAG (no noted tool exists for that). A line like
+         "would you like me to trigger / unpause it?" is a fail.
+
+      ACCEPTABLE variations (do NOT flag these):
+      - One brief context sentence before the question (e.g. "The DAG has no
+        recent runs.") is fine.
+      - Reporting the DAG name and that it is paused is fine - that information
+        came verbatim from the tool result.
+      - Answer may be short (one or two sentences) - brevity is preferred here.
+
+  - scenario_id: S5
+    title: "Quote specific error"
+    tags: [read, airflow, debugging, summary]
+    setup:
+      project: noted-testing
+    user_request: "what python exception happened in train_model_task for run abc123?"
+    expected_tools_called:
+      - name: get_task_log
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - fetch the log
+      - extract and quote the Traceback / Exception text
+      - do NOT speculate beyond what the log shows
+
+  - scenario_id: S6
+    title: "Long log summarization"
+    tags: [read, airflow, summary]
+    setup:
+      project: noted-testing
+    user_request: "summarize the train_model_task log for jena_training_pipeline run abc123"
+    expected_tools_called:
+      - name: get_task_log
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - report key phases (data loading, training epochs, evaluation, MLflow logging)
+      - quote any warnings/errors verbatim
+      - do not paste the whole log

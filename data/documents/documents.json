@@ -1,0 +1,57 @@
+{
+  "categories": {
+    "MLOps": {},
+    "noted User Manual": {},
+    "Github": {},
+    "guides": {},
+    "Reports": {},
+    "Manuals": {}
+  },
+  "documents": [
+    {
+      "name": "Apache Airflow",
+      "category": "Guides",
+      "location": "files/airflow.pdf"
+    },
+    {
+      "name": "Airflow Installation",
+      "category": "Guides",
+      "location": "files/installation.md"
+    },
+    {
+      "name": "Github Personal Web Token",
+      "category": "Guides",
+      "location": "files/github_pwt.md"
+    },
+    {
+      "name": "noted Platform User Manual",
+      "category": "Manuals",
+      "location": "files/noted_platform_user_manual.pdf"
+    },
+    {
+      "name": "noted Platform Setup and Installation Manual",
+      "category": "Manuals",
+      "location": "files/noted_platform_setup_and_installation_manual.pdf"
+    },
+    {
+      "name": "Tutorial #3 - Final Project Delivery",
+      "category": "Reports",
+      "location": "files/noted_platform_final_delivery_project_report.pdf"
+    },
+    {
+      "name": "noted Project Notebook Companion",
+      "category": "Manuals",
+      "location": "files/noted_project_notebook_companion.pdf"
+    },
+    {
+      "name": "noted Platform Developer Manual",
+      "category": "Manuals",
+      "location": "files/noted_platform_developer_manual.pdf"
+    },
+    {
+      "name": "noted Platform Technical Architecture",
+      "category": "Manuals",
+      "location": "files/noted_platform_technical_architecture.pdf"
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "name": "noted-js-env",
+  "version": "1.0.0",
+  "private": true,
+  "description": "noted JavaScript environment",
+  "dependencies": {
+    "ijavascript": "^5.2.1"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["zeromq"],
+    "overrides": {
+      "uuid": "^7.0.0"
+    }
+  }
+}

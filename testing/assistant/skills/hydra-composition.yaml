@@ -1,0 +1,61 @@
+# Machine-readable scenarios for the `hydra-composition` skill test doc.
+
+doc_id: hydra-composition
+doc_type: skill
+
+# Scenarios covered: S1, S2, S3, S4 (4 of 6).
+# DEFERRED: S5 (interpolation subtleties), S6 (_target_ instantiation).
+
+scenarios:
+  - scenario_id: S1
+    title: "What composition does"
+    tags: [skill, hydra, composition]
+    setup:
+      project: noted-testing
+    user_request: "what does 'composition' mean in Hydra?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - merges the base config with selected group files + overrides into a single resolved config
+      - the defaults list controls which options are picked
+      - noted's Composer UI exposes the composition as dropdowns + inputs
+
+  - scenario_id: S2
+    title: "Override on command line"
+    tags: [skill, hydra, composition, override]
+    setup:
+      project: noted-testing
+    user_request: "how do I override a value at run time?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - Python CLI: `python train.py training.lr=1e-4`
+      - noted Composer: change the value in the override field
+      - overrides are recorded in the run's Hydra bundle
+
+  - scenario_id: S3
+    title: "Override a group choice"
+    tags: [skill, hydra, composition]
+    setup:
+      project: noted-testing
+    user_request: "how do I switch from the default data to a different dataset?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - change the defaults entry: `- data: jena_2012_dataset` instead of `- data: jena_full_dataset`
+      - or CLI override: `data=jena_2012_dataset`
+      - noted's Composer has a dropdown for this
+
+  - scenario_id: S4
+    title: "Inspect resolved"
+    tags: [skill, hydra, composition]
+    setup:
+      project: noted-testing
+    user_request: "show me the resolved config"
+    expected_tools_called:
+      - name: get_hydra_config
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - get_hydra_config returns the RESOLVED composition (not raw files)
+      - report key sections

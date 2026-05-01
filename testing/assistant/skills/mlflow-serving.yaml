@@ -1,0 +1,271 @@
+# Machine-readable scenarios for the `mlflow-serving` skill test doc.
+# Human-readable counterpart: mlflow-serving.md.
+#
+# Skill auto-injects on `mlflow_run_in_context` (when active_run_id is set).
+# Scenarios that require an active run in context are marked; the harness
+# currently doesn't have a fixture to look up a run_id from the sandbox by
+# tag, so those scenarios (S5, S6, S7, S10) are DEFERRED to a later
+# milestone where that fixture lands. Present doc covers S1-S4, S8-S9,
+# S11-S16 (12 of 16).
+
+doc_id: mlflow-serving
+doc_type: skill
+
+scenarios:
+  - scenario_id: S1
+    title: "Check what is deployed (ready state)"
+    tags: [skill, mlflow, serving]
+    setup:
+      project: noted-testing
+      prerequisites:
+        - fixture: unload_model
+        - fixture: deploy_model
+          args:
+            model_name: "Sandbox Forecaster"
+            alias: champion
+    user_request: "is there a model deployed right now?"
+    expected_tools_called:
+      - name: get_serving_status
+        exact_count: 1
+    expected_tools_NOT_called:
+      - list_registered_models
+      - deploy_model
+    expected_answer_focus: |
+      - confirm deployed; report model name, version, alias, framework
+      - originating run_id may be included
+      - must not defer the answer to the UI
+
+  - scenario_id: S2
+    title: "Check status when nothing is loaded"
+    tags: [skill, mlflow, serving]
+    setup:
+      project: noted-testing
+      prerequisites:
+        - fixture: unload_model
+    user_request: "is a model currently loaded on the serving container?"
+    expected_tools_called:
+      - name: get_serving_status
+        exact_count: 1
+    expected_tools_NOT_called:
+      - deploy_model
+      - list_registered_models
+    expected_answer_focus: |
+      - report idle / no model loaded
+      - may SUGGEST deploy_model as next step in text (must not call it)
+
+  - scenario_id: S3
+    title: "Deploy a specific version"
+    tags: [skill, mlflow, serving, write]
+    setup:
+      project: noted-testing
+      prerequisites:
+        - fixture: unload_model
+    user_request: "deploy version 3 of Sandbox Forecaster"
+    expected_tools_called:
+      - name: deploy_model
+        exact_count: 1
+        args_match:
+          model_name: "Sandbox Forecaster"
+          version: "3"
+    expected_tools_NOT_called:
+      - list_registered_models
+      - list_model_versions
+    expected_answer_focus: |
+      - brief pre-call intent is fine ("I'll deploy v3")
+      - deploy_model must use version="3"
+      - must not ask "are you sure?" before firing
+
+  - scenario_id: S4
+    title: "Deploy via alias"
+    tags: [skill, mlflow, serving, write]
+    setup:
+      project: noted-testing
+      prerequisites:
+        - fixture: unload_model
+    user_request: "deploy the staging version of Sandbox Forecaster"
+    expected_tools_called:
+      - name: deploy_model
+        exact_count: 1
+        args_match:
+          model_name: "Sandbox Forecaster"
+          alias: "staging"
+    expected_tools_NOT_called:
+      - list_model_versions
+      - get_run_details
+    expected_answer_focus: |
+      - deploy_model must use alias="staging" (do NOT resolve to numeric version manually)
+      - brief intent statement acceptable
+      - a defensive list_registered_models call beforehand is ACCEPTABLE (discovery of the right model_name); do not fail the scenario solely on that
+
+  - scenario_id: S8
+    title: "Invoke via tool (smoke test)"
+    tags: [skill, mlflow, serving, invoke]
+    setup:
+      project: noted-testing
+      prerequisites:
+        - fixture: unload_model
+        - fixture: deploy_model
+          args:
+            model_name: "Sandbox Forecaster"
+            alias: champion
+    user_request: "run a smoke test against the deployed model"
+    expected_tools_called:
+      - name: invoke_model
+        exact_count: 1
+    expected_tools_NOT_called:
+      - deploy_model
+    expected_answer_focus: |
+      - call invoke_model (ideally with no data arg for the built-in smoke test)
+      - report predictions + output shape from the tool result
+      - must NOT hand the user a Python/curl script to run
+
+  - scenario_id: S9
+    title: "Invoke with realistic values"
+    tags: [skill, mlflow, serving, invoke]
+    setup:
+      project: noted-testing
+      prerequisites:
+        - fixture: unload_model
+        - fixture: deploy_model
+          args:
+            model_name: "Sandbox Forecaster"
+            alias: champion
+    user_request: "create a sample request with realistic values and test it"
+    expected_tools_called:
+      - name: invoke_model
+        exact_count: 1
+    expected_tools_NOT_called:
+      - deploy_model
+    expected_answer_focus: |
+      - may first call get_serving_schema to confirm the shape (optional)
+      - must call invoke_model with data matching the expected tensor shape
+      - predictions reported from the tool result; no fabricated values
+      - must NOT hand the user a script
+
+  - scenario_id: S11
+    title: "External-client integration question (no tool action)"
+    tags: [skill, mlflow, serving, documentation]
+    setup:
+      project: noted-testing
+    user_request: "how would I hit the prediction endpoint from my own Python script running outside noted?"
+    expected_tools_called: []
+    expected_tools_NOT_called:
+      - invoke_model
+      - deploy_model
+    expected_answer_focus: |
+      - describe the external URL pattern (POST http://<host>:8123/api/serving/predict)
+      - show a JSON body shape (tensor, dataframe_records, or dataframe_split)
+      - short requests-based Python snippet
+      - must NOT call invoke_model (the user asked HOW, not to run one now)
+      - a defensive get_serving_schema call to show shapes for the currently-deployed model is ACCEPTABLE (it directly informs the JSON body structure)
+      - offering a follow-up next-step in text (e.g. "you can then test it with...") is fine per judge rubric
+
+  - scenario_id: S12
+    title: "Wrong payload shape diagnosis (no tool action)"
+    tags: [skill, mlflow, serving, troubleshooting]
+    setup:
+      project: noted-testing
+      prerequisites:
+        - fixture: unload_model
+        - fixture: deploy_model
+          args:
+            model_name: "Sandbox Forecaster"
+            alias: champion
+    user_request: "my POST to /api/serving/predict returned a 500 with 'AttributeError: string has no attribute get'. why?"
+    expected_tools_called: []
+    expected_tools_NOT_called:
+      - invoke_model
+      - deploy_model
+    expected_answer_focus: |
+      - PRIMARY intent is DIAGNOSIS of the error (not schema exploration)
+      - explain that the payload shape or type is wrong: the server-side parser received a string where it expected a list/dict, OR the JSON body is malformed
+      - recommend: pass a real JSON array/object matching the model's tensor shape (not a stringified one)
+      - defensive discovery calls (get_serving_status and/or get_serving_schema, each at most once) BEFORE the diagnosis are ACCEPTABLE - they ground the diagnosis in the currently deployed model's shape
+      - as long as the FINAL answer delivers the diagnosis, tool-call overreach on discovery alone does not fail this scenario
+      - must NOT suggest restarting the serving container (unrelated to the symptom)
+
+  - scenario_id: S13
+    title: "Registered-model discovery"
+    tags: [skill, mlflow, serving, registry]
+    setup:
+      project: noted-testing
+    user_request: "which models are available in the registry?"
+    expected_tools_called:
+      - name: list_registered_models
+        exact_count: 1
+    expected_tools_NOT_called:
+      - deploy_model
+    expected_answer_focus: |
+      - list model names with their current aliases (e.g. @champion -> v1)
+      - do not invent models not in the registry
+
+  - scenario_id: S14
+    title: "Version comparison before deploying"
+    tags: [skill, mlflow, serving, registry]
+    setup:
+      project: noted-testing
+    user_request: "is v2 of Sandbox Forecaster worth deploying over the champion (v1)?"
+    expected_tools_called:
+      - name: list_model_versions
+    expected_tools_NOT_called:
+      - deploy_model
+    expected_answer_focus: |
+      - call list_model_versions to retrieve the run_ids behind v1 and v2 (a defensive list_registered_models call beforehand to confirm the model name is EXPLICITLY ACCEPTABLE - it is helpful and not procedural creep)
+      - may then call get_run_details OR compare_runs on the two runs to inspect metrics (both run_ids must be FULL 32-char hashes - regression guard for prior truncation bug)
+      - the FINAL conclusion must correctly identify v1 as better (lower val_mae=2.15, higher val_r2=0.894, lower val_rmse=3.02) - intermediate self-correction in the same answer is acceptable as long as the final stated conclusion is correct
+      - the judge MUST verify the FINAL CONCLUSION against the run results, not the intermediate reasoning; if the final stated conclusion is "v1 is better" with correct metric numbers, the answer passes regardless of any intermediate confusion
+      - must NOT call deploy_model (user asked for a comparison, not a deploy)
+
+  - scenario_id: S15
+    title: "Constraint awareness: framework pin mismatch"
+    tags: [skill, mlflow, serving, documentation]
+    setup:
+      project: noted-testing
+    user_request: "my model's requirements.txt pins torch==2.3 but the serving container has torch 2.4. what happens?"
+    expected_tools_called: []
+    expected_tools_NOT_called:
+      - deploy_model
+    expected_answer_focus: |
+      - explain that the baseline serving image is a fixed superset
+      - pins outside it fail at load time with an ImportError (not silently succeed)
+      - may mention the worker-subprocess serving refactor as the eventual fix
+      - must NOT invent a per-model venv feature that doesn't exist
+
+  - scenario_id: S16
+    title: "Workflow: deploy then immediately invoke"
+    tags: [skill, mlflow, serving, workflow]
+    setup:
+      project: noted-testing
+      prerequisites:
+        - fixture: unload_model
+    turns:
+      - user_request: "deploy the champion of Sandbox Forecaster"
+        expected_tools_called:
+          - name: deploy_model
+            exact_count: 1
+            args_match:
+              model_name: "Sandbox Forecaster"
+              alias: "champion"
+        expected_tools_NOT_called:
+          - invoke_model
+          - get_serving_schema
+        expected_answer_focus: |
+          - confirm deploy succeeded (grounded in the tool result)
+      - user_request: "now test it"
+        expected_tools_called:
+          - name: invoke_model
+            exact_count: 1
+        expected_tools_NOT_called:
+          - deploy_model
+        expected_answer_focus: |
+          - real prediction output from the deployed model
+          - must NOT hand the user a Python script
+
+  # DEFERRED scenarios (require a run-id lookup fixture not yet implemented):
+  #   S5: "deploy the best model from this run" - needs active_run_id
+  #   S6: Logged Model id anti-pattern - needs active_run_id with m-... artifact
+  #   S7: register + alias + deploy workflow - needs active_run_id
+  #   S10: inverse transform follow-up - multi-turn, needs prior prediction + run_id
+  # These will land when a `lookup_sandbox_run(role=...)` fixture is added to
+  # fixtures.py that resolves the sandbox unregistered-source run and populates
+  # scenario setup.active_run_id.

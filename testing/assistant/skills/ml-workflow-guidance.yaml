@@ -1,0 +1,72 @@
+# Machine-readable scenarios for the `ml-workflow-guidance` skill test doc.
+
+doc_id: ml-workflow-guidance
+doc_type: skill
+
+# Scenarios covered: S1, S2, S3, S4, S5 (5 of 7).
+# DEFERRED: S6 (productionization), S7 (team collaboration).
+
+scenarios:
+  - scenario_id: S1
+    title: "Experimentation flow"
+    tags: [skill, workflow]
+    setup:
+      project: noted-testing
+    user_request: "what's the recommended ML workflow in noted?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - outline: load data (DVC) -> config (Hydra) -> develop (notebook cells) -> tracked runs (Run Manager) -> compare runs (MLflow) -> register model -> deploy
+      - mention each stage's entry point
+
+  - scenario_id: S2
+    title: "Best practice: where to put code"
+    tags: [skill, workflow, conventions]
+    setup:
+      project: noted-testing
+    user_request: "should I write data loading in cells or in src/?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - core functions live in src/ for testability and reuse
+      - notebook cells orchestrate; import from src/
+      - explain Run Manager can select cells that invoke src/ functions
+
+  - scenario_id: S3
+    title: "Reproducibility checklist"
+    tags: [skill, workflow]
+    setup:
+      project: noted-testing
+    user_request: "how do I make my experiments reproducible?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - DVC-track data, Hydra-manage config, Run Manager for tracking
+      - mention seed management (cfg.seed)
+      - point to noted-lineage skill
+
+  - scenario_id: S4
+    title: "When to use Airflow"
+    tags: [skill, workflow, airflow]
+    setup:
+      project: noted-testing
+    user_request: "when should I use Airflow instead of Run Manager?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - Run Manager = interactive tracked runs from notebook
+      - Airflow = scheduled / automated / parameter sweeps / drift checks
+      - both log to same MLflow experiment
+
+  - scenario_id: S5
+    title: "From notebook to DAG"
+    tags: [skill, workflow, airflow]
+    setup:
+      project: noted-testing
+    user_request: "I want to put my training into an Airflow DAG"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - point to airflow-dag-creation skill
+      - the DAG should reuse functions from src/ (not copy notebook cells)
+      - Hydra config lives in dags/ or references the project config/

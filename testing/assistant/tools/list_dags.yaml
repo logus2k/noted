@@ -1,0 +1,108 @@
+# Machine-readable scenarios for the `list_dags` tool test doc.
+
+doc_id: list_dags
+doc_type: tool
+
+# Scenarios covered: S1, S2, S3, S4, S5, S6 (6 of 8).
+# DEFERRED: S7 (paused-only DAGs), S8 (no DAGs at all).
+
+scenarios:
+  - scenario_id: S1
+    title: "Basic listing"
+    tags: [read, airflow]
+    setup:
+      project: noted-testing
+    user_request: "what DAGs are available?"
+    expected_tools_called:
+      - name: list_dags
+        exact_count: 1
+    expected_tools_NOT_called:
+      - get_dag_status
+    expected_answer_focus: |
+      - list DAG ids from the tool result
+      - mention paused/active state if shown
+      - do NOT call get_dag_status unless user asks for a specific DAG
+
+  - scenario_id: S2
+    title: "Find a specific DAG"
+    tags: [read, airflow, search]
+    setup:
+      project: noted-testing
+    user_request: "is there a DAG called 'jena_training_pipeline'?"
+    expected_tools_called:
+      - name: list_dags
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - report present/absent based on tool result
+      - if absent, list the actual DAGs that exist
+
+  - scenario_id: S3
+    title: "Pre-flight before get_dag_status"
+    tags: [read, airflow, workflow]
+    setup:
+      project: noted-testing
+    user_request: "show me details for the training pipeline DAG"
+    # The user names the DAG by description, not by its exact dag_id. Either
+    # path is fine: (a) infer the id and call get_dag_status directly, or
+    # (b) call list_dags first to resolve the id, then get_dag_status. The
+    # only requirement is that get_dag_status ends up being called against
+    # the resolved id.
+    expected_tools_called:
+      - name: get_dag_status
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - end with a get_dag_status call against the actual DAG id (e.g. my_training_pipeline)
+      - calling list_dags first to resolve the natural-language name to the real id is fine
+      - report the DAG's status / recent runs from the get_dag_status output
+
+  - scenario_id: S4
+    title: "Pipeline overview question"
+    tags: [read, airflow, summary]
+    setup:
+      project: noted-testing
+    user_request: "what kind of automation is set up here?"
+    expected_tools_called:
+      - name: list_dags
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - list DAGs to inventory automation
+      - briefly characterize what each DAG appears to do based on its name
+      - do NOT speculate beyond what the name suggests
+
+  - scenario_id: S5
+    title: "User confused: DAG vs run"
+    tags: [read, airflow, terminology]
+    setup:
+      project: noted-testing
+    user_request: "what runs do we have?"
+    expected_tools_called: []
+    expected_tools_NOT_called:
+      - list_dags
+    expected_answer_focus: |
+      - "runs" likely means MLflow runs in this context (project_id implies an MLflow experiment)
+      - call get_experiment_runs not list_dags
+      - if context is genuinely ambiguous, ask the user
+
+  - scenario_id: S6
+    title: "Multi-turn list then drill"
+    tags: [read, airflow, workflow]
+    setup:
+      project: noted-testing
+    turns:
+      - user_request: "what DAGs do we have?"
+        expected_tools_called:
+          - name: list_dags
+            exact_count: 1
+        expected_tools_NOT_called:
+          - get_dag_status
+        expected_answer_focus: "list DAGs"
+      - user_request: "give me details on the first one"
+        expected_tools_called:
+          - name: get_dag_status
+            exact_count: 1
+        expected_tools_NOT_called:
+          - list_dags
+        expected_answer_focus: "use the dag_id from prior turn; report status and recent runs"

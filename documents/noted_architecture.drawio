@@ -1,0 +1,476 @@
+<mxfile host="Electron" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/29.6.1 Chrome/142.0.7444.265 Electron/39.8.0 Safari/537.36" version="29.6.1">
+  <diagram id="noted-architecture" name="noted - Technical Architecture">
+    <mxGraphModel dx="2052" dy="1187" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="subtitle" parent="1" style="text;html=1;fontSize=12;align=center;verticalAlign=middle;whiteSpace=wrap;fontColor=#555555;fontFamily=Verdana;" value="High-Level Technical Architecture" vertex="1">
+          <mxGeometry height="25" width="590" x="566" y="65" as="geometry" />
+        </mxCell>
+        <mxCell id="users_group" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#BBBBBB;dashed=1;arcSize=8;fontFamily=Verdana;" value="" vertex="1">
+          <mxGeometry height="65" width="556" x="584" y="104" as="geometry" />
+        </mxCell>
+        <mxCell id="users_label" parent="1" style="text;html=1;fontSize=11;fontStyle=1;align=left;verticalAlign=middle;fontColor=#666666;fontFamily=Verdana;" value="Users" vertex="1">
+          <mxGeometry height="20" width="60" x="594" y="109" as="geometry" />
+        </mxCell>
+        <mxCell id="user_ds" parent="1" style="shape=mxgraph.general.user;fillColor=#16537e;fontColor=#FFFFFF;fontSize=9;fontStyle=1;strokeColor=none;whiteSpace=wrap;html=1;fontFamily=Verdana;" value="ML Engineer /&lt;br&gt;Data Scientist" vertex="1">
+          <mxGeometry height="45" width="87" x="679" y="115" as="geometry" />
+        </mxCell>
+        <mxCell id="user_ops" parent="1" style="shape=mxgraph.general.user;fillColor=#16537e;fontColor=#FFFFFF;fontSize=9;fontStyle=1;strokeColor=none;whiteSpace=wrap;html=1;fontFamily=Verdana;" value="MLOps /&lt;br&gt;Platform Eng." vertex="1">
+          <mxGeometry height="47" width="81" x="822" y="114" as="geometry" />
+        </mxCell>
+        <mxCell id="user_lead" parent="1" style="shape=mxgraph.general.user;fillColor=#16537e;fontColor=#FFFFFF;fontSize=9;fontStyle=1;strokeColor=none;whiteSpace=wrap;html=1;fontFamily=Verdana;" value="Tech Lead /&lt;br&gt;Reviewer" vertex="1">
+          <mxGeometry height="45" width="79" x="962.5" y="114" as="geometry" />
+        </mxCell>
+        <mxCell id="nginx" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8d44d;strokeColor=#c9a900;fontStyle=1;fontSize=11;fontColor=#1a1a2e;arcSize=12;fontFamily=Verdana;" value="nginx Reverse Proxy&lt;br&gt;&lt;font style=&quot;font-size:9px;font-weight:normal;&quot;&gt;SSL Termination  |  Routing&lt;/font&gt;" vertex="1">
+          <mxGeometry height="40" width="559" x="583" y="194" as="geometry" />
+        </mxCell>
+        <mxCell id="e_user1_nginx" edge="1" parent="1" source="user_ds" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#999999;strokeWidth=1.5;entryX=0.25;entryY=0;entryDx=0;entryDy=0;fontFamily=Verdana;" target="nginx">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_user2_nginx" edge="1" parent="1" source="user_ops" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#999999;strokeWidth=1.5;fontFamily=Verdana;" target="nginx">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_user3_nginx" edge="1" parent="1" source="user_lead" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#999999;strokeWidth=1.5;entryX=0.75;entryY=0;entryDx=0;entryDy=0;fontFamily=Verdana;" target="nginx">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pres_group" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;arcSize=6;fontFamily=Verdana;" value="" vertex="1">
+          <mxGeometry height="80" width="557" x="584" y="259" as="geometry" />
+        </mxCell>
+        <mxCell id="pres_label" parent="1" style="text;html=1;fontSize=10;fontStyle=1;align=left;verticalAlign=top;fontColor=#3a6ea5;fontFamily=Verdana;" value="Presentation Layer" vertex="1">
+          <mxGeometry height="16" width="120" x="588" y="257" as="geometry" />
+        </mxCell>
+        <mxCell id="frontend" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#6c8ebf;fontSize=10;arcSize=10;fontFamily=Verdana;" value="&lt;b&gt;noted Frontend&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;Vanilla ES6 + CodeMirror 6&lt;/font&gt;" vertex="1">
+          <mxGeometry height="45" width="140" x="606" y="282" as="geometry" />
+        </mxCell>
+        <mxCell id="ui_data" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f0fe;strokeColor=#6c8ebf;fontSize=8;fontStyle=1;arcSize=14;fontFamily=Verdana;" value="Data&lt;br&gt;Panel" vertex="1">
+          <mxGeometry height="30" width="55" x="761" y="277" as="geometry" />
+        </mxCell>
+        <mxCell id="ui_config" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f0fe;strokeColor=#6c8ebf;fontSize=8;fontStyle=1;arcSize=14;fontFamily=Verdana;" value="Config&lt;br&gt;Panel" vertex="1">
+          <mxGeometry height="30" width="55" x="823" y="277" as="geometry" />
+        </mxCell>
+        <mxCell id="ui_exp" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f0fe;strokeColor=#6c8ebf;fontSize=8;fontStyle=1;arcSize=14;fontFamily=Verdana;" value="Experiments&lt;br&gt;Panel" vertex="1">
+          <mxGeometry height="30" width="65" x="885" y="277" as="geometry" />
+        </mxCell>
+        <mxCell id="ui_pipe" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f0fe;strokeColor=#6c8ebf;fontSize=8;fontStyle=1;arcSize=14;fontFamily=Verdana;" value="Pipeline&lt;br&gt;Panel" vertex="1">
+          <mxGeometry height="30" width="55" x="957" y="277" as="geometry" />
+        </mxCell>
+        <mxCell id="ui_model" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f0fe;strokeColor=#6c8ebf;fontSize=8;fontStyle=1;arcSize=14;fontFamily=Verdana;" value="Models&lt;br&gt;Panel" vertex="1">
+          <mxGeometry height="30" width="55" x="1019" y="277" as="geometry" />
+        </mxCell>
+        <mxCell id="ui_serve" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f0fe;strokeColor=#6c8ebf;fontSize=8;fontStyle=1;arcSize=14;fontFamily=Verdana;" value="Try It&lt;br&gt;Panel" vertex="1">
+          <mxGeometry height="30" width="50" x="1081" y="277" as="geometry" />
+        </mxCell>
+        <mxCell id="ui_socketio_label" parent="1" style="text;html=1;fontSize=8;fontStyle=2;align=center;verticalAlign=middle;fontColor=#3a6ea5;fontFamily=Verdana;" value="Socket.io (real-time)" vertex="1">
+          <mxGeometry height="16" width="110" x="857" y="314" as="geometry" />
+        </mxCell>
+        <mxCell id="e_nginx_fe" edge="1" parent="1" source="nginx" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#6c8ebf;strokeWidth=1.5;fontFamily=Verdana;" target="pres_group">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="api_group" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;arcSize=6;fontFamily=Verdana;" value="" vertex="1">
+          <mxGeometry height="100" width="557" x="584" y="369" as="geometry" />
+        </mxCell>
+        <mxCell id="api_label" parent="1" style="text;html=1;fontSize=10;fontStyle=1;align=left;verticalAlign=top;fontColor=#3a7a35;fontFamily=Verdana;" value="API / Proxy Layer (Single Entry Point)" vertex="1">
+          <mxGeometry height="16" width="250" x="588" y="367" as="geometry" />
+        </mxCell>
+        <mxCell id="api_core" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#82b366;fontSize=10;arcSize=10;fontFamily=Verdana;" value="&lt;b&gt;noted&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;FastAPI + Uvicorn + Socket.io&lt;br&gt;(single container: API + static files)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="45" width="170" x="606" y="394" as="geometry" />
+        </mxCell>
+        <mxCell id="svc_vcs" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0f7ef;strokeColor=#82b366;fontSize=8;fontStyle=1;arcSize=14;fontFamily=Verdana;" value="Project Version&lt;br&gt;Control" vertex="1">
+          <mxGeometry height="30" width="75" x="796" y="391" as="geometry" />
+        </mxCell>
+        <mxCell id="svc_autolog" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0f7ef;strokeColor=#82b366;fontSize=8;fontStyle=1;arcSize=14;fontFamily=Verdana;" value="Auto-Instru&lt;br&gt;mentation" vertex="1">
+          <mxGeometry height="30" width="75" x="881" y="391" as="geometry" />
+        </mxCell>
+        <mxCell id="svc_daggen" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0f7ef;strokeColor=#82b366;fontSize=8;fontStyle=1;arcSize=14;fontFamily=Verdana;" value="DAG&lt;br&gt;Generator" vertex="1">
+          <mxGeometry height="30" width="70" x="966" y="391" as="geometry" />
+        </mxCell>
+        <mxCell id="svc_events" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0f7ef;strokeColor=#82b366;fontSize=8;fontStyle=1;arcSize=14;fontFamily=Verdana;" value="Event&lt;br&gt;Distributor" vertex="1">
+          <mxGeometry height="30" width="70" x="1046" y="391" as="geometry" />
+        </mxCell>
+        <mxCell id="svc_kernel" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0f7ef;strokeColor=#82b366;fontSize=8;fontStyle=1;arcSize=14;fontFamily=Verdana;" value="Kernel&lt;br&gt;Manager" vertex="1">
+          <mxGeometry height="28" width="75" x="796" y="429" as="geometry" />
+        </mxCell>
+        <mxCell id="svc_compose" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0f7ef;strokeColor=#82b366;fontSize=8;fontStyle=1;arcSize=14;fontFamily=Verdana;" value="Config&lt;br&gt;Composer" vertex="1">
+          <mxGeometry height="28" width="75" x="881" y="429" as="geometry" />
+        </mxCell>
+        <mxCell id="svc_serving" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0f7ef;strokeColor=#82b366;fontSize=8;fontStyle=1;arcSize=14;fontFamily=Verdana;" value="Serving&lt;br&gt;Proxy" vertex="1">
+          <mxGeometry height="28" width="70" x="966" y="429" as="geometry" />
+        </mxCell>
+        <mxCell id="svc_activity" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0f7ef;strokeColor=#82b366;fontSize=8;fontStyle=1;arcSize=14;fontFamily=Verdana;" value="Activity&lt;br&gt;Feed" vertex="1">
+          <mxGeometry height="28" width="70" x="1046" y="429" as="geometry" />
+        </mxCell>
+        <mxCell id="e_fe_api" edge="1" parent="1" source="pres_group" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#555555;strokeWidth=2;fontColor=#555555;fontSize=9;labelBackgroundColor=#FFFFFF;fontFamily=Verdana;" target="api_group" value="REST + Socket.io">
+          <mxGeometry relative="1" x="0.2" y="51" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="backend_group" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;arcSize=4;fontFamily=Verdana;" value="" vertex="1">
+          <mxGeometry height="195" width="1389" x="101" y="509" as="geometry" />
+        </mxCell>
+        <mxCell id="backend_label" parent="1" style="text;html=1;fontSize=10;fontStyle=1;align=left;verticalAlign=top;fontColor=#8a6d00;fontFamily=Verdana;" value="Backend Services (Docker Internal Network)" vertex="1">
+          <mxGeometry height="16" width="280" x="111" y="512" as="geometry" />
+        </mxCell>
+        <mxCell id="mlflow_box" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#d6b656;arcSize=8;fontFamily=Verdana;" value="" vertex="1">
+          <mxGeometry height="145" width="240" x="121" y="539" as="geometry" />
+        </mxCell>
+        <mxCell id="mlflow_title" parent="1" style="text;html=1;fontSize=12;fontStyle=1;align=center;verticalAlign=middle;fontColor=#1a1a2e;fontFamily=Verdana;" value="MLflow 3.x Server" vertex="1">
+          <mxGeometry height="20" width="240" x="121" y="543" as="geometry" />
+        </mxCell>
+        <mxCell id="mlflow_tracking" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff9e6;strokeColor=#d6b656;fontSize=9;fontStyle=1;arcSize=12;fontFamily=Verdana;" value="Tracking API&lt;br&gt;&lt;font style=&quot;font-size:8px;font-weight:normal;&quot;&gt;Experiments, Runs,&lt;br&gt;Metrics, Artifacts&lt;/font&gt;" vertex="1">
+          <mxGeometry height="50" width="100" x="136" y="569" as="geometry" />
+        </mxCell>
+        <mxCell id="mlflow_registry" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff9e6;strokeColor=#d6b656;fontSize=9;fontStyle=1;arcSize=12;fontFamily=Verdana;" value="Model Registry&lt;br&gt;&lt;font style=&quot;font-size:8px;font-weight:normal;&quot;&gt;Versions, Aliases,&lt;br&gt;Lineage&lt;/font&gt;" vertex="1">
+          <mxGeometry height="50" width="100" x="246" y="569" as="geometry" />
+        </mxCell>
+        <mxCell id="mlflow_genai" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff9e6;strokeColor=#d6b656;fontSize=9;fontStyle=1;arcSize=12;fontFamily=Verdana;" value="GenAI Tracing&lt;br&gt;&lt;font style=&quot;font-size:8px;font-weight:normal;&quot;&gt;LLM Chain Traces&lt;/font&gt;" vertex="1">
+          <mxGeometry height="42" width="100" x="136" y="627" as="geometry" />
+        </mxCell>
+        <mxCell id="mlflow_artifacts" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff9e6;strokeColor=#d6b656;fontSize=9;fontStyle=1;arcSize=12;fontFamily=Verdana;" value="Artifact Store&lt;br&gt;&lt;font style=&quot;font-size:8px;font-weight:normal;&quot;&gt;-&amp;gt; MinIO (S3)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="42" width="100" x="246" y="627" as="geometry" />
+        </mxCell>
+        <mxCell id="airflow_box" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#d6b656;arcSize=8;fontFamily=Verdana;" value="" vertex="1">
+          <mxGeometry height="145" width="280" x="381" y="539" as="geometry" />
+        </mxCell>
+        <mxCell id="airflow_title" parent="1" style="text;html=1;fontSize=12;fontStyle=1;align=center;verticalAlign=middle;fontColor=#1a1a2e;fontFamily=Verdana;" value="Apache Airflow 3.0" vertex="1">
+          <mxGeometry height="20" width="280" x="381" y="543" as="geometry" />
+        </mxCell>
+        <mxCell id="airflow_sched" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff9e6;strokeColor=#d6b656;fontSize=9;fontStyle=1;arcSize=12;fontFamily=Verdana;" value="Scheduler +&lt;br&gt;DAG Processor" vertex="1">
+          <mxGeometry height="32" width="75" x="396" y="571" as="geometry" />
+        </mxCell>
+        <mxCell id="airflow_worker" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff9e6;strokeColor=#d6b656;fontSize=9;fontStyle=1;arcSize=12;fontFamily=Verdana;" value="Celery Worker(s)&lt;br&gt;+ Triggerer" vertex="1">
+          <mxGeometry height="32" width="75" x="481" y="571" as="geometry" />
+        </mxCell>
+        <mxCell id="airflow_rest" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff9e6;strokeColor=#d6b656;fontSize=9;fontStyle=1;arcSize=12;fontFamily=Verdana;" value="API Server&lt;br&gt;&lt;font style=&quot;font-size:8px;font-weight:normal;&quot;&gt;Trigger, Monitor, Schedule&lt;/font&gt;" vertex="1">
+          <mxGeometry height="32" width="80" x="566" y="571" as="geometry" />
+        </mxCell>
+        <mxCell id="airflow_dags" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff9e6;strokeColor=#d6b656;fontSize=9;fontStyle=1;arcSize=12;fontFamily=Verdana;" value="Generated DAGs&lt;br&gt;&lt;font style=&quot;font-size:8px;font-weight:normal;&quot;&gt;DVC Pull -&amp;gt; Validate Config -&amp;gt; Train&lt;/font&gt;" vertex="1">
+          <mxGeometry height="35" width="250" x="396" y="614" as="geometry" />
+        </mxCell>
+        <mxCell id="airflow_sweep" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff9e6;strokeColor=#d6b656;fontSize=9;fontStyle=1;arcSize=12;fontFamily=Verdana;" value="Dynamic Task Mapping&lt;br&gt;&lt;font style=&quot;font-size:8px;font-weight:normal;&quot;&gt;Hydra Multirun Sweeps&lt;/font&gt;" vertex="1">
+          <mxGeometry height="22" width="250" x="396" y="656" as="geometry" />
+        </mxCell>
+        <mxCell id="hydra_box" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#d6b656;arcSize=8;fontFamily=Verdana;" value="" vertex="1">
+          <mxGeometry height="145" width="180" x="681" y="539" as="geometry" />
+        </mxCell>
+        <mxCell id="hydra_title" parent="1" style="text;html=1;fontSize=12;fontStyle=1;align=center;verticalAlign=middle;fontColor=#1a1a2e;fontFamily=Verdana;" value="Hydra + OmegaConf" vertex="1">
+          <mxGeometry height="20" width="180" x="681" y="543" as="geometry" />
+        </mxCell>
+        <mxCell id="hydra_compose" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff9e6;strokeColor=#d6b656;fontSize=9;fontStyle=1;arcSize=12;fontFamily=Verdana;" value="Compose API&lt;br&gt;&lt;font style=&quot;font-size:8px;font-weight:normal;&quot;&gt;Config Assembly&lt;/font&gt;" vertex="1">
+          <mxGeometry height="35" width="85" x="696" y="571" as="geometry" />
+        </mxCell>
+        <mxCell id="hydra_struct" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff9e6;strokeColor=#d6b656;fontSize=9;fontStyle=1;arcSize=12;fontFamily=Verdana;" value="Structured&lt;br&gt;Configs&lt;br&gt;&lt;font style=&quot;font-size:8px;font-weight:normal;&quot;&gt;Type Validation&lt;/font&gt;" vertex="1">
+          <mxGeometry height="48" width="58" x="791" y="571" as="geometry" />
+        </mxCell>
+        <mxCell id="hydra_groups" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff9e6;strokeColor=#d6b656;fontSize=9;fontStyle=1;arcSize=12;fontFamily=Verdana;" value="Config Groups&lt;br&gt;&lt;font style=&quot;font-size:8px;font-weight:normal;&quot;&gt;model/ data/ training/&lt;/font&gt;" vertex="1">
+          <mxGeometry height="35" width="85" x="696" y="614" as="geometry" />
+        </mxCell>
+        <mxCell id="hydra_instantiate" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff9e6;strokeColor=#d6b656;fontSize=9;fontStyle=1;arcSize=12;fontFamily=Verdana;" value="instantiate()&lt;br&gt;&lt;font style=&quot;font-size:8px;font-weight:normal;&quot;&gt;Object Creation&lt;/font&gt;" vertex="1">
+          <mxGeometry height="35" width="65" x="786" y="627" as="geometry" />
+        </mxCell>
+        <mxCell id="dvc_box" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#d6b656;arcSize=8;fontFamily=Verdana;" value="" vertex="1">
+          <mxGeometry height="145" width="190" x="881" y="539" as="geometry" />
+        </mxCell>
+        <mxCell id="dvc_title" parent="1" style="text;html=1;fontSize=11;fontStyle=1;align=center;verticalAlign=middle;fontColor=#1a1a2e;fontFamily=Verdana;" value="DVC + Git (Backend-Managed)" vertex="1">
+          <mxGeometry height="20" width="190" x="881" y="543" as="geometry" />
+        </mxCell>
+        <mxCell id="dvc_tracking" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff9e6;strokeColor=#d6b656;fontSize=9;fontStyle=1;arcSize=12;fontFamily=Verdana;" value="Data Versioning&lt;br&gt;&lt;font style=&quot;font-size:8px;font-weight:normal;&quot;&gt;add / push / pull / checkout&lt;/font&gt;" vertex="1">
+          <mxGeometry height="32" width="160" x="896" y="571" as="geometry" />
+        </mxCell>
+        <mxCell id="dvc_hash" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff9e6;strokeColor=#d6b656;fontSize=9;fontStyle=1;arcSize=12;fontFamily=Verdana;" value="Data Hash&lt;br&gt;&lt;font style=&quot;font-size:8px;font-weight:normal;&quot;&gt;Lineage Tag for MLflow&lt;/font&gt;" vertex="1">
+          <mxGeometry height="32" width="90" x="896" y="611" as="geometry" />
+        </mxCell>
+        <mxCell id="dvc_git" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff9e6;strokeColor=#d6b656;fontSize=9;fontStyle=1;arcSize=12;fontFamily=Verdana;" value="Bare Git Repos&lt;br&gt;&lt;font style=&quot;font-size:8px;font-weight:normal;&quot;&gt;pygit2 / subprocess&lt;/font&gt;" vertex="1">
+          <mxGeometry height="42" width="60" x="996" y="611" as="geometry" />
+        </mxCell>
+        <mxCell id="dvc_pointer" parent="1" style="text;html=1;fontSize=8;fontStyle=2;align=center;verticalAlign=middle;fontColor=#8a6d00;fontFamily=Verdana;" value=".dvc pointer files -&amp;gt; MinIO" vertex="1">
+          <mxGeometry height="14" width="160" x="896" y="659" as="geometry" />
+        </mxCell>
+        <mxCell id="serving_box" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#d6b656;arcSize=8;fontFamily=Verdana;" value="" vertex="1">
+          <mxGeometry height="145" width="190" x="1091" y="539" as="geometry" />
+        </mxCell>
+        <mxCell id="serving_title" parent="1" style="text;html=1;fontSize=12;fontStyle=1;align=center;verticalAlign=middle;fontColor=#1a1a2e;fontFamily=Verdana;" value="Model Server" vertex="1">
+          <mxGeometry height="20" width="190" x="1091" y="543" as="geometry" />
+        </mxCell>
+        <mxCell id="serving_fastapi" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff9e6;strokeColor=#d6b656;fontSize=9;fontStyle=1;arcSize=12;fontFamily=Verdana;" value="FastAPI + Uvicorn&lt;br&gt;&lt;font style=&quot;font-size:8px;font-weight:normal;&quot;&gt;/predict  /health  /schema&lt;/font&gt;" vertex="1">
+          <mxGeometry height="35" width="160" x="1106" y="571" as="geometry" />
+        </mxCell>
+        <mxCell id="serving_hotload" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff9e6;strokeColor=#d6b656;fontSize=9;fontStyle=1;arcSize=12;fontFamily=Verdana;" value="Hot Reload&lt;br&gt;&lt;font style=&quot;font-size:8px;font-weight:normal;&quot;&gt;Watch @champion alias&lt;/font&gt;" vertex="1">
+          <mxGeometry height="35" width="100" x="1106" y="614" as="geometry" />
+        </mxCell>
+        <mxCell id="serving_pydantic" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff9e6;strokeColor=#d6b656;fontSize=9;fontStyle=1;arcSize=12;fontFamily=Verdana;" value="Pydantic&lt;br&gt;&lt;font style=&quot;font-size:8px;font-weight:normal;&quot;&gt;Schema&lt;br&gt;Validation&lt;/font&gt;" vertex="1">
+          <mxGeometry height="48" width="55" x="1216" y="614" as="geometry" />
+        </mxCell>
+        <mxCell id="serving_ondemand" parent="1" style="text;html=1;fontSize=8;fontStyle=2;align=center;verticalAlign=middle;fontColor=#8a6d00;fontFamily=Verdana;" value="On-demand lifecycle (start/stop)" vertex="1">
+          <mxGeometry height="14" width="160" x="1106" y="664" as="geometry" />
+        </mxCell>
+        <mxCell id="kernel_box" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#d6b656;arcSize=8;fontFamily=Verdana;" value="" vertex="1">
+          <mxGeometry height="145" width="160" x="1301" y="539" as="geometry" />
+        </mxCell>
+        <mxCell id="kernel_title" parent="1" style="text;html=1;fontSize=12;fontStyle=1;align=center;verticalAlign=middle;fontColor=#1a1a2e;fontFamily=Verdana;" value="Notebook Kernels" vertex="1">
+          <mxGeometry height="20" width="160" x="1301" y="543" as="geometry" />
+        </mxCell>
+        <mxCell id="kernel_client" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff9e6;strokeColor=#d6b656;fontSize=9;fontStyle=1;arcSize=12;fontFamily=Verdana;" value="jupyter_client&lt;br&gt;&lt;font style=&quot;font-size:8px;font-weight:normal;&quot;&gt;Multi-runtime venvs&lt;br&gt;(Python 3.10-3.14)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="32" width="130" x="1316" y="571" as="geometry" />
+        </mxCell>
+        <mxCell id="kernel_mlflow_env" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff9e6;strokeColor=#d6b656;fontSize=9;fontStyle=1;arcSize=12;fontFamily=Verdana;" value="MLflow Env Injection&lt;br&gt;&lt;font style=&quot;font-size:8px;font-weight:normal;&quot;&gt;TRACKING_URI, EXPERIMENT&lt;br&gt;+ CUDA LD_LIBRARY_PATH&lt;/font&gt;" vertex="1">
+          <mxGeometry height="32" width="130" x="1316" y="611" as="geometry" />
+        </mxCell>
+        <mxCell id="kernel_auto" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff9e6;strokeColor=#d6b656;fontSize=9;fontStyle=1;arcSize=12;fontFamily=Verdana;" value="Auto-tracking hooks&lt;br&gt;&lt;font style=&quot;font-size:8px;font-weight:normal;&quot;&gt;Framework detection&lt;/font&gt;" vertex="1">
+          <mxGeometry height="27" width="130" x="1316" y="651" as="geometry" />
+        </mxCell>
+        <mxCell id="e_api_mlflow" edge="1" parent="1" source="api_group" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#8a6d00;strokeWidth=1.5;exitX=0.2;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontFamily=Verdana;" target="mlflow_box">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="693" y="488" />
+              <mxPoint x="241" y="488" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_api_airflow" edge="1" parent="1" source="api_group" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#8a6d00;strokeWidth=1.5;exitX=0.4;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontFamily=Verdana;" target="airflow_box">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="805" y="497" />
+              <mxPoint x="521" y="497" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_api_hydra" edge="1" parent="1" source="api_group" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#8a6d00;strokeWidth=1.5;exitX=0.55;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontFamily=Verdana;" target="hydra_box">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_api_dvc" edge="1" parent="1" source="api_group" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#8a6d00;strokeWidth=1.5;exitX=0.7;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontFamily=Verdana;" target="dvc_box">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_api_serving" edge="1" parent="1" source="api_group" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#8a6d00;strokeWidth=1.5;exitX=0.83;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontFamily=Verdana;" target="serving_box">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_api_kernel" edge="1" parent="1" source="api_group" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#8a6d00;strokeWidth=1.5;exitX=0.95;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontFamily=Verdana;" target="kernel_box">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1113" y="494" />
+              <mxPoint x="1381" y="494" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="data_group" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;arcSize=6;fontFamily=Verdana;" value="" vertex="1">
+          <mxGeometry height="129" width="1388" x="101" y="739" as="geometry" />
+        </mxCell>
+        <mxCell id="data_label" parent="1" style="text;html=1;fontSize=10;fontStyle=1;align=left;verticalAlign=top;fontColor=#a33b3b;fontFamily=Verdana;" value="Data / Persistence Layer" vertex="1">
+          <mxGeometry height="16" width="180" x="117" y="742" as="geometry" />
+        </mxCell>
+        <mxCell id="minio" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#b85450;fontSize=10;arcSize=8;fontFamily=Verdana;" value="&lt;b&gt;MinIO&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;S3-Compatible Object Storage&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;font style=&quot;font-size:8px;&quot;&gt;noted-mlflow-artifacts/&lt;br&gt;noted-dvc/&lt;br&gt;Pre-signed URLs&lt;/font&gt;" vertex="1">
+          <mxGeometry height="87" width="200" x="290" y="764" as="geometry" />
+        </mxCell>
+        <mxCell id="postgres" parent="1" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=8;fillColor=#FFFFFF;strokeColor=#b85450;fontSize=10;arcSize=8;fontFamily=Verdana;" value="&lt;b&gt;PostgreSQL&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;Shared Instance&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;font style=&quot;font-size:8px;&quot;&gt;DB: noted (app metadata)&lt;br&gt;DB: mlflow (tracking)&lt;br&gt;DB: airflow (metadata)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="96" width="180" x="560" y="761" as="geometry" />
+        </mxCell>
+        <mxCell id="redis" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#b85450;fontSize=10;arcSize=8;fontFamily=Verdana;" value="&lt;b&gt;Redis&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;Celery Broker&lt;br&gt;(Airflow-managed)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="54" width="130" x="810" y="772" as="geometry" />
+        </mxCell>
+        <mxCell id="project_fs" parent="1" style="shape=mxgraph.flowchart.multi-document;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#b85450;fontSize=10;arcSize=8;fontFamily=Verdana;" value="&lt;b&gt;Project Filesystem&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;/data/projects/{id}/&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;font style=&quot;font-size:8px;&quot;&gt;notebooks/  src/  config/&lt;br&gt;data/  .git/  .dvc/  venv/&lt;/font&gt;" vertex="1">
+          <mxGeometry height="99" width="190" x="1000" y="760" as="geometry" />
+        </mxCell>
+        <mxCell id="gpu" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#b85450;fontSize=10;arcSize=8;fontFamily=Verdana;" value="&lt;b&gt;NVIDIA GPU&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;CUDA Training&lt;/font&gt;" vertex="1">
+          <mxGeometry height="53" width="130" x="1260" y="772" as="geometry" />
+        </mxCell>
+        <mxCell id="e_mlflow_pg" edge="1" parent="1" source="mlflow_box" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#b85450;strokeWidth=1.2;dashed=1;fontFamily=Verdana;" target="postgres">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="241" y="728" />
+              <mxPoint x="651" y="728" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_mlflow_minio" edge="1" parent="1" source="mlflow_artifacts" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#b85450;strokeWidth=1.2;dashed=1;fontFamily=Verdana;" target="minio">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="296" y="722" />
+              <mxPoint x="391" y="722" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_airflow_pg" edge="1" parent="1" source="airflow_box" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#b85450;strokeWidth=1.2;dashed=1;fontFamily=Verdana;" target="postgres">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="521" y="708" />
+              <mxPoint x="651" y="708" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_airflow_redis" edge="1" parent="1" source="airflow_worker" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#b85450;strokeWidth=1.2;dashed=1;exitX=0.75;exitY=1;exitDx=0;exitDy=0;fontFamily=Verdana;" target="redis">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="536" y="603" />
+              <mxPoint x="536" y="696" />
+              <mxPoint x="876" y="696" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_dvc_minio" edge="1" parent="1" source="dvc_box" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#b85450;strokeWidth=1.2;dashed=1;fontFamily=Verdana;" target="minio">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="976" y="716" />
+              <mxPoint x="391" y="716" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_dvc_fs" edge="1" parent="1" source="dvc_git" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#b85450;strokeWidth=1.2;dashed=1;fontFamily=Verdana;" target="project_fs">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1026" y="716" />
+              <mxPoint x="1096" y="716" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_kernel_gpu" edge="1" parent="1" source="kernel_box" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#b85450;strokeWidth=1.2;dashed=1;exitX=0.25;exitY=1;exitDx=0;exitDy=0;fontFamily=Verdana;" target="gpu">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1341" y="714" />
+              <mxPoint x="1326" y="714" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_kernel_fs" edge="1" parent="1" source="kernel_client" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#b85450;strokeWidth=1.2;dashed=1;fontFamily=Verdana;" target="project_fs">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1381" y="724" />
+              <mxPoint x="1096" y="724" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_serving_mlflow" edge="1" parent="1" source="serving_hotload" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#8a6d00;strokeWidth=1;dashed=1;dashPattern=4 4;fontFamily=Verdana;" target="mlflow_registry">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1156" y="689" />
+              <mxPoint x="373" y="689" />
+              <mxPoint x="373" y="619" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="lineage_group" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e6e0f8;strokeColor=#9673a6;dashed=1;arcSize=8;fontFamily=Verdana;" value="" vertex="1">
+          <mxGeometry height="72" width="1389" x="101" y="880" as="geometry" />
+        </mxCell>
+        <mxCell id="lineage_label" parent="1" style="text;html=1;fontSize=10;fontStyle=1;align=left;verticalAlign=top;fontColor=#6b4c8a;fontFamily=Verdana;" value="Lineage Chain (Full Traceability)" vertex="1">
+          <mxGeometry height="16" width="220" x="111" y="880" as="geometry" />
+        </mxCell>
+        <mxCell id="lin_data" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#9673a6;fontSize=9;fontStyle=1;arcSize=12;fontFamily=Verdana;" value="Data Version&lt;br&gt;&lt;font style=&quot;font-size:8px;font-weight:normal;&quot;&gt;DVC hash&lt;/font&gt;" vertex="1">
+          <mxGeometry height="28" width="100" x="157" y="911" as="geometry" />
+        </mxCell>
+        <mxCell id="lin_arrow1" edge="1" parent="1" style="endArrow=block;html=1;strokeColor=#9673a6;strokeWidth=2;endFill=1;fontFamily=Verdana;" value="">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="267" y="925" as="sourcePoint" />
+            <mxPoint x="367" y="925" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="lin_config" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#9673a6;fontSize=9;fontStyle=1;arcSize=12;fontFamily=Verdana;" value="Config Snapshot&lt;br&gt;&lt;font style=&quot;font-size:8px;font-weight:normal;&quot;&gt;Hydra hash&lt;/font&gt;" vertex="1">
+          <mxGeometry height="28" width="110" x="377" y="911" as="geometry" />
+        </mxCell>
+        <mxCell id="lin_arrow2" edge="1" parent="1" style="endArrow=block;html=1;strokeColor=#9673a6;strokeWidth=2;endFill=1;fontFamily=Verdana;" value="">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="497" y="925" as="sourcePoint" />
+            <mxPoint x="597" y="925" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="lin_run" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#9673a6;fontSize=9;fontStyle=1;arcSize=12;fontFamily=Verdana;" value="MLflow Run&lt;br&gt;&lt;font style=&quot;font-size:8px;font-weight:normal;&quot;&gt;Metrics, Params, Artifacts&lt;/font&gt;" vertex="1">
+          <mxGeometry height="28" width="150" x="607" y="911" as="geometry" />
+        </mxCell>
+        <mxCell id="lin_arrow3" edge="1" parent="1" style="endArrow=block;html=1;strokeColor=#9673a6;strokeWidth=2;endFill=1;fontFamily=Verdana;" value="">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="767" y="925" as="sourcePoint" />
+            <mxPoint x="867" y="925" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="lin_pipeline" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#9673a6;fontSize=9;fontStyle=1;arcSize=12;fontFamily=Verdana;" value="Pipeline Run&lt;br&gt;&lt;font style=&quot;font-size:8px;font-weight:normal;&quot;&gt;Airflow DAG&lt;/font&gt;" vertex="1">
+          <mxGeometry height="28" width="110" x="877" y="911" as="geometry" />
+        </mxCell>
+        <mxCell id="lin_arrow4" edge="1" parent="1" style="endArrow=block;html=1;strokeColor=#9673a6;strokeWidth=2;endFill=1;fontFamily=Verdana;" value="">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="997" y="925" as="sourcePoint" />
+            <mxPoint x="1097" y="925" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="lin_model" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#9673a6;fontSize=9;fontStyle=1;arcSize=12;fontFamily=Verdana;" value="Model Version&lt;br&gt;&lt;font style=&quot;font-size:8px;font-weight:normal;&quot;&gt;Registry alias&lt;/font&gt;" vertex="1">
+          <mxGeometry height="28" width="110" x="1107" y="911" as="geometry" />
+        </mxCell>
+        <mxCell id="lin_arrow5" edge="1" parent="1" style="endArrow=block;html=1;strokeColor=#9673a6;strokeWidth=2;endFill=1;fontFamily=Verdana;" value="">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1227" y="925" as="sourcePoint" />
+            <mxPoint x="1327" y="925" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="lin_serving" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#9673a6;fontSize=9;fontStyle=1;arcSize=12;fontFamily=Verdana;" value="Live Serving&lt;br&gt;&lt;font style=&quot;font-size:8px;font-weight:normal;&quot;&gt;@champion endpoint&lt;/font&gt;" vertex="1">
+          <mxGeometry height="28" width="120" x="1337" y="911" as="geometry" />
+        </mxCell>
+        <mxCell id="4nEBIGcgvNHPTkLa6fzQ-2" connectable="0" parent="1" style="group" value="" vertex="1">
+          <mxGeometry height="109" width="500" x="993.5" y="964" as="geometry" />
+        </mxCell>
+        <mxCell id="legend_box" parent="4nEBIGcgvNHPTkLa6fzQ-2" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FAFAFA;strokeColor=#CCCCCC;arcSize=8;fontFamily=Verdana;" value="" vertex="1">
+          <mxGeometry height="109" width="500" as="geometry" />
+        </mxCell>
+        <mxCell id="legend_title" parent="4nEBIGcgvNHPTkLa6fzQ-2" style="text;html=1;fontSize=10;fontStyle=1;align=left;verticalAlign=middle;fontColor=#333333;fontFamily=Verdana;" value="Legend" vertex="1">
+          <mxGeometry height="21.799999999999997" width="50" x="10" y="2.7249999999999996" as="geometry" />
+        </mxCell>
+        <mxCell id="leg1" parent="4nEBIGcgvNHPTkLa6fzQ-2" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontFamily=Verdana;" value="" vertex="1">
+          <mxGeometry height="16.349999999999998" width="16" x="15" y="29.0625" as="geometry" />
+        </mxCell>
+        <mxCell id="leg1_t" parent="4nEBIGcgvNHPTkLa6fzQ-2" style="text;html=1;fontSize=9;align=left;verticalAlign=middle;fontFamily=Verdana;" value="Presentation Layer" vertex="1">
+          <mxGeometry height="21.799999999999997" width="100" x="35" y="26.337499999999995" as="geometry" />
+        </mxCell>
+        <mxCell id="leg2" parent="4nEBIGcgvNHPTkLa6fzQ-2" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontFamily=Verdana;" value="" vertex="1">
+          <mxGeometry height="16.349999999999998" width="16" x="15" y="56.3125" as="geometry" />
+        </mxCell>
+        <mxCell id="leg2_t" parent="4nEBIGcgvNHPTkLa6fzQ-2" style="text;html=1;fontSize=9;align=left;verticalAlign=middle;fontFamily=Verdana;" value="API / Proxy Layer" vertex="1">
+          <mxGeometry height="21.799999999999997" width="100" x="35" y="53.5875" as="geometry" />
+        </mxCell>
+        <mxCell id="leg3" parent="4nEBIGcgvNHPTkLa6fzQ-2" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontFamily=Verdana;" value="" vertex="1">
+          <mxGeometry height="16.349999999999998" width="16" x="15" y="83.5625" as="geometry" />
+        </mxCell>
+        <mxCell id="leg3_t" parent="4nEBIGcgvNHPTkLa6fzQ-2" style="text;html=1;fontSize=9;align=left;verticalAlign=middle;fontFamily=Verdana;" value="Backend Services" vertex="1">
+          <mxGeometry height="21.799999999999997" width="100" x="35" y="80.83749999999999" as="geometry" />
+        </mxCell>
+        <mxCell id="leg4" parent="4nEBIGcgvNHPTkLa6fzQ-2" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontFamily=Verdana;" value="" vertex="1">
+          <mxGeometry height="16.349999999999998" width="16" x="160" y="29.0625" as="geometry" />
+        </mxCell>
+        <mxCell id="leg4_t" parent="4nEBIGcgvNHPTkLa6fzQ-2" style="text;html=1;fontSize=9;align=left;verticalAlign=middle;fontFamily=Verdana;" value="Data / Persistence" vertex="1">
+          <mxGeometry height="21.799999999999997" width="100" x="180" y="26.337499999999995" as="geometry" />
+        </mxCell>
+        <mxCell id="leg5" parent="4nEBIGcgvNHPTkLa6fzQ-2" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e6e0f8;strokeColor=#9673a6;fontFamily=Verdana;" value="" vertex="1">
+          <mxGeometry height="16.349999999999998" width="16" x="160" y="56.3125" as="geometry" />
+        </mxCell>
+        <mxCell id="leg5_t" parent="4nEBIGcgvNHPTkLa6fzQ-2" style="text;html=1;fontSize=9;align=left;verticalAlign=middle;fontFamily=Verdana;" value="Lineage Chain" vertex="1">
+          <mxGeometry height="21.799999999999997" width="100" x="180" y="53.5875" as="geometry" />
+        </mxCell>
+        <mxCell id="leg6" parent="4nEBIGcgvNHPTkLa6fzQ-2" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8d44d;strokeColor=#c9a900;fontFamily=Verdana;" value="" vertex="1">
+          <mxGeometry height="16.349999999999998" width="16" x="160" y="83.5625" as="geometry" />
+        </mxCell>
+        <mxCell id="leg6_t" parent="4nEBIGcgvNHPTkLa6fzQ-2" style="text;html=1;fontSize=9;align=left;verticalAlign=middle;fontFamily=Verdana;" value="External Entry Point" vertex="1">
+          <mxGeometry height="21.799999999999997" width="110" x="180" y="80.83749999999999" as="geometry" />
+        </mxCell>
+        <mxCell id="leg7_line" edge="1" parent="4nEBIGcgvNHPTkLa6fzQ-2" style="endArrow=none;html=1;strokeColor=#555555;strokeWidth=2;fontFamily=Verdana;" value="">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="310" y="38.599999999999994" as="sourcePoint" />
+            <mxPoint x="340" y="38.599999999999994" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="leg7_t" parent="4nEBIGcgvNHPTkLa6fzQ-2" style="text;html=1;fontSize=9;align=left;verticalAlign=middle;fontFamily=Verdana;" value="Synchronous / API call" vertex="1">
+          <mxGeometry height="21.799999999999997" width="120" x="345" y="27.699999999999996" as="geometry" />
+        </mxCell>
+        <mxCell id="leg8_line" edge="1" parent="4nEBIGcgvNHPTkLa6fzQ-2" style="endArrow=none;html=1;strokeColor=#b85450;strokeWidth=1.2;dashed=1;fontFamily=Verdana;" value="">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="310" y="65.85" as="sourcePoint" />
+            <mxPoint x="340" y="65.85" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="leg8_t" parent="4nEBIGcgvNHPTkLa6fzQ-2" style="text;html=1;fontSize=9;align=left;verticalAlign=middle;fontFamily=Verdana;" value="Data / persistence link" vertex="1">
+          <mxGeometry height="21.799999999999997" width="120" x="345" y="54.949999999999996" as="geometry" />
+        </mxCell>
+        <mxCell id="title" parent="1" style="text;html=1;fontSize=22;fontStyle=1;align=center;verticalAlign=middle;whiteSpace=wrap;fontColor=#1a1a2e;fontFamily=Verdana;" value="Integrated MLOps Platform Architecture" vertex="1">
+          <mxGeometry height="40" width="552" x="586" y="31" as="geometry" />
+        </mxCell>
+        <mxCell id="IC2kt--qmVOWzkbUQ0ES-2" parent="1" style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=default;verticalAlign=top;aspect=fixed;imageAspect=0;image=data:image/png,iVBORw0KGgoAAAANSUhEUgAAA7QAAAEACAYAAACDAzrkAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAACqMSURBVHhe7Z3bbiRJdmXrS/Q0LUCC0C8SIIzmSdIAagmZzEtVZV26Ma3//4kSonKCGVxx8wh3M9/HbC1goYEukr7t2DGzMAaZ/O47ERERERGRSfmbv/njb71lBhEREREREZGH4WWzh8wgIiIiIiIi8jC8bPbwX/7lT15qRUREREREZB28bPaSOUREREREREQeghfNXjKHiIiIiIiIyEPwotlLf+xYREREREREVsGLZk+ZRURERERERGQxvGT21HdpRURERERE5Gl4yewt84iIiIiIiIgsghfM3jKPiIiIiIiIyCJ4weytP3YsIiIiIiIiT8EL5h4yk4iIiIiIiMhdeLncQ9+lFRERERERkYfh5XIvmUtERERERETkJrxY7qXv0oqIiIiIiMhD8GK5p8wmIiIiIiIichVeKvfUd2lFRERERERkMbxU7i3ziYiIiIiIiFyEF8q99V1aERERERERWQQvlAl6qRUREREREZG78DKZInOKiIiIiIiIvIEXyRR9l1ZERERERERuwotkkl5qRURERERE5Cq8RKbJvCIiIiIiIiK/wwtkmr5LKyIiIiIiIhfhBTJRL7UiIiIiIiJyBi+PqXqpFRERERERkTfw4pgss4uIiIiIiMjE8NKYrO/SioiIiIiIyCu8NKbrpVZERERERER+hxfGCnqpFRERERERkZIX2oNeakVERERERCaHF8VKeqkVERERERGZGF4Sq+mlVkREREREZFJ4Qayol1oREREREZEJ4eWwql5qRUREREREJoMXw8p6qRUREREREZkIXgqr66VWRERERERkEnghHEEvtSIiIiIiIhPAy+AoeqkVEREREREZHF4ER9JLrYiIiIiIyMDwEjiaXmpFREQWwkM0RQ9zERG5Bs+MEfUcFBERWQAP0CSZVURE5ADPi1H1UisiInIHHp5JMquIiMgBnhcj66VWRETkBjw4U/QAFxGRa/DMmEHPRRERkQvwwEyROUVERI7wzJhFL7UiIiKAh2WKzCkiInKEZ8ZMeqkVERE5gQdliswpIiJyhGfGbHqpFRER+f/wkEyROUVERI7wzJhVL7YiIjI9PBxTZE4REZEjPDNm1kutiIhMDQ/GFJlTRETkCM+M2fVSKyIi08JDMUXmFBEROcIzQ73UiojIpPBATJE5RUREjvDM0G96sRURkangQZgic4qIiBzhmaFv9VIrIiLTwEMwReYUERE5wjNDz/VSKyIiU8ADMEXmFBEROcIzQy/rpVZERIaHh1+KzCkiInKEZ4be1outiIgMCw+9FJlTRETkCM8Mva+XWhERGRIeeCkyp4iIyBGeGbpML7UiIjIcPOxSZE4REZEjPDN0uV5qRURkKHjQpcicIiIiR3hm6GN6qRURkWHgIZcic4qIiBzhmaGP66VWRESGgAdciswpIiJyhGeGPq8XWxERKQ0PthSZU0RE5AjPDF2nl1oRESkLD7UUmVNEROQIzwxdr5daEREpCQ+0FJlTRETkCM8M3UYvtSIiUg4eZikyp4iIyBGeGbqdXmpFRKQUPMhSZE4REZEjPDN0W73UiohIGXiIpcicIiIiR3hm6PZ6qRURkRLwAEuROUVERI7wzNA2eqkVEZF4eHilyJwiIiJHeGZoO1l7ERGRKHhwpcicIiIiR3hmaDt9l1ZERKLhwZUic4qIiBzhmaFt9VIrIiKx8NBKkTlFRESO8MzQ9nqpFRGRSHhgpcicIiIiR3hmaB+91IqISBw8rFJkThERkSM8M7SfnAsREZFd4UGVInOKiIgc4Zmh/fRdWhERiYIHVYrMKSIicoRnhvbVS62IiMTAQypF5hQRETnCM0P766VWREQi4AGVInOKiIgc4ZnR2uPl7fC//G8zy3mRUJY2rt+lkETsX7kHeyFF5hRZytJ971T3QKnMIz0/Sq9zXK3l8x+p+ciO0k+l6d2MTrpsRe/ePWoPjwfnOEXmFDmw19530P1P9qJn31fpc+ZuLZ9/pOfcpFqlZ4YgseFsAFlCYu9e0n6uR3Jv2U9zk9yb1F6VLUnr/dT+Zs7W8vkkbd56y3rsxufPf10U5tKEJTb7pZzpJtZR+lOxd6m93J+le/iRCn2W1kfHGh9rl5avMhX6can2hTxCtd5P6W/mai2ff4tqc7qFD/fF50+/nH2RBJlzD0ZqoIcbQ8oyUt9e035+DNZPc+XcyXLc+2RGRur7PfubWVrL5y9hpLleIsd/kw8ffjr7AgkyZy9maJY9Nwxpwwx9e037+T6smebKuZPbuPfJjMzQ9737m89vLZ//KPYA8EI7R1Nc8qFGkThm7dtb2tOXYZ00V86dnOPed6573xzM2Pu9epvPbS2f/yyj9wTHe5WZf+R49CZYaq/NQrbBvr2vPf0W1kdz5dzJN9z77uveNyb2fvve5vNay+dvwYh9snjef/j+z2efnCBzbsmIE76Fi5tGumPPPq993f+g1ufl3M2Oe99zuu+Ngf1/bqve5nNay+dvyWh9w/Fd5PvPv559YoLMuQWjTXALW20U8hz27HbO3NushebKuZsV975tnHnfq4z9f9+te5tfv7V8fgtG6aNFcz3LO7SjTGovFzWPNMN+beeMvc0aaK6cu9lw72vjjPteRez/x9yyr/m1W8vnt2SEvuKYzvjyw1/OPilB5nyWESZxL7fcKGQZ9msfZ+ttjl9z5dzNgntfH2fb+6pg/69zi77m12wtn9+Dyn12d46//zzuPwpVeeKSvNtEshp7dR9n6W2OW3Pl3M2A+19/Z9n7KmD/b+PanubXay2f34vK/caxvGHEC23lyUp17UYh17Ff93f0/uZ4NVfO3ci49+3r6PteOvZ/G5/ta36d1vL5vanYfzfndrQLbcUJquLNRpKHsVezHLm/OVbNlXM3Ku5/GY687yVj/7f1mb7m12gtn78X1XqR+V8Z6UJbbVIq+swmIefYq7mO2OMco+bKuRsN975MR9z3ErH/+/loT/PzW8vn70mlvmT2Vz59rH+hrTQRI/joJiHfsFdrOFqPc3yaK+duJNz/sh1t30vD/u/vIz3Nz20tn59AhR69OqcfXn46++AEmfMaFYo/olcbSq5ir9ZypB7n2DRXzt0IuPfVcqS9LwXXwH4u7Wd+Xmv5/BQq9Coz/86njz+ffWCCzHmJCkUfWc6HXMderevSwzAZjklz5dxVx72vpiPseym4BjK819P8+Nby+Wkk9y2z/k7VC21yoWfx3uYg9ukoVu91jkdz5dxVxv2vttX3vb2x//O81dP82Nby+Ymk9vDFefz4od6PHKcWeEYvNpX8jn06lpV7nWPRXDl3FXHvG8fK+96euAZyvdbT/LjW8vmppPYyc5a70KYWdmavbQ4zY5+OadVe5zg0V85dNdz7xrPqvrcXroF8L/U0P6a1fH4yiT3NjKUutIkF1a9yrmbGPh3bSwdhOhyD5sq5q4R737hW3Pf2wDVQR84d/3tr+fx00nqb+cpcaNMKqW/1sPuKfTqH1fqd+TVXzl0V3PvGt9q+1xvXQC3Zz/zvrT19diVS+pzzV+YfheJ/1zw5ZzORssC1r2cbaijMrbly7irg/jePVfa83rgGanrs5z3mjz1UiT3qdck3oSr8HdqUwultZz3o7M+5rdD3zKy5cu7Scf+bzwp7Xm9YI9V7soeqkbD3vwmU+iPHe37XRJ93toPO/tSD7Is0mFdz5dwl4/43r7Od9bdwHegzso8qsnfvvwmT+iPHWtc3DTYwey9kzTH9xR3zaq6cu1Tc/zR93+uB60Cflb1UlT3XwJsgXmh1a2c55DhundvkvmdWzZVzl8ieL2A0y+R9rzWuA10j+6kye62FN/vPp4+/nH2A6lrfdPqA7LV4NdvUF3fMqbly7hJhZp3b1H2vJb4G0LWyp6rD8fXyNcCH0N+h1dq+6fLB8CDTWya+uGNGzZVzl8bM+9+9tW1t5oHjV31U9lR19tr/XgP4Dq22cNTDba8Fq7VM63/m01w5d0nMsP+1Wrsz1I5jHpUZ5lLby74agT3WxuvDfYdWW/mmywdgj4WqdW31wvgZmE1z5dylMPL+13utjlrL3nXcg1HnTvvL3hqF3mvk9cFeaB9z7Ybde6L3dG2t0uD4ZnDLOZyp94+yBnvBXJrplutta5i1uim1Hm1fTKlrC0abq0fccl5nruOprMtI9Jzj14d+ePFCe8stF/Elek76HnK8VRl9no627vdTZqhpz3omkD6ns83HVqTP6yOm9sBINebYRoHjHNle62Skvn9U1mI0es3t6wP9Hdpzey3kU3pNfG85zoqMOjdH9+j3U6zvWHD8Kc42D1sxyvqsMv8j1LtKrR9hhHm5597zNkONT+X4R4RjbuFr33qh/ebei/nAaAs6oaZrGG0+Tk2cm1HrzXGODMeeInPKMljHaibuc0uovhdWrfs1OL5RTJyn6r2/VI57RHrN5fv3X37zd2hd0M3l2CrBsVQ3sdcvMVL/H6xS9y3g2FNkTrlP5XU4wpqrXP+DHE9Vqs/DJSusjxHrfirHOyo95vFP//Hpt+9eXr6c/YdZTF/QPZqghxxXFUap/8H0Xr+Gc1APjjtF5pTbVF57o621qnMxwjxUrf01K87JaHNwlOMcGY59a//u7/75t+8+f/r17D+MbrUFXX0xV6v3EY6jqlXrf6R6/5/KsY0Ix5wic8ptWL8KVt/rblF1H6w+JxxPZavPRdU1cE2Ob2R6zN10F9qqC7pHM7SU40mner0PVu31azgnNeCYU2ROuU7FtTbD2qo4Lwc5jipUrTcdbW2MMi8c1+hw/Fv73aePP5/9n6NafVFXXsQcSzKV63y0eq9fw7nJh+NNkTnlMhXX2Ohr6hTnpx8cR0Wr1v4eFdcB5ZhGp/WcTXGhHWlBt26IVnIcyTB7JUfq9WtUXQOnckwjwbGmOMPa2ALWLd0Z57XiHsgxpFOxxnT0tVF9jjieGWANtnT4P9sz4oKuuIg5hlQq1vboiL1+C+cqE441SWaVt1RbUyOvo3s4V21h/kpWq/Uaqq2DUzmWGWg5X999HPjP9oy8qDnWdKvMBXNXsUp9t6bl5thajmUUOM4UZ10jj8CaJet81tv/mD+VanU9dcZ1UXW+OI5ZYB22ctgL7eiLuuIC5hjSqFjTg6P3+j2ctyw4zhSZU95SaR2NunaewXnbHuauYpX6tqLSWjjI/LPQap6G/JHjWRZ1q6ZoJfOnwbwVnKXX71FtLRzlOEaAY0zRtXIb1itV5/GcSvsfs6dRqZanui6+Umn+mH0mWIstHO5CO9ui5viTZfYkKm2CR2fr9Xs4hxlwjCmOWOutqLR2mF2+UmUO09ch81Ywvaa9qbIWmHsmWIstHOpHjmdc1FUW7kFmT4JZ052x15dQaT0c5Riqw/GlyJzyDdYqVfe921TZ/5g7hSr1O9U1cRnWKVFmnomt19of/vCPY/3ZHhZsFliHVFM33q0XVg85BvkGa5Vu6rp4Fo4vReaUb7BWiY62TlrBuiXKzCkwZwU5BvlKhdd1zDwbrMca//Vf/+u37z68jPEO7cyHXYWFe5TZE2DGdGfu9SVUWg9HOYbKcGwpMqd8pcJ6cc9bjvP5PMyZbmodU0hfC8w7G6zHGl/efxnjR45d1Ns2RkuZe2/SNzxqry/Ded0Pji1F5pSvsE6JMrPcpsL+x8x7U6Fmp450ZrQkeV6ZdTa2mpvXtfBxgHdoWaQZ2aoxWsvce8N8yXqAPUaVNXGU+avCcaXInFJjjbjvPQfrmCbz7g3zpcv8cp3UfY45Z4Q1ecbXL1b9d2g97L7B2iTKzHvDfMkyu9yHNUyW2avCcaXInJI7V6cysywj9UX80bTXbsyXbFrtKsAaJsiMM8KaPOPrF6v+O7RvKjM5rE2izLwn6Qf+qR5gz+Ec94fjSpE5JXeujo6yJvaC9UyTeffCc2J8EueYGWeENXnG1y/2+VPdv0Prwn5L4oKlzLwnzJYss8tyWMtkmb0iHFOKzDk76eeF5/t6nONlMFeyzC7LYS33lvlmZIs96vWLffpY80KbshGmwTqlybx7wmyp2uvr2GLD7CWzV4RjSpE5Z4f1SZN55TlY1zSZdw+YKVVfC6wj7bUA880K6/Kor1+o6r9y/KYa8grrlCbz7kXaxnZLZpfHYU1THeEFC8eUInPODuuTJvPKc7CuaTJvb3wtMBdJ881ss8K6POrrF6r6Du2basgrrFOaKS/YmSvVlHpVJ+kQuyezV4PjSZE5ZyZ9PbjvbUf6XDNvb5gnVdfEdrC2e8lcs8K6POKbdVHxQuvCvk764XWQmfeAmVJlbnke1jZV5q4Gx5Mic84Ma5Mm88o6WN8k9349xzypMrc8T8rrZOaaFdblEd98oYr/KNSbAcgZrFeazNublM3snnsf9KPhvPeB40mROWeGtUmyev8nkr73MW8v0uty1DWxPazxHjLTrLAuj/jmC1W70Lqw78Oapcm8vWGeVJlb1sMap8rcleBYUmTOWUl/Ec+8sg2sc5LM2gvmSJW5ZT2s8R4y06ywLo/45gtV+5HjN+HlIqxZmszbG+ZJ1G/ctCH9xfxR5q4Ex5Iic84K65Im88o2sM5JMmsvmCNRXwu0IeG1ADPNCuvyiG++0KePP599QLJvwstFWLM0mbc3zJMoM8t2sNaJVn4Rw7GkyJyzwrokWbnv00l4AX/NveadORJlZtkO1rq3zDMrz+5NZ/vGh0J/tucsvFyEdUuTeXvy7MLpLXPLdtgDbeE4UmTOWWFdkmRW2RbWO0lmbY3ngOzdA8wzM6zNEvk1Sl1omV0us/civSfz9oRZEvUbN+1hzRNl5ipwHCky56ywLkkyq2wL650ks7aGz0/U1wLtYc17yiwzw9oskV/DC+2gsHZJMmtPmCVRZpbtYc0TZeYqcBwpMueM+M3OuWG9k2TW1vD5iTKzbA9r3lNmmRnWZon8GqX+UShml+uwdkkya0+YJU2/I9uH9Bf2B5m5ChxHisw5I6xJku597Une93rPP5+fKDPL9uy5JphlZlibe17cL6r8o1AXw8tVWL8kmbUXe25cS2VmaQdrn2bVPY/jSJE5Z4Q1SZJZpQ2se5LM2hI+O82q+39FWPteMsfMsDb35Of/zsv7L2cfmChzy21YvySZtRfMkSgzSztY+0SZuQIcQ4rMOSOsSZLMKm1g3ZNk1lb4zW05hbXvJXPMDGtzT37+73z4UOMdWuaW27B+STJrL5gjUWaWdrD2iTJzBTiGFJlzRliTJJlV2sC6J8msreBzE2Vmacde3+BgjplhbW559acXqvwOLXPLbVi/JJm1F8yR5tVFKk3Y6xB7RGauAMeQInPORnq/M6+0gXVPkllbwecmyszSFta/h8wwM6zNLfm5r3z+/OvZByfK3HIb1i9JZu0Fc6TJvNIezkGazFsBjiFF5pwN1iNNv6HXHr+p8RU+N03XQn84Bz1khplhbW7Jz33lh+//cvbBabq4H4c1TJJZe8EcaTKvtIdzkGbFvY9jSJE5Z4P1UE2z137H56bJvNIezkEPmWFmWJtr3twjKvzIMTPLfVjDJJm1B+nfmT7IzNIezkGizJwO86fInLPBeqgmyr5tAZ+ZJvNKezgHPWSGmWFtrsnPe8OHDz+dfUKazCz3YQ2TZNYeMEOizCzt4RwkyszpMH+KzDkbrIdqouzbFvCZaTKvtGePNz2YYWZYm2vy897w4cUL7Yiwhkkyaw+YIVFmlvbscYg9KjOnw/wpMudssB6qibJvt8Y9X67BeWgtnz8zrM0lb/648YFPH/P/bA8zy31YwySZtQfMkObdhSrN4FykybzpMH+KzDkbrIdqouzbreHz0vS1wH5wLlrL58/K0m8y8fPO8EeOx4Q1TJJZe8AMaTKv9INzkSbzpsP8KTLnbLAeqomyb7eGz0uTeaUfnIvW8vmzwrpck593hhfaMWENk2TWHjBDmswr/eBcpMm86TB/isw5G6yHaqLs263h89JkXukH56K1fP6ssC6XXPSTC15ox4Q1TJJZe8AMaTKv9INzkSbzpsP8KTLnbLAeqomyb7eGz0uTeaUfnIvW8vmzwrpckp9zkZeXL2efmCYzy31YwySZtQfMkCbzSj84F2kybzrMnyJzzsTS31FS3Vv27tbweWkyr/SDc9FaPn9WWBe66N3ZA+/e/Xj2yWkys9yHNUySWXvADGkyr/SDc5Em86bD/Cky50ywFqqpsne3hs9Lk3mlH5yL1vL5s8K6UH78VdLfoV18M5c3sI5JMmsPmCFN5pV+cC7SZN50mD9F5pwJ1kI1Vfbu1vB5aTKv9INz0Vo+f1ZYl1MfugO+f5/9Di3zyjJYxySZtQfMkCbzSj84F2k+tKEHwPwpMudMsBaqqbJ3t4bPS5N5pR+ci9by+TNy79dh+PE3SX+HlnllGaxjkszaA2ZIk3mlH5yLRJk5GWZPkTlngrVQTZW9uzV8XprMK/3gXLSWz58R1uTUh7+Z74V2TFjHJJm1B8yQJvNKPzgXiTJzMsyeInPOBGuhmip7d2v4vDSZV/rBuWgtnz8jrMmq+qT/2R7mlWWwjkkyaw+YIU3mlX5wLhJl5mSYPUXmnAnWQjVV9u7W8HlpMq/0g3PRWj5/RliTow+/O3vgoxfaIWEdk2TWHjBDmswr/eBcJMrMyTB7isw5E6yFaqrs3a3h89JkXukH56K1fP6MsCarauOFdkxYxySZtQfMkCbzSj84F4kyczLMniJzzgRroZoqe3dr+Lw0mVf6wbloLZ8/G9f+Qain3p094IV2TFjHJJm1B8yQJvNKPzgXaT69ue8E86fInDPBWqimyt7dGj4vTeaVfnAuWsvnzwbrcXDV652X9/6jUCPCOibJrD1ghjSZV/rBuUiTedNh/hSZcyZYC9VU2btbw+elybzSD85Fa/n82WA9Vtfkw4vv0I4I65gks/aAGdJkXukH5yJN5k2H+VNkzplgLVRTZe9uDZ+XJvNKPzgXreXzZ4P1WPXu7AF/5HhMWMckmbUHzJAm80o/OBdpMm86zJ8ic87Etd9VUk2Tvbs1fF6azCv94Fy0ls+fjc3r8enjL2dFTpJ5ZRmsY5LM2gNmSJN5pR+cizSZNx3mT5E5Z4P1UE2Ufbs1fF6azCv94Fy0ls+fCX6TdfW7swd8h3ZMWMckmbUHzJAm80o/OBdpMm86zJ8ic84G66GaKPt2a/i8NJlX+sG5aC2fPxOnddjkMnvA36EdE9YxSWbtATOkudmClofhXKTJvOkwf4rMORush2qi7Nut4fPS9LXAfnAuWsvnz8SxBpv2uxfaMWEdk2TWHjBDosws7eGPvSTKzOkwf4rMORush2qi7Nutcc+Xa3AeWsvnz8LpGuR/W4UX2jFhHZNk1h54iMklOAeJMnM6zJ8ic84G66GaKPu2BXxmmswrfeA8tJbPn4Xj+Dd9d/aAF9oxYR2TZNZeMEeazCvt4RwkyszpMH+KzDkbrIdqmpu/wL0Cn5sm80p79njTgxlm4TD2Jmv95d2PZ0VOknllGaxjkszaC+ZIk3mlPZyDRJk5HeZPkTlng/VIs8kLHJELsPfSZF5pD+egh8wwA4d9vtle7zu0Y8I6JsmsvWCONJlX2sM5SLPZxt8QjiFF5pwN1iNN5hVpBXsvTeaV9nAOesgMshL/bM+YsI5JMmsvmCPNipeXyuzxI0aPyswV4BhSZM7ZYD3SZF6RVrD30vS1QH84Bz1kBlnJp48/nxU5SeaVZbCOSTJrL5gjUWaWdrD2iTJzBTiGFJlzNtK/gcO8Iq1g7yXKzNKOvfZG5pCV+A7tmLCOSTJrL5gjUWaWdrD2iTJzBTiGFJlzRliTJJlVpBV7XWAekZmlHax9L5lDVuLv0I4J65gks/bCQ0xOYe0TZeYKcAwpMueMsCZJ+mOW0hP2X5rMK+1g7XvJHLISL7Rjwjomyaw9YZY0fVHXhwrf3KjaCxxHisw5I6xJmswr0gr2XppV9/+KsPa9ZA5ZiT9yPCasY5LM2hNmSZSZZXtY80SZuQocR4rMOSOsSZrMK9IK9l6izCzbs+c3t5lFVvLy/stZkZNkXlkG65gks/aEWRJlZtke1jxRZq4Cx5Eic87Ini/elsi8Iq1g7yXKzLI9rHlPmUVW4oV2TFjHJJm1J+kv6A76o0ZtqdADB5m7ChxHisw5K6xLku590osK54DroS179wDzyEr8HdoxYR2TZNbeME+izCzbwVonWvmFDMeSInPOCuuSJvOKtIK9lygzy3aw1r1lHlmJF9oxYR2TZNbeME+ilS806bDWiTJzJTiWFJlzVliXNN37pBfsvURdD+1grXvLPLISL7Rjwjomyay9YZ5UmVvWs/ePGC2VuSvBsaTInLNSYQ0ws0gL2HepMresJ2EfZCZZib9DOyasY5LM2puEjWyJzC3rYY1TZe5KcCwpMufMsDZpMq9IC9h3qfou7fawxnvITLIS/2zPmLCOSTLrHjBToh5i21LlGxnV553jSZE5Z4a1SbP6GpAaVDkTDjK7PE/KvDOXrOTl3Y9nRU6SeWUZrGOSzLoHzJQqc8vzsLapMnc1OJ4UmXNmUl7Q3ZKZRVrAvkvVb/JsB2u7l8wlK/F3aMeEdUySWfegwgu6gx5i21Blvg8yezU4nhSZc3ZYnzTd+6QH7LtkmV0eJ+m1ALPJSnyHdkxYxySZdS+YK1XmlsdhTVMd4UU8x5Qic84O65MoM4tsTdIF554jnA97w5ruKbPJSvxHocaEdUySWfeCuVL1EFtHpRcszF4RjilF5pydCuvCvU96wL5LltllOWl7HvPJSj59/OWsyEkyryyDdUySWfcibXO7pS/snoe1TJbZK8IxpegaOoc1SpSZRbaGPZes+9hzJL7eY0ZZif/K8Ziwjkky654wW7LMLvdJPMSuOcoLFY4rSWadHdYn0VHWRQKfP//VWl6g0jlx0DXxOKxhgswoK/n08eezIifJvLIM1jFJZt0TZkvWQ+wxqr1IYf6qcFxJMuvsVFkjzC3PcVpTz5O3sOfSZX65Tuo+x5yyEt+hHRPWMUlm3ZPUje6avghZDmuX7EjzyrElyaySPV9HR1ofe3HtrLO2X2Fd0nXelnGt7xNkVlmJF9oxYR2TZNa9Yb50mV/OST7ELsn8leHYkmRWyZ6vU30B/zxL98OZa7y0RknOPF9LSJ9T5pWVvH/vn+0ZEdYxSWbdm/RNj3qI3abafB7kGCrDsSXJrFJrvTC73OeZ+Z31jGEdKjjrXC2BtUqTeWUlLy/+2Z4RYR2TZNYEmDFdD7HLPPPibW9Hm0uOL0lmla+wTqmOtlZ6wBo+6kw1r3h+HJxpjpZSYS6ZWVbywR85HhLWMUlmTaDC5kc9xN5ScQ4PchzV4fiSZFb5SqW14763nC3ndZa6c9xVnGV+lrBl37eUuWUlH1680I4I65gks6bAnBX0EPtKlQOMjjh/HGOSI9Z7K1irZJ3H+7TcE0euP8dayZHnZSkt+35rmV1W4oV2TFjHJJk1hUob4amzH2JV5+0gxzICHGOazCtfqbaOZt/3btFrLkecg161a+WIc7KUanPH/LISf4d2TFjHJJk1CWat4qyHWLUD7NRR54zjTJN55RusVbqjrqE17LUnjjQXHFs1R5qLpezV92vkGGQl7979cFbkJJlXlsE6JsmsSVTcFI/OdohVnquDHM8ocJxpzrZOHqHimnI+v5Eyf9XnJKWOa6w+B0upPFcci6zEP9szJqxjksyaBvNW0kOshiPPE8ea6Mj1XwtrVcHZ5zN1P6w8L6k1fcTK9V9C9TnieGQlXmjHhHVMklnTqL5JHhz5IKs+PyPPzQGON1Xmlq9UXV+jr6trVJmvivPDMVS0Yt2XUKXvb8kxyUpe3nmhHRHWMUlmTWSEzXK0g2yEOTnIcY0Gx5vqaOtjSyqvtZnmteI8cQzJVKzvNUdaF6PMC8clK/FfOR4T1jFJZk2FuSs6yiE2ygE2ynzcgmNOdob5eBbWqpIzzGvFPbHivHAMla1Y/1Mq9vwtOT5Zif/K8ZiwjkkyayojbZ5VD7KR5uAgxzciHHO6VddGa0ZYeyPObdV5qToXVet9y2pzMeIcHOQ4ZSX+Du2YsI5JMmsyo22kVQ6y0ep+sErt18JxV3CWuXmUEdbhSHNbeT44lkpwLKNYYW1U7vl7cqyyknf+Du2QsI5JMms6zD+CqQfZqIdXar1bUHUOE+boWDv+/3vCOlU1YX6fpeqaOlq59geq1/+eafMzer2PctyyEv8O7Ziwjkkyazojb64pB9nINT7I8Y4Ox1/J3mviUu/zY/bkUr7K9p7fNYxSe46rIqPMxS33Xhsz1PhUjl9W8l//+fmsyEkyryyDdUySWSsww0bb+zCboaYHe9c1Adagqi3mbknf83P2ZknmaraY2y0YrdapdX4Gjm1ke83baP3+iKyFrOTlvf8o1IiwjkkyaxU4jtHd+kCb8eDauoZVYB1G8ZH5XNPv/FoJMONIPjKvrVjTL6km1HVLRpyjpW41lzPXkLI2spLPn345K3KSzCvLYB2TZNYquBHrI271AqAirpV1sp4JzDSnPdbu6PXsUcM9GH3etJ/sLVnJp49eaEeEdUySWSvhYaZLZe/MBuuhy2UtU5h9/3vmkjZrzViHkeBYVZ+RfSUr+fDhp7MiJ8m8sgzWMUlmrcasL1B0uc+88B0N1kSXy1om4f6n9xx9/3MN6Bayr2QlvkM7JqxjksxaEQ80veboL+aW4hp5XtYyDedWrznL/uca0LWyp2Qlnz//elbkJJlXlsE6JsmsVeG4VGd5MbcU1keXyTomwsyqs+1/Xmp1jewnWcn3XmiHhHVMklmr4mGmp872Ym4JrJEuk3VMxP1PT511/3Md6LOyl2Ql/ivHY8I6JsmslfEw04Ozvpi7h+vjOVnHVJxfPTj7/uc60GdkH8lKfvzhL2dFTpJ5ZRmsY5LMWh0Ps7md/cXcPVgvvS9rmIz739y6/32FdVG9J3tIVuKPHI8J65gks46AL+rm1Bdz92HN9L6sYTruf/PKXpgV10Bdj+f4jz/+9ey/tZQ9JCvxQjsmrGOSzDoKHmhz6WV2Ga6Lx2UNK+A8z6d74FtcA/VkD/O/t/T0ubIBP3z/57MiJ8m8sgzWMUlmHQkPtDnkISi3cV08JutXBed5Ht0DL+MaqOOlHubHtJTPlpX4O7Rjwjomyayj4YE2tpcOQbkP66jXZe2q4R44tu6Bt7H/873Ww/y4lvLZspKfvvy/syInybyyDNYxSWYdFQ+18bx2CMp9XA/LZe0q4nyPp/vfcuz/XG/1MT+2pXy2rMR3aMeEdUySWUfGQ20cbx2CsgzWVC/LulXF/W8c3f8ex/7PlPN0Cj+2pXy2rMQL7Ziwjkky6+h4qNXXF3Pb4FpYJutWGee8vu5/63AN5Hivl/nxLeWzZSU/+yPHQ8I6JsmsM+CBVtN7h588jmvhvqxZdZzzuroHboNrYF+X9jE/r6V8tqzEC+2YsI5JMutMeKjVcekBKI/jOrgt6zUKznst3QO3xf7fx0f6mJ/bUj5bVvLrz/99VuQkmVeWwTomyayz4aGW7yMHoDwHa67fZK1Gwv0vX/e/dtj/fX20l/n5LeWzZSW+QzsmrGOSzDorHmx5Pnr4yfPY/9dlrUbE+c/UPbAP9n97n+llfo2W8tmyEv9sz5iwjkky68x4qOX4zOEn67D/L8s6jYrzn6P7X3/s/3Y+28/8Oi3ls2UlXmjHhHVMklnFg21Pnz34ZDvs/7eyPqPj/O+re+B+2PvburaX+fVaymfLSvyR4zFhHZNkVvmGh1s/1x58si32/jdZm1mwB/rqHpiDvb/eLfqZX7OlfLasxAvtmLCOSTKrvMWDra1bHHrSBnv/q6zLbNgHbXUPzMXef9wt+5lfu6V8tqzk55/+elbkJJlXlsE6JsmschkPtm3d8tCTtsze+/bqV2bvg621r+pg7y9z657m128pny0r+eGHv5wVOUnmlWWwjkkyq9zHw+15tz7wpA+z9zzrMTOz98Ja3QPrYu9ftlVP8zkt5bNlJT998R3aEWEdk2RWWY6H23JbHXjSl1l7nnWQeXvhWd0Dx8C+/2brnubzWspny0q80I4J65gks8rjeMBdt/WBJ/swU8/bw7eZqRee0f4Zl1l7v1dP87kt5bNlJb/4O7RDwjomyayyjlkPuFN7HXayP6P3u738GKP3w1Ltm7mYpe979zWf31I+W1by68//fVbkJJlXlsE6Jsmssh2zHHIHex90kscI/W4fb8cI/fCI9o4cGK3v9+xrZmkpny0r+fTxl7MiJ8m8sgzWMUlmlTZ4yMlMVOp3e7kPlXpiqfaO3KJqz6f0NXO1lM8WEZEFVDvoUg44qUlKv9vHGaT0w6PaP/Is6T1vb4uIyCYkHXgebtKDVj1v/9ajVS88qz0kLdm73+1vERHpTovDzwNNRKrQYg886D4oSWzd5/a3iIhEcfgd+7//+38+O7Ae9R/+4X//9u79jx5yIlKK//vv73/72z/809me9qiHr/Hv//but8+f/+w+KHH88Y//56xnH/UP/+sff/vPP322v2UX/ger6xxZdJiqXAAAAABJRU5ErkJggg==;" value="" vertex="1">
+          <mxGeometry height="35.97" width="133.21" x="1422" y="44" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

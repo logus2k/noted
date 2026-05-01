@@ -1,0 +1,18 @@
+{
+  "kb_id": "noted",
+  "name": "noted",
+  "description": "Default knowledge base shipped with the platform.",
+  "created_at": "2026-04-27T10:43:18.776453+00:00",
+  "embeddings_model": "bge-m3",
+  "included_files": [
+    "noted_technical_architecture.md",
+    "noted_architecture_principles.md",
+    "noted_platform_developer_manual.md",
+    "noted_project_notebook_companion.md",
+    "noted_vision.md",
+    "noted_scope.md",
+    "noted_integrations_reference.md",
+    "noted_platform_user_manual.md",
+    "noted_platform_final_delivery_project_report.md"
+  ]
+}

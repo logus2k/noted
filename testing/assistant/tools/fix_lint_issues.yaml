@@ -1,0 +1,109 @@
+# Machine-readable scenarios for the `fix_lint_issues` tool test doc.
+
+doc_id: fix_lint_issues
+doc_type: tool
+
+# Scenarios covered: S1, S2, S3, S4, S5 (5 of 7).
+# DEFERRED: S6 (rule code not present in file), S7 (autofix produces conflicts).
+
+scenarios:
+  - scenario_id: S1
+    title: "Fix all"
+    tags: [write, linting]
+    setup:
+      project: noted-testing
+      file_path: sample_lint.py
+      prerequisites:
+        - fixture: reset_lint_fixture
+    user_request: "fix all lint issues in the open file"
+    expected_tools_called:
+      - name: fix_lint_issues
+        exact_count: 1
+    expected_tools_NOT_called:
+      - update_file
+    expected_answer_focus: |
+      - call fix_lint_issues with no codes (fixes all)
+      - confirmation handled by platform
+      - report what was fixed
+
+  - scenario_id: S2
+    title: "Fix specific rule"
+    tags: [write, linting]
+    setup:
+      project: noted-testing
+      file_path: sample_lint.py
+      prerequisites:
+        - fixture: reset_lint_fixture
+    user_request: "remove unused imports in the open file"
+    expected_tools_called:
+      - name: fix_lint_issues
+        exact_count: 1
+        args_match:
+          codes: "F401"
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - "unused imports" = F401
+      - pass codes="F401" to scope the fix
+      - report only F401 fixes
+
+  - scenario_id: S3
+    title: "Fix multiple rules"
+    tags: [write, linting]
+    setup:
+      project: noted-testing
+      file_path: sample_lint.py
+      prerequisites:
+        - fixture: reset_lint_fixture
+    user_request: "fix all unused-import (F401) and unsorted-imports (I001) issues"
+    expected_tools_called:
+      - name: fix_lint_issues
+        exact_count: 1
+        args_match:
+          codes: "F401,I001"
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - codes string accepts comma-separated rules
+      - report fixes for both
+
+  - scenario_id: S4
+    title: "Don't use update_file for lint"
+    tags: [write, linting, scope]
+    setup:
+      project: noted-testing
+      file_path: sample_lint.py
+      prerequisites:
+        - fixture: reset_lint_fixture
+    user_request: "fix lint warnings"
+    expected_tools_called:
+      - name: fix_lint_issues
+        exact_count: 1
+    expected_tools_NOT_called:
+      - update_file
+    expected_answer_focus: |
+      - lint policy: ALWAYS use fix_lint_issues, never update_file for lint
+      - it preserves user formatting; update_file would replace whole file content
+
+  - scenario_id: S5
+    title: "Pre-flight diagnostics"
+    tags: [write, linting, workflow]
+    setup:
+      project: noted-testing
+      file_path: sample_lint.py
+      prerequisites:
+        - fixture: reset_lint_fixture
+    turns:
+      - user_request: "what lint issues are in the open file?"
+        expected_tools_called:
+          - name: get_lint_diagnostics
+            exact_count: 1
+        expected_tools_NOT_called:
+          - fix_lint_issues
+        expected_answer_focus: "list issues by rule code"
+      - user_request: "fix the F401 ones"
+        expected_tools_called:
+          - name: fix_lint_issues
+            exact_count: 1
+            args_match:
+              codes: "F401"
+        expected_tools_NOT_called: []
+        expected_answer_focus: "fix only F401; report"

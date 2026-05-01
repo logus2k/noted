@@ -1,0 +1,25 @@
+services:
+  noted:
+    image: logus2k/noted
+    container_name: noted
+    build: .
+    pull_policy: never
+    ports:
+      - "8123:8123"
+    volumes:
+      - ./data:/app/data
+      # R renv package cache lives under /app/data/.renv-cache (bind-
+      # mounted via the data/ volume) so it survives image rebuilds.
+      # Set via RENV_PATHS_CACHE in runtime.json kernel_env and the
+      # Rscript launcher template.
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped
+

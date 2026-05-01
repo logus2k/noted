@@ -1,0 +1,36 @@
+{
+  "domain_id": "noted",
+  "name": "noted",
+  "description": "The noted MLOps platform. Holds platform-specific skills (airflow, dvc, hydra, mlflow, evidently) plus your noted-related documents. Activate to bring MLOps context into the Assistant; deactivate for a clean general-purpose Assistant.",
+  "created_at": "2026-04-27T16:03:39.469795+00:00",
+  "embeddings_model": "bge-m3",
+  "pinned": false,
+  "deletable": false,
+  "arcadedb_database": "noted",
+  "corpus_collection": "noted__corpus",
+  "entity_cache_collection": "noted__gr_entities",
+  "summary_cache_collection": "noted__gr_summaries",
+  "included_files": [
+    {
+      "path": "noted_platform_developer_manual.pdf",
+      "mode": "read_store",
+      "added_at": "2026-04-27T16:08:05.690838+00:00",
+      "category": "Manuals",
+      "display_name": "noted Platform Developer Manual"
+    },
+    {
+      "path": "noted_platform_setup_and_installation_manual.pdf",
+      "mode": "read_store",
+      "added_at": "2026-04-27T16:08:05.792511+00:00",
+      "category": "Manuals",
+      "display_name": "noted Platform Setup and Installation Manual"
+    },
+    {
+      "path": "noted_platform_user_manual.pdf",
+      "mode": "read_store",
+      "added_at": "2026-04-27T16:08:05.895769+00:00",
+      "category": "Manuals",
+      "display_name": "noted Platform User Manual"
+    }
+  ]
+}

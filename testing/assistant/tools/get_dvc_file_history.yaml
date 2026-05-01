@@ -1,0 +1,87 @@
+# Machine-readable scenarios for the `get_dvc_file_history` tool test doc.
+
+doc_id: get_dvc_file_history
+doc_type: tool
+
+# Scenarios covered: S1, S2, S3, S4, S5 (5 of 7).
+# DEFERRED: S6 (file with 100+ versions), S7 (deleted-from-tracking file).
+
+scenarios:
+  - scenario_id: S1
+    title: "Basic history fetch"
+    tags: [read, dvc]
+    setup:
+      project: jena_weather
+    user_request: "show me the version history of jena_climate_2009_2016.csv in jena_weather"
+    expected_tools_called:
+      - name: get_dvc_file_history
+        exact_count: 1
+        args_match:
+          dvc_file: "jena_climate_2009_2016.csv"
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - report the version sequence with hashes / timestamps
+      - mention how many versions exist
+
+  - scenario_id: S2
+    title: "Latest version question"
+    tags: [read, dvc]
+    setup:
+      project: jena_weather
+    user_request: "what's the latest version of jena_climate_2009_2016.csv in jena_weather?"
+    expected_tools_called:
+      - name: get_dvc_file_history
+        exact_count: 1
+        args_match:
+          dvc_file: "jena_climate_2009_2016.csv"
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - identify the most-recent entry in the history
+      - report its hash and date
+
+  - scenario_id: S3
+    title: "Hash lookup"
+    tags: [read, dvc]
+    setup:
+      project: jena_weather
+    user_request: "what's the current md5 of jena_climate_2009_2016.csv in jena_weather?"
+    expected_tools_called:
+      - name: get_dvc_file_history
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - report the hash of the most-recent version
+      - quote it verbatim from the tool result
+
+  - scenario_id: S4
+    title: "Wrong path"
+    tags: [read, dvc, error]
+    setup:
+      project: jena_weather
+    user_request: "show history of imaginary_file.csv in jena_weather"
+    expected_tools_called:
+      - name: get_dvc_file_history
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - tool errors / empty
+      - report not tracked; suggest get_dvc_data_overview
+
+  - scenario_id: S5
+    title: "Multi-turn overview then history"
+    tags: [read, dvc, workflow]
+    setup:
+      project: jena_weather
+    turns:
+      - user_request: "what DVC datasets exist?"
+        expected_tools_called:
+          - name: get_dvc_data_overview
+            exact_count: 1
+        expected_tools_NOT_called: []
+        expected_answer_focus: "list datasets"
+      - user_request: "history of jena_climate_2009_2016.csv from jena_weather"
+        expected_tools_called:
+          - name: get_dvc_file_history
+            exact_count: 1
+        expected_tools_NOT_called: []
+        expected_answer_focus: "fetch history; reuse repo_path/dvc_file from prior turn"

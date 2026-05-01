@@ -1,0 +1,148 @@
+# Machine-readable scenarios for the `list_registered_models` tool test doc.
+# Human-readable counterpart: list_registered_models.md.
+
+doc_id: list_registered_models
+doc_type: tool
+
+# Scenarios covered: S1, S2, S3, S4, S5, S6, S7, S8 (8 of 10).
+# DEFERRED: S9 (empty registry - destructive wipe), S10 (concurrent registration).
+
+scenarios:
+  - scenario_id: S1
+    title: "Basic listing"
+    tags: [read, mlflow, registry]
+    setup:
+      project: noted-testing
+    user_request: "what models are in the registry?"
+    expected_tools_called:
+      - name: list_registered_models
+        exact_count: 1
+    expected_tools_NOT_called:
+      - list_model_versions
+      - get_serving_status
+      - deploy_model
+    expected_answer_focus: |
+      - lists the registered models present (Sandbox Forecaster, possibly Jena Weather Forecaster)
+      - mentions any current aliases for each (e.g. @champion -> v1)
+      - must not invent models that are not in the result
+
+  - scenario_id: S2
+    title: "Discover model_name for a write tool"
+    tags: [read, mlflow, registry, discovery]
+    setup:
+      project: noted-testing
+    user_request: "I want to deploy a model but I don't remember the exact name"
+    expected_tools_called:
+      - name: list_registered_models
+        exact_count: 1
+    expected_tools_NOT_called:
+      - deploy_model
+    expected_answer_focus: |
+      - list the registered model names so the user can pick one
+      - do NOT call deploy_model on its own; the user has to choose
+      - may suggest the next step ("once you pick, I can deploy version X or alias @champion")
+
+  - scenario_id: S3
+    title: "Find which model(s) carry @champion"
+    tags: [read, mlflow, registry, alias]
+    setup:
+      project: noted-testing
+    user_request: "which model has the @champion alias?"
+    expected_tools_called:
+      - name: list_registered_models
+        exact_count: 1
+    expected_tools_NOT_called:
+      - list_model_versions
+    expected_answer_focus: |
+      - report every model that carries an @champion alias and the version it points at (alias scope is per-model in MLflow, so several models may share the alias name)
+      - report grounded in the tool output (no fabricated names or versions)
+      - do NOT need to call list_model_versions; the alias info is already in list_registered_models output
+
+  - scenario_id: S4
+    title: "Aliasless models surfaced"
+    tags: [read, mlflow, registry, alias]
+    setup:
+      project: noted-testing
+    user_request: "are there any models without an alias?"
+    expected_tools_called:
+      - name: list_registered_models
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - identify models whose entry shows "no aliases" or no alias mapping
+      - list them by name
+      - do not fabricate alias presence/absence
+
+  - scenario_id: S5
+    title: "User asks about a specific model that exists"
+    tags: [read, mlflow, registry]
+    setup:
+      project: noted-testing
+    user_request: "is Sandbox Forecaster registered?"
+    expected_tools_called:
+      - name: list_registered_models
+        exact_count: 1
+    expected_tools_NOT_called:
+      - list_model_versions
+    expected_answer_focus: |
+      - confirm Sandbox Forecaster is in the registry
+      - mention its current aliases (if any)
+      - do NOT call list_model_versions unless the user asks for versions
+
+  - scenario_id: S6
+    title: "User asks about a model that doesn't exist"
+    tags: [read, mlflow, registry]
+    setup:
+      project: noted-testing
+    user_request: "is GBM Forecaster registered?"
+    expected_tools_called:
+      - name: list_registered_models
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - report that GBM Forecaster is NOT in the registry
+      - list the registered models that ARE present so the user has alternatives
+      - must not fabricate the existence of GBM Forecaster
+
+  - scenario_id: S7
+    title: "Pre-flight before register_model"
+    tags: [read, mlflow, registry, workflow]
+    setup:
+      project: noted-testing
+    user_request: "I'm about to register a model from a run - is the name 'Sandbox Forecaster' already taken?"
+    expected_tools_called:
+      - name: list_registered_models
+        exact_count: 1
+    expected_tools_NOT_called:
+      - register_model
+    expected_answer_focus: |
+      - confirm Sandbox Forecaster IS already registered
+      - explain that re-registering under the same name appends a NEW VERSION (does not overwrite v1)
+      - do not actually call register_model without explicit user confirmation
+
+  - scenario_id: S8
+    title: "Multi-turn: discover then act"
+    tags: [read, mlflow, registry, workflow]
+    setup:
+      project: noted-testing
+      prerequisites:
+        - fixture: unload_model
+    turns:
+      - user_request: "what models can I deploy?"
+        expected_tools_called:
+          - name: list_registered_models
+            exact_count: 1
+        expected_tools_NOT_called:
+          - deploy_model
+        expected_answer_focus: "list the registered models with their aliases"
+      - user_request: "deploy the champion of Sandbox Forecaster"
+        expected_tools_called:
+          - name: deploy_model
+            exact_count: 1
+            args_match:
+              model_name: "Sandbox Forecaster"
+              alias: "champion"
+        expected_tools_NOT_called: []
+        expected_answer_focus: |
+          - confirm deploy succeeded based on tool result
+          - do not re-list models

@@ -1,0 +1,115 @@
+# Machine-readable scenarios for the `update_file` tool test doc.
+
+doc_id: update_file
+doc_type: tool
+
+# Scenarios covered: S1, S2, S3, S4, S5 (5 of 7).
+# DEFERRED: S6 (file in protected path), S7 (very-large file edit).
+
+scenarios:
+  - scenario_id: S1
+    title: "Edit project file"
+    tags: [write, files]
+    setup:
+      project: noted-testing
+      # File is open in the editor so its content is in FILE CONTEXT - the
+      # model should not need a get_file_contents call.
+      file_path: src/training/pipeline.py
+    user_request: "in the open file, add a print('training complete') statement at the end of fit()"
+    expected_tools_called:
+      - name: update_file
+        exact_count: 1
+    expected_tools_NOT_called:
+      - get_file_contents
+    expected_answer_focus: |
+      - rewrite the open file with the added print statement at the end of fit()
+      - confirmation handled by platform
+      - report what changed
+
+  - scenario_id: S2
+    title: "Edit a file by name (multi-turn)"
+    tags: [write, files, workflow]
+    # STATUS: FAIL-ESCALATED. Tests the classic multi-turn fetch-then-edit
+    # flow: user says "show me <file>" (Assistant must fetch because the
+    # file is NOT pre-inlined), then "add X to it" (Assistant must call
+    # update_file carrying file_path + new_content). See ESCALATIONS.md.
+    # The reset_pipeline_fixture prerequisite restores pipeline.py to a
+    # canonical state because successful update_file calls mutate the file
+    # on disk across runs, polluting subsequent judge verdicts.
+    setup:
+      project: noted-testing
+      prerequisites:
+        - fixture: reset_pipeline_fixture
+    turns:
+      - user_request: "show me src/training/pipeline.py"
+        expected_tools_called:
+          - name: get_file_contents
+            exact_count: 1
+            args_match:
+              path: "src/training/pipeline.py"
+        expected_tools_NOT_called:
+          - update_file
+        expected_answer_focus: "fetch the file via get_file_contents and quote the relevant content"
+      - user_request: "add a print('hi') statement at the start of fit()"
+        expected_tools_called:
+          - name: update_file
+            exact_count: 1
+            args_match:
+              file_path: "src/training/pipeline.py"
+        expected_tools_NOT_called: []
+        expected_answer_focus: |
+          - rewrite the file with the print('hi') line inserted at the start of fit()
+          - the update_file call must carry file_path explicitly (the file is not pre-inlined in FILE CONTEXT)
+          - report what changed
+
+  - scenario_id: S3
+    title: "Don't use for lint fixes"
+    tags: [write, files, scope]
+    setup:
+      project: noted-testing
+      file_path: sample_lint.py
+      prerequisites:
+        - fixture: reset_lint_fixture
+    user_request: "fix the F401 unused-import warning in the open file"
+    expected_tools_called:
+      - name: fix_lint_issues
+        exact_count: 1
+    expected_tools_NOT_called:
+      - update_file
+    expected_answer_focus: |
+      - lint fixes go through fix_lint_issues, not update_file
+      - this is platform policy
+
+  - scenario_id: S4
+    title: "Don't use for new file"
+    tags: [write, files, scope]
+    setup:
+      project: noted-testing
+    user_request: "create a new file src/utils/helpers.py with a sigmoid function"
+    expected_tools_called:
+      - name: create_file
+        exact_count: 1
+    expected_tools_NOT_called:
+      - update_file
+    expected_answer_focus: |
+      - "create a new file" = create_file, not update_file
+      - update_file is for modifying EXISTING files
+
+  - scenario_id: S5
+    title: "Don't use on notebooks"
+    tags: [write, files, scope]
+    setup:
+      project: noted-testing
+      notebook: training_sandbox.ipynb
+    user_request: "in training_sandbox.ipynb, replace cell 7's content with `print('hello')`"
+    expected_tools_called:
+      - name: update_cell
+        exact_count: 1
+        args_match:
+          cell_index: 7
+    expected_tools_NOT_called:
+      - update_file
+    expected_answer_focus: |
+      - notebook cells use update_cell (or batch_update_cells), not update_file
+      - update_file would corrupt the .ipynb JSON
+      - new_content for cell 7 is `print('hello')`

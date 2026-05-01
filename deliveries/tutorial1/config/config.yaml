@@ -1,0 +1,21 @@
+data:
+  file: data/jena_climate_2009_2016.csv
+  resample_freq: 1h
+  features:
+    - T (degC)
+    - p (mbar)
+    - rh (%)
+    - wv (m/s)
+    - max. wv (m/s)
+    - wd (deg)
+  target: T (degC)
+  split:
+    train: 0.70
+    val: 0.15
+    test: 0.15
+
+model:
+  type: LinearRegression
+
+forecast:
+  strategy: 1-step ahead

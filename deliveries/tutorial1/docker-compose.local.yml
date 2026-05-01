@@ -1,0 +1,26 @@
+---
+# Local override — adds nginx reverse proxy for standalone access (no external domain).
+# Usage: docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
+# Access noted at http://localhost:6543
+services:
+  nginx:
+    image: nginx:stable-alpine3.21-slim
+    container_name: noted-nginx
+    ports:
+      - "6543:6543"
+    volumes:
+      - ./nginx/nginx-local.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - noted
+    networks:
+      - noted-network
+    restart: unless-stopped
+
+  airflow-apiserver:
+    environment:
+      AIRFLOW__API__BASE_URL: http://localhost:6543/airflow
+      AIRFLOW__WEBSERVER__BASE_URL: http://localhost:6543/airflow
+
+  minio:
+    environment:
+      MINIO_BROWSER_REDIRECT_URL: http://localhost:6543/minio

@@ -1,0 +1,84 @@
+# Machine-readable scenarios for the `scroll_to_cell` tool test doc.
+
+doc_id: scroll_to_cell
+doc_type: tool
+
+# Scenarios covered: S1, S2, S3, S4 (4 of 6).
+# DEFERRED: S5 (cell index out of range), S6 (no notebook open).
+
+scenarios:
+  - scenario_id: S1
+    title: "Scroll to specific cell"
+    tags: [navigate, notebook]
+    setup:
+      project: noted-testing
+      notebook: training_sandbox.ipynb
+    user_request: "scroll to cell 5"
+    expected_tools_called:
+      - name: scroll_to_cell
+        exact_count: 1
+        args_match:
+          cell_index: 5
+    expected_tools_NOT_called:
+      - get_notebook_cells
+    expected_answer_focus: |
+      - one short confirmation sentence ("Cell 5 is now visible." or similar)
+      - do NOT quote or summarize the cell's contents - the user asked for navigation, not for the body
+
+  - scenario_id: S2
+    title: "Find then scroll"
+    tags: [navigate, notebook, workflow]
+    setup:
+      project: noted-testing
+      notebook: training_sandbox.ipynb
+    turns:
+      - user_request: "which cell in training_sandbox.ipynb defines the model?"
+        # Notebook is inlined; identify the cell from inlined source -
+        # get_notebook_cells would be a redundant fetch.
+        expected_tools_called: []
+        expected_tools_NOT_called:
+          - scroll_to_cell
+          - get_notebook_cells
+        expected_answer_focus: "identify the cell index from the inlined notebook content"
+      - user_request: "scroll there"
+        expected_tools_called:
+          - name: scroll_to_cell
+            exact_count: 1
+        expected_tools_NOT_called: []
+        expected_answer_focus: "use the cell_index from prior turn"
+
+  - scenario_id: S3
+    title: "First / last cell"
+    tags: [navigate, notebook]
+    setup:
+      project: noted-testing
+      notebook: training_sandbox.ipynb
+    user_request: "go to the first cell"
+    expected_tools_called:
+      - name: scroll_to_cell
+        exact_count: 1
+        args_match:
+          cell_index: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - "first cell" = cell_index 1 (1-based)
+      - confirm navigation
+
+  - scenario_id: S4
+    title: "Don't scroll for read intent"
+    tags: [navigate, notebook, ambiguity]
+    setup:
+      project: noted-testing
+      notebook: training_sandbox.ipynb
+    user_request: "show me cell 5"
+    # Notebook is inlined; "show me cell 5" is satisfied by quoting the
+    # inlined content in text. get_notebook_cells would be a redundant
+    # fetch. scroll_to_cell is wrong because the user wants content, not
+    # navigation.
+    expected_tools_called: []
+    expected_tools_NOT_called:
+      - scroll_to_cell
+      - get_notebook_cells
+    expected_answer_focus: |
+      - "show me" = quote cell 5's content from the inlined notebook context
+      - do NOT call scroll_to_cell (user asked for content, not navigation)

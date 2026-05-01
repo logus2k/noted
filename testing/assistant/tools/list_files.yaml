@@ -1,0 +1,95 @@
+# Machine-readable scenarios for the `list_files` tool test doc.
+
+doc_id: list_files
+doc_type: tool
+
+# Scenarios covered: S1, S2, S3, S4, S5 (5 of 7).
+# DEFERRED: S6 (very-deep tree), S7 (hidden files / dotfiles).
+
+scenarios:
+  - scenario_id: S1
+    title: "List project root"
+    tags: [read, files]
+    setup:
+      project: noted-testing
+    user_request: "what files are at the project root?"
+    expected_tools_called:
+      - name: list_files
+        exact_count: 1
+        args_match:
+    expected_tools_NOT_called:
+      - get_file_contents
+    expected_answer_focus: |
+      - report top-level entries
+      - dirs vs files distinction
+
+  - scenario_id: S2
+    title: "List subdirectory"
+    tags: [read, files]
+    setup:
+      project: noted-testing
+    user_request: "what's in src/?"
+    expected_tools_called:
+      - name: list_files
+        exact_count: 1
+        args_match:
+          path: "src"
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - report contents of src/
+      - mention nested directories without recursion
+
+  - scenario_id: S3
+    title: "Glob pattern"
+    tags: [read, files, search]
+    setup:
+      project: noted-testing
+    user_request: "show me all python files in src/"
+    expected_tools_called:
+      - name: list_files
+        exact_count: 1
+        args_match:
+          path: "src"
+          pattern: "*.py"
+    expected_tools_NOT_called:
+      - search_files
+    expected_answer_focus: |
+      - filter by *.py
+      - list matching files
+
+  - scenario_id: S4
+    title: "Empty directory"
+    tags: [read, files, edge]
+    setup:
+      project: noted-testing
+    user_request: "what's in an_empty_dir/?"
+    expected_tools_called:
+      - name: list_files
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - tool returns empty result or error
+      - report that the dir is empty / does not exist
+
+  - scenario_id: S5
+    title: "Discovery before file read"
+    tags: [read, files, workflow]
+    setup:
+      project: noted-testing
+    turns:
+      - user_request: "what notebooks are in the project?"
+        expected_tools_called:
+          - name: list_files
+            exact_count: 1
+            args_match:
+              pattern: "*.ipynb"
+        expected_tools_NOT_called:
+          - get_notebook_cells
+        expected_answer_focus: "list .ipynb files"
+      - user_request: "open the first one"
+        expected_tools_called:
+          - name: get_notebook_cells
+            exact_count: 1
+        expected_tools_NOT_called:
+          - list_files
+        expected_answer_focus: "read the notebook using path from prior turn"

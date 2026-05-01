@@ -1,0 +1,79 @@
+# Machine-readable scenarios for the `airflow-dag-creation` skill test doc.
+
+doc_id: airflow-dag-creation
+doc_type: skill
+
+# Scenarios covered: S1, S2, S3, S4, S5 (5 of 7).
+# DEFERRED: S6 (xcom patterns), S7 (TaskFlow vs classic operators).
+
+scenarios:
+  - scenario_id: S1
+    title: "Create a new training DAG"
+    tags: [skill, airflow, creation]
+    setup:
+      project: noted-testing
+    user_request: "how do I create a new DAG for training my forecaster?"
+    expected_tools_called: []
+    expected_tools_NOT_called:
+      - create_file
+    expected_answer_focus: |
+      - outline the file location (dags/) and standard template (compose -> ingest -> preprocess -> train -> promote)
+      - do NOT create_file without user confirmation of name / content
+      - offer to generate a template file on request
+
+  - scenario_id: S2
+    title: "Where DAG code should go"
+    tags: [skill, airflow, creation]
+    setup:
+      project: noted-testing
+    user_request: "where should I put DAG code?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - dags/ at project root is the standard location
+      - Airflow scheduler picks up files matching dag_id pattern
+      - reuse functions from src/ to keep DAG code thin
+
+  - scenario_id: S3
+    title: "Task definition pattern"
+    tags: [skill, airflow, creation]
+    setup:
+      project: noted-testing
+    user_request: "what's the recommended task structure?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - @task decorator (TaskFlow) for pure-Python tasks
+      - one task = one logical step, idempotent
+      - each task should log to MLflow independently where appropriate
+
+  - scenario_id: S4
+    title: "MLflow integration pattern"
+    tags: [skill, airflow, creation, mlflow]
+    setup:
+      project: noted-testing
+    user_request: "how does a DAG task log to MLflow?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - the train task calls mlflow.start_run() explicitly with experiment_id
+      - tags dag_run_id, dag_id, task_id for traceability
+      - different from notebook auto-instrumentation (Run Manager)
+
+  - scenario_id: S5
+    title: "Generate template"
+    tags: [skill, airflow, creation, workflow]
+    setup:
+      project: noted-testing
+    user_request: "create a DAG skeleton at dags/my_training.py"
+    expected_tools_called:
+      - name: create_file
+        exact_count: 1
+        args_match:
+          file_path: "dags/my_training.py"
+    expected_tools_NOT_called:
+      - update_file
+    expected_answer_focus: |
+      - create_file with a minimal DAG template
+      - platform confirms before creating
+      - describe: imports, @dag decorator, example tasks

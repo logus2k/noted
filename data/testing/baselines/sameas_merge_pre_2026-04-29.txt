@@ -1,0 +1,75 @@
+sameAs merge baseline captured: 2026-04-28T23:57:21.605473
+Pre-rebuild snapshot. Re-run after rebuild for comparison.
+
+========== sw_arch ==========
+
+Entity counts by type:
+  concept                      2198
+  markdown_chunk                999
+  term                          477
+  person                        241
+  organization                  128
+  community_summary              31
+  community                      31
+  markdown_doc                    6
+  TOTAL                        4111
+
+Thematic entities: 3044
+
+Edge counts by type:
+  similar_to                   7778
+  mentions                     5146
+  member_of                    3044
+  chunked_into                  999
+  sameAs                        147
+  summarizes                     31
+
+sameAs score distribution: exact=21  high(0.95+)=67  low(0.92-0.94)=59
+sameAs equivalence classes: 115 covering 249 entities
+Predicted entity reduction (B as currently coded): -134
+
+Largest 8 classes (sample):
+  [4]  foundation model based agents | foundation model-based agents | foundation model-based agent | foundation mode based agents
+  [4]  retrieval-augmented generation | Retrieval Augmented Generation (RAG) | Retrieval Augmented Generation | Retrieval-Augmented Generation (RAG)
+  [4]  agentic systems | agentic system | agent system | Agent systems
+  [3]  knowledge graphs | knowledge graph | knowledge gap
+  [3]  agentic workflows | agentic workflow | agent workflows
+  [3]  LLM agents | LlmAgent | LLM Agent
+  [3]  Agents Trajectories | agent trajectories | agentic trajectories
+  [3]  gemini-2.5-flash | gemini-2.0-flash | Gemini 2.0 Flash
+
+========== eu_ai ==========
+
+Entity counts by type:
+  concept                       740
+  markdown_chunk                327
+  term                          143
+  organization                   54
+  community_summary              12
+  community                      12
+  markdown_doc                    1
+  TOTAL                        1289
+
+Thematic entities: 937
+
+Edge counts by type:
+  similar_to                   4133
+  mentions                     1972
+  member_of                     937
+  chunked_into                  327
+  sameAs                        132
+  summarizes                     12
+
+sameAs score distribution: exact=6  high(0.95+)=75  low(0.92-0.94)=51
+sameAs equivalence classes: 83 covering 193 entities
+Predicted entity reduction (B as currently coded): -110
+
+Largest 8 classes (sample):
+  [7]  Directive 2014/90/EU | Directive 2013/32/EU | Directive 2013/53/EU | Directive 2014/33/EU | Directive 2014/34/EU | Directive 2014/53/EU | Directive 2014/30/EU
+  [6]  Directive 2014/30/EU | Directive 2014/53/EU | Directive 2014/31/EU | Directive 2014/32/EU | Directive 2014/17/EU | Directive 2014/90/EU
+  [5]  Regulation (EU) No 575/2013 | Regulation (EU) No 182/2011 | Regulation (EU) No 167/2013 | Regulation (EU) No 168/2013 | Regulation (EU) No 603/2013
+  [4]  Annex III | Annex VII | Annex VIII | Annex XIII
+  [4]  (EU) No 1003/2010 | (EU) No 1005/2010 | (EU) No 1008/2010 | (EU) No 1009/2010
+  [4]  Regulations (EU) 2017/745 | Regulations (EU) 2017/746 | Regulation (EU) 2017/746 | Regulation (EU) 2017/745
+  [4]  remote biometric identification system | post-remote biometric identification systems | post-remote biometric identification system | remote biometric identification systems
+  [3]  real-time remote biometric identification systems | real-time biometric identification system | real-time remote biometric identification system

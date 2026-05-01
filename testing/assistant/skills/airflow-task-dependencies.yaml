@@ -1,0 +1,56 @@
+# Machine-readable scenarios for the `airflow-task-dependencies` skill test doc.
+
+doc_id: airflow-task-dependencies
+doc_type: skill
+
+# Scenarios covered: S1, S2, S3, S4 (4 of 6).
+# DEFERRED: S5 (branch operator), S6 (dynamic task mapping).
+
+scenarios:
+  - scenario_id: S1
+    title: "Sequential pipeline"
+    tags: [skill, airflow, dependencies]
+    setup:
+      project: noted-testing
+    user_request: "how do I make tasks run in order: ingest -> preprocess -> train?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - with TaskFlow, call order + data passing defines dependency
+      - classic: `ingest >> preprocess >> train`
+
+  - scenario_id: S2
+    title: "Fan-out"
+    tags: [skill, airflow, dependencies]
+    setup:
+      project: noted-testing
+    user_request: "how do I run multiple evaluation tasks in parallel after training?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - `train >> [eval_a, eval_b, eval_c]` runs the three in parallel
+      - downstream task after all: `[eval_a, eval_b, eval_c] >> report`
+
+  - scenario_id: S3
+    title: "Diamond pattern"
+    tags: [skill, airflow, dependencies]
+    setup:
+      project: noted-testing
+    user_request: "I need A -> (B, C) -> D"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - `A >> [B, C] >> D`
+      - D waits for both B and C
+
+  - scenario_id: S4
+    title: "Cross-DAG dependencies"
+    tags: [skill, airflow, dependencies]
+    setup:
+      project: noted-testing
+    user_request: "how do I make one DAG trigger after another?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - ExternalTaskSensor OR TriggerDagRunOperator
+      - explain tradeoffs: sensor waits for completion; trigger just fires and forgets

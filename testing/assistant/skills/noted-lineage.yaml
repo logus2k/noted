@@ -1,0 +1,96 @@
+# Machine-readable scenarios for the `noted-lineage` skill test doc.
+
+doc_id: noted-lineage
+doc_type: skill
+
+# Scenarios covered: S1, S2, S3, S4, S5, S6 (6 of 8).
+# DEFERRED: S7 (cross-project lineage), S8 (lineage across model re-registration).
+
+scenarios:
+  - scenario_id: S1
+    title: "Lineage chain explanation"
+    tags: [skill, lineage]
+    setup:
+      project: noted-testing
+    user_request: "how does noted maintain data-to-model lineage?"
+    expected_tools_called: []
+    expected_tools_NOT_called:
+      - query_knowledge_graph
+    expected_answer_focus: |
+      - present the chain: Data (DVC) -> Config (Hydra) -> Code (Git) -> Pipeline (Airflow) -> Run (MLflow) -> Model (Registry)
+      - explain each node's role
+      - this is a conceptual question; do NOT call query_knowledge_graph
+
+  - scenario_id: S2
+    title: "Trace a deployed model back to data"
+    tags: [skill, lineage, workflow]
+    setup:
+      project: noted-testing
+      prerequisites:
+        - fixture: unload_model
+        - fixture: deploy_model
+          args:
+            model_name: "Sandbox Forecaster"
+            alias: champion
+    user_request: "trace the currently-deployed model back to the data it was trained on"
+    expected_tools_called:
+      - name: get_serving_status
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - get_serving_status gives model + run_id
+      - then get_run_details on the run would show DVC dataset hashes / hydra config
+      - explain the chain even if not drilling further
+      - acceptable variant: also call get_run_details proactively
+
+  - scenario_id: S3
+    title: "Config hash significance"
+    tags: [skill, lineage, hydra]
+    setup:
+      project: noted-testing
+    user_request: "what does the hydra_config_hash on a run represent?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - unique identifier for the exact composed Hydra configuration used
+      - changes when any override changes; matches indicate reproducibility
+      - links to the per-run Hydra bundle stored as artifact
+
+  - scenario_id: S4
+    title: "Why DVC hashes matter for lineage"
+    tags: [skill, lineage, dvc]
+    setup:
+      project: noted-testing
+    user_request: "why is the DVC hash logged per run?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - guarantees the model can be traced back to the EXACT data version
+      - enables reproducibility and drift detection
+      - mention that git commit + hydra config + dvc hash together fully specify a run
+
+  - scenario_id: S5
+    title: "Missing lineage diagnosis"
+    tags: [skill, lineage, diagnostic]
+    setup:
+      project: noted-testing
+    user_request: "one of my runs has no hydra_config_hash - why?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - likely the run was created outside the Run Manager (manual mlflow.start_run, or produced by a pre-instrumentation workflow)
+      - explain Run Manager is what stamps hydra_config_hash
+      - suggest re-running through Run Manager to get full lineage
+
+  - scenario_id: S6
+    title: "Cross-tool question"
+    tags: [skill, lineage, integration]
+    setup:
+      project: noted-testing
+    user_request: "how do I know which Airflow DAG run produced a given MLflow run?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - DAG runs log MLflow runs with explicit dag_run_id tag
+      - cross-reference via MLflow run tags
+      - mention get_run_details to inspect tags for a run in question

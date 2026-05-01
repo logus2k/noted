@@ -1,0 +1,57 @@
+# Machine-readable scenarios for the `dvc-checkout` skill test doc.
+
+doc_id: dvc-checkout
+doc_type: skill
+
+# Scenarios covered: S1, S2, S3, S4 (4 of 6).
+# DEFERRED: S5 (checkout in Airflow worker), S6 (sparse checkout).
+
+scenarios:
+  - scenario_id: S1
+    title: "Basic checkout"
+    tags: [skill, dvc, checkout]
+    setup:
+      project: noted-testing
+    user_request: "I just cloned the repo - how do I get the data files?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - dvc pull
+      - retrieves files from remote according to .dvc metadata
+
+  - scenario_id: S2
+    title: "Checkout one file"
+    tags: [skill, dvc, checkout]
+    setup:
+      project: noted-testing
+    user_request: "I only need data.csv, not all tracked files"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - dvc pull data.csv (or data.csv.dvc)
+      - avoids downloading unrelated large files
+
+  - scenario_id: S3
+    title: "Checkout after reset"
+    tags: [skill, dvc, checkout]
+    setup:
+      project: noted-testing
+    user_request: "I deleted my data.csv by accident"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - dvc checkout data.csv (restores from local cache if present)
+      - if not cached, dvc pull data.csv
+
+  - scenario_id: S4
+    title: "Checkout wrong version"
+    tags: [skill, dvc, checkout]
+    setup:
+      project: noted-testing
+    user_request: "I'm on the wrong version of data - how do I switch?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - git checkout <target-commit> data.csv.dvc
+      - dvc checkout data.csv
+      - confirms file hash via .dvc metadata

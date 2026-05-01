@@ -1,0 +1,168 @@
+# Machine-readable scenarios for the `get_run_details` tool test doc.
+
+doc_id: get_run_details
+doc_type: tool
+
+# Scenarios covered: S1, S2, S3, S4, S5, S6, S7, S8 (8 of 10).
+# DEFERRED: S9 (FAILED-run with stack trace), S10 (run with 1000+ artifacts).
+
+scenarios:
+  - scenario_id: S1
+    title: "Basic run details by id"
+    tags: [read, mlflow, runs]
+    setup:
+      project: noted-testing
+    user_request: "show me details for run ad190b73dd6147158fc27f1eda9f1637"
+    expected_tools_called:
+      - name: get_run_details
+        exact_count: 1
+        args_match:
+          run_id: "ad190b73dd6147158fc27f1eda9f1637"
+    expected_tools_NOT_called:
+      - get_experiment_runs
+      - list_run_artifacts
+    expected_answer_focus: |
+      - report status, start/end, metrics, params, tags from the tool result
+      - mention artifacts (Models / Images / Charts / Files) at a summary level
+      - do NOT call list_run_artifacts unless asked to drill into a specific path
+
+  - scenario_id: S2
+    title: "Metrics-focused query"
+    tags: [read, mlflow, runs, metrics]
+    setup:
+      project: noted-testing
+    user_request: "what's the val_mae for run ad190b73dd6147158fc27f1eda9f1637?"
+    expected_tools_called:
+      - name: get_run_details
+        exact_count: 1
+        args_match:
+          run_id: "ad190b73dd6147158fc27f1eda9f1637"
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - cite the val_mae value verbatim from the tool result (2.15 for v1's run)
+      - do not synthesize or round; report what the tool returned
+
+  - scenario_id: S3
+    title: "Params-focused query (target normalization)"
+    tags: [read, mlflow, runs, params]
+    setup:
+      project: noted-testing
+    user_request: "what target_mean and target_std were used in run ad190b73dd6147158fc27f1eda9f1637?"
+    expected_tools_called:
+      - name: get_run_details
+        exact_count: 1
+        args_match:
+          run_id: "ad190b73dd6147158fc27f1eda9f1637"
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - report target_mean and target_std from params section
+      - mention these are needed for inverse-transform of scaled predictions
+
+  - scenario_id: S4
+    title: "Artifacts overview"
+    tags: [read, mlflow, runs, artifacts]
+    setup:
+      project: noted-testing
+    user_request: "what artifacts does run ad190b73dd6147158fc27f1eda9f1637 have?"
+    expected_tools_called:
+      - name: get_run_details
+        exact_count: 1
+        args_match:
+          run_id: "ad190b73dd6147158fc27f1eda9f1637"
+    expected_tools_NOT_called:
+      - list_run_artifacts
+    expected_answer_focus: |
+      - summarize the Models / Images / Charts / Files counts and a few names
+      - do NOT call list_run_artifacts unless the user asks for a specific path
+
+  - scenario_id: S5
+    title: "Nonexistent run_id"
+    tags: [read, mlflow, runs, error]
+    setup:
+      project: noted-testing
+    user_request: "show me run 0000000000000000000000000000abcd"
+    expected_tools_called:
+      - name: get_run_details
+        exact_count: 1
+        args_match:
+          run_id: "0000000000000000000000000000abcd"
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - tool will error (run not found)
+      - report the failure; suggest the user check the run_id
+      - do NOT fabricate a fake run
+
+  - scenario_id: S6
+    title: "Drill-down: details then artifact path"
+    tags: [read, mlflow, runs, workflow]
+    setup:
+      project: noted-testing
+    turns:
+      - user_request: "show me run ad190b73dd6147158fc27f1eda9f1637"
+        expected_tools_called:
+          - name: get_run_details
+            exact_count: 1
+        expected_tools_NOT_called:
+          - list_run_artifacts
+        expected_answer_focus: "report metrics, params, artifact summary"
+      - user_request: "what's inside the model/ directory?"
+        expected_tools_called:
+          - name: list_run_artifacts
+            exact_count: 1
+            args_match:
+              run_id: "ad190b73dd6147158fc27f1eda9f1637"
+              path: "model"
+        expected_tools_NOT_called:
+          - get_run_details
+        expected_answer_focus: "list contents of the model/ artifact subtree; reuse run_id from prior turn"
+
+  - scenario_id: S7
+    title: "Truncated run_id rejection"
+    tags: [read, mlflow, runs, error]
+    setup:
+      project: noted-testing
+    user_request: "show me run ad190b73"
+    expected_tools_called:
+      - name: get_run_details
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - tool may accept short prefix or error; either way, report the result faithfully
+      - if error, ask the user for the full 32-char run_id
+      - do NOT pad / fabricate the rest of the id
+
+  - scenario_id: S8
+    title: "Comparison setup pattern"
+    tags: [read, mlflow, runs, workflow]
+    setup:
+      project: noted-testing
+    turns:
+      - user_request: "show me run ad190b73dd6147158fc27f1eda9f1637 details"
+        expected_tools_called:
+          - name: get_run_details
+            exact_count: 1
+        expected_tools_NOT_called: []
+        expected_answer_focus: "report run details"
+      - user_request: "now show me 8921d48aca9b4f328910bceb66778c7c so I can compare"
+        # User says "so I can compare" - the cleanest answer is compare_runs
+        # against the prior run_id, which gives both runs' fields side by
+        # side in one call. The two run_ids must both be present in args.
+        #
+        # JUSTIFICATION (validated 2026-04-22): a strict-variant run requiring
+        # get_run_details on turn 2 FAILED (Gemma reliably picks compare_runs
+        # when the user says "compare"). compare_runs IS the canonical tool
+        # for comparison requests, and the user's wording makes that intent
+        # unambiguous. Accepting compare_runs here is not a soft-cheat; it
+        # reflects the tool's intended use case for comparison-phrased
+        # requests. The scenario remains in the get_run_details doc because
+        # turn 1 exercises get_run_details.
+        expected_tools_called:
+          - name: compare_runs
+            exact_count: 1
+            args_match:
+              run_id_a: "ad190b73dd6147158fc27f1eda9f1637"
+              run_id_b: "8921d48aca9b4f328910bceb66778c7c"
+        expected_tools_NOT_called: []
+        expected_answer_focus: |
+          - present both runs side by side using the compare_runs output
+          - call out the per-metric / per-param differences

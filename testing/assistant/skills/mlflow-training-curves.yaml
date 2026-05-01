@@ -1,0 +1,75 @@
+# Machine-readable scenarios for the `mlflow-training-curves` skill test doc.
+
+doc_id: mlflow-training-curves
+doc_type: skill
+
+# Scenarios covered: S1, S2, S3, S4, S5 (5 of 7).
+# DEFERRED: S6 (plateau detection), S7 (early-stop patience tuning).
+
+scenarios:
+  - scenario_id: S1
+    title: "Request training curves"
+    tags: [skill, mlflow, curves]
+    setup:
+      project: noted-testing
+    user_request: "show the training curve for run ad190b73dd6147158fc27f1eda9f1637"
+    expected_tools_called:
+      - name: get_run_details
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - metrics are logged per step/epoch
+      - report the min/max/final of each; mention where to view the curve (MLflow UI)
+      - noted's Live Metrics panel shows curves as training happens
+
+  - scenario_id: S2
+    title: "Interpret overfitting"
+    tags: [skill, mlflow, curves, diagnostic]
+    setup:
+      project: noted-testing
+    user_request: "my train loss keeps going down but val loss stopped - is that bad?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - classic overfitting signal
+      - suggest reducing model capacity / adding regularization / early stopping
+      - mention restore_best_weights option
+
+  - scenario_id: S3
+    title: "Learning rate schedule impact"
+    tags: [skill, mlflow, curves]
+    setup:
+      project: noted-testing
+    user_request: "how do I read the lr curve?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - lr logged per step if ReduceLROnPlateau / scheduler active
+      - drops correspond to plateau detections
+      - note pattern meaning (patience, factor)
+
+  - scenario_id: S4
+    title: "Comparing curves"
+    tags: [skill, mlflow, curves, compare]
+    setup:
+      project: noted-testing
+    user_request: "how do I compare training curves between two runs?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - MLflow UI supports overlay
+      - or compare_runs (this tool shows metric final values, not curves)
+      - suggest looking at the UI for full curve overlay
+
+  - scenario_id: S5
+    title: "Sudden metric spike"
+    tags: [skill, mlflow, curves, diagnostic]
+    setup:
+      project: noted-testing
+    user_request: "val loss spiked in the middle of training - what happened?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - common causes: bad batch, lr schedule adjustment, gradient explosion
+      - suggest looking at lr curve + gradient-clipping config
+      - if reproducible, bisect epoch range

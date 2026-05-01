@@ -1,0 +1,47 @@
+# Machine-readable scenarios for the `dvc-best-practices` skill test doc.
+
+doc_id: dvc-best-practices
+doc_type: skill
+
+# Scenarios covered: S1, S2, S3 (3 of 5).
+# DEFERRED: S4 (metric files), S5 (plot tracking).
+
+scenarios:
+  - scenario_id: S1
+    title: "What to track"
+    tags: [skill, dvc, best_practices]
+    setup:
+      project: noted-testing
+    user_request: "what should I put in DVC?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - raw + derived datasets
+      - large binary files (images, audio)
+      - NOT code (use git), NOT models (use MLflow Registry)
+
+  - scenario_id: S2
+    title: "Directory vs file tracking"
+    tags: [skill, dvc, best_practices]
+    setup:
+      project: noted-testing
+    user_request: "should I dvc add a whole directory or individual files?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - directory: single .dvc per dir (simpler, fewer git entries)
+      - file: one .dvc per file (finer versioning, more git churn)
+      - recommend directory for homogeneous datasets, file for mixed
+
+  - scenario_id: S3
+    title: "Cache management"
+    tags: [skill, dvc, best_practices]
+    setup:
+      project: noted-testing
+    user_request: "my .dvc/cache is huge - can I clean it?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - dvc gc (garbage collect) removes unreachable cache entries
+      - options: --all-branches, --all-tags for aggressive cleanup
+      - careful: --workspace-only keeps only current version

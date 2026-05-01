@@ -1,0 +1,47 @@
+# Machine-readable scenarios for the `hydra-templates` skill test doc.
+
+doc_id: hydra-templates
+doc_type: skill
+
+# Scenarios covered: S1, S2, S3 (3 of 5).
+# DEFERRED: S4 (partial-instantiation via _partial_), S5 (recursive instantiate).
+
+scenarios:
+  - scenario_id: S1
+    title: "What are config templates"
+    tags: [skill, hydra, templates]
+    setup:
+      project: noted-testing
+    user_request: "what's a config template in Hydra?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - a reusable YAML snippet with `_target_` for auto-instantiation
+      - loaded from config/<group>/<template>.yaml; supplies defaults for common setups
+      - Composer lets user pick a template from a group dropdown
+
+  - scenario_id: S2
+    title: "Using a template"
+    tags: [skill, hydra, templates]
+    setup:
+      project: noted-testing
+    user_request: "how do I use an existing model template?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - reference by group + name (e.g. defaults list - model: lstm_baseline)
+      - override specific fields if needed (model.hidden_size=128)
+      - Composer surfaces both the selection and the inline overrides
+
+  - scenario_id: S3
+    title: "Creating a new template"
+    tags: [skill, hydra, templates]
+    setup:
+      project: noted-testing
+    user_request: "how do I create a new model template?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - create config/model/my_model.yaml with _target_ + params
+      - document the inputs
+      - test by running with `model=my_model` override

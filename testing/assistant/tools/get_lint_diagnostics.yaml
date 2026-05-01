@@ -1,0 +1,102 @@
+# Machine-readable scenarios for the `get_lint_diagnostics` tool test doc.
+
+doc_id: get_lint_diagnostics
+doc_type: tool
+
+# Scenarios covered: S1, S2, S3, S4, S5 (5 of 7).
+# DEFERRED: S6 (file with hundreds of warnings), S7 (multi-language file).
+
+scenarios:
+  - scenario_id: S1
+    title: "Basic lint check"
+    tags: [read, linting]
+    setup:
+      project: noted-testing
+      file_path: sample_lint.py
+      prerequisites:
+        - fixture: reset_lint_fixture
+    user_request: "any lint warnings in the open file?"
+    expected_tools_called:
+      - name: get_lint_diagnostics
+        exact_count: 1
+    expected_tools_NOT_called:
+      - fix_lint_issues
+    expected_answer_focus: |
+      - report diagnostics from tool result
+      - if none, say "no warnings"
+      - do NOT auto-fix without user confirmation
+
+  - scenario_id: S2
+    title: "Suggest fix path"
+    tags: [read, linting, workflow]
+    setup:
+      project: noted-testing
+      file_path: sample_lint.py
+      prerequisites:
+        - fixture: reset_lint_fixture
+    user_request: "are there issues to fix?"
+    expected_tools_called:
+      - name: get_lint_diagnostics
+        exact_count: 1
+    expected_tools_NOT_called:
+      - fix_lint_issues
+    expected_answer_focus: |
+      - report diagnostics
+      - mention fix_lint_issues as the next step (with rule codes)
+
+  - scenario_id: S3
+    title: "Rule code lookup"
+    tags: [read, linting]
+    setup:
+      project: noted-testing
+      file_path: sample_lint.py
+      prerequisites:
+        - fixture: reset_lint_fixture
+    user_request: "what's the F401 about in the open file?"
+    expected_tools_called:
+      - name: get_lint_diagnostics
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - find F401 entries
+      - explain F401 = unused import; quote the offending lines
+
+  - scenario_id: S4
+    title: "Report cleanly"
+    tags: [read, linting, summary]
+    setup:
+      project: noted-testing
+      file_path: sample_lint.py
+      prerequisites:
+        - fixture: reset_lint_fixture
+    user_request: "lint summary"
+    expected_tools_called:
+      - name: get_lint_diagnostics
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - count by severity (error / warning)
+      - group by rule code if many
+
+  - scenario_id: S5
+    title: "Pre-flight before fix"
+    tags: [read, linting, workflow]
+    setup:
+      project: noted-testing
+      file_path: sample_lint.py
+      prerequisites:
+        - fixture: reset_lint_fixture
+    turns:
+      - user_request: "what lint issues are in the open file?"
+        expected_tools_called:
+          - name: get_lint_diagnostics
+            exact_count: 1
+        expected_tools_NOT_called:
+          - fix_lint_issues
+        expected_answer_focus: "list issues"
+      - user_request: "fix them all"
+        expected_tools_called:
+          - name: fix_lint_issues
+            exact_count: 1
+        expected_tools_NOT_called: []
+        expected_answer_focus: "call fix_lint_issues; backend handles confirmation"

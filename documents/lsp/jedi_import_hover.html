@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title></title>
+            <style>
+/* From extension vscode.github */
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+.vscode-dark img[src$=\#gh-light-mode-only],
+.vscode-light img[src$=\#gh-dark-mode-only],
+.vscode-high-contrast:not(.vscode-high-contrast-light) img[src$=\#gh-light-mode-only],
+.vscode-high-contrast-light img[src$=\#gh-dark-mode-only] {
+	display: none;
+}
+
+</style>
+            
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Microsoft/vscode/extensions/markdown-language-features/media/markdown.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Microsoft/vscode/extensions/markdown-language-features/media/highlight.css">
+<style>
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe WPC', 'Segoe UI', system-ui, 'Ubuntu', 'Droid Sans', sans-serif;
+                font-size: 14px;
+                line-height: 1.6;
+            }
+        </style>
+        <style>
+.task-list-item {
+    list-style-type: none;
+}
+
+.task-list-item-checkbox {
+    margin-left: -20px;
+    vertical-align: middle;
+    pointer-events: none;
+}
+</style>
+<style>
+:root {
+  --color-note: #0969da;
+  --color-tip: #1a7f37;
+  --color-warning: #9a6700;
+  --color-severe: #bc4c00;
+  --color-caution: #d1242f;
+  --color-important: #8250df;
+}
+
+</style>
+<style>
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-note: #2f81f7;
+    --color-tip: #3fb950;
+    --color-warning: #d29922;
+    --color-severe: #db6d28;
+    --color-caution: #f85149;
+    --color-important: #a371f7;
+  }
+}
+
+</style>
+<style>
+.markdown-alert {
+  padding: 0.5rem 1rem;
+  margin-bottom: 16px;
+  color: inherit;
+  border-left: .25em solid #888;
+}
+
+.markdown-alert>:first-child {
+  margin-top: 0
+}
+
+.markdown-alert>:last-child {
+  margin-bottom: 0
+}
+
+.markdown-alert .markdown-alert-title {
+  display: flex;
+  font-weight: 500;
+  align-items: center;
+  line-height: 1
+}
+
+.markdown-alert .markdown-alert-title .octicon {
+  margin-right: 0.5rem;
+  display: inline-block;
+  overflow: visible !important;
+  vertical-align: text-bottom;
+  fill: currentColor;
+}
+
+.markdown-alert.markdown-alert-note {
+  border-left-color: var(--color-note);
+}
+
+.markdown-alert.markdown-alert-note .markdown-alert-title {
+  color: var(--color-note);
+}
+
+.markdown-alert.markdown-alert-important {
+  border-left-color: var(--color-important);
+}
+
+.markdown-alert.markdown-alert-important .markdown-alert-title {
+  color: var(--color-important);
+}
+
+.markdown-alert.markdown-alert-warning {
+  border-left-color: var(--color-warning);
+}
+
+.markdown-alert.markdown-alert-warning .markdown-alert-title {
+  color: var(--color-warning);
+}
+
+.markdown-alert.markdown-alert-tip {
+  border-left-color: var(--color-tip);
+}
+
+.markdown-alert.markdown-alert-tip .markdown-alert-title {
+  color: var(--color-tip);
+}
+
+.markdown-alert.markdown-alert-caution {
+  border-left-color: var(--color-caution);
+}
+
+.markdown-alert.markdown-alert-caution .markdown-alert-title {
+  color: var(--color-caution);
+}
+
+</style>
+        
+        </head>
+        <body class="vscode-body vscode-light">
+            <h2 id="keyword-import">keyword import</h2>
+<p>The &quot;import&quot; statement</p>
+<hr>
+<p>import_stmt     ::= &quot;import&quot; module [&quot;as&quot; identifier] (&quot;,&quot; module [&quot;as&quot; identifier])*
+| &quot;from&quot; relative_module &quot;import&quot; identifier [&quot;as&quot; identifier]
+(&quot;,&quot; identifier [&quot;as&quot; identifier])*
+| &quot;from&quot; relative_module &quot;import&quot; &quot;(&quot; identifier [&quot;as&quot; identifier]
+(&quot;,&quot; identifier [&quot;as&quot; identifier])* [&quot;,&quot;] &quot;)&quot;
+| &quot;from&quot; relative_module &quot;import&quot; &quot;<em>&quot;
+module          ::= (identifier &quot;.&quot;)</em> identifier
+relative_module ::= &quot;.&quot;* module | &quot;.&quot;+</p>
+<p>The basic import statement (no &quot;from&quot; clause) is executed in two
+steps:</p>
+<ol>
+<li>
+<p>find a module, loading and initializing it if necessary</p>
+</li>
+<li>
+<p>define a name or names in the local namespace for the scope where
+the &quot;import&quot; statement occurs.</p>
+</li>
+</ol>
+<p>When the statement contains multiple clauses (separated by commas) the
+two steps are carried out separately for each clause, just as though
+the clauses had been separated out into individual import statements.</p>
+<p>The details of the first step, finding and loading modules, are
+described in greater detail in the section on the import system, which
+also describes the various types of packages and modules that can be
+imported, as well as all the hooks that can be used to customize the
+import system. Note that failures in this step may indicate either
+that the module could not be located, <em>or</em> that an error occurred
+while initializing the module, which includes execution of the
+module’s code.</p>
+<p>If the requested module is retrieved successfully, it will be made
+available in the local namespace in one of three ways:</p>
+<ul>
+<li>
+<p>If the module name is followed by &quot;as&quot;, then the name following &quot;as&quot;
+is bound directly to the imported module.</p>
+</li>
+<li>
+<p>If no other name is specified, and the module being imported is a
+top level module, the module’s name is bound in the local namespace
+as a reference to the imported module</p>
+</li>
+<li>
+<p>If the module being imported is <em>not</em> a top level module, then the
+name of the top level package that contains the module is bound in
+the local namespace as a reference to the top level package. The
+imported module must be accessed using its full qualified name
+rather than directly</p>
+</li>
+</ul>
+<p>The &quot;from&quot; form uses a slightly more complex process:</p>
+<ol>
+<li>
+<p>find the module specified in the &quot;from&quot; clause, loading and
+initializing it if necessary;</p>
+</li>
+<li>
+<p>for each of the identifiers specified in the &quot;import&quot; clauses:</p>
+<ol>
+<li>
+<p>check if the imported module has an attribute by that name</p>
+</li>
+<li>
+<p>if not, attempt to import a submodule with that name and then
+check the imported module again for that attribute</p>
+</li>
+<li>
+<p>if the attribute is not found, &quot;ImportError&quot; is raised.</p>
+</li>
+<li>
+<p>otherwise, a reference to that value is stored in the local
+namespace, using the name in the &quot;as&quot; clause if it is present,
+otherwise using the attribute name</p>
+</li>
+</ol>
+</li>
+</ol>
+<p>Examples:</p>
+<p>import foo                 # foo imported and bound locally
+import foo.bar.baz         # foo, foo.bar, and foo.bar.baz imported, foo bound locally
+import foo.bar.baz as fbb  # foo, foo.bar, and foo.bar.baz imported, foo.bar.baz bound as fbb
+from foo.bar import baz    # foo, foo.bar, and foo.bar.baz imported, foo.bar.baz bound as baz
+from foo import attr       # foo imported and foo.attr bound as attr</p>
+<p>If the list of identifiers is replaced by a star (&quot;'*'&quot;), all public
+names defined in the module are bound in the local namespace for the
+scope where the &quot;import&quot; statement occurs.</p>
+<p>The <em>public names</em> defined by a module are determined by checking the
+module’s namespace for a variable named &quot;<strong>all</strong>&quot;; if defined, it must
+be a sequence of strings which are names defined or imported by that
+module.  The names given in &quot;<strong>all</strong>&quot; are all considered public and
+are required to exist.  If &quot;<strong>all</strong>&quot; is not defined, the set of public
+names includes all names found in the module’s namespace which do not
+begin with an underscore character (&quot;'_'&quot;).  &quot;<strong>all</strong>&quot; should contain
+the entire public API. It is intended to avoid accidentally exporting
+items that are not part of the API (such as library modules which were
+imported and used within the module).</p>
+<p>The wild card form of import — &quot;from module import *&quot; — is only
+allowed at the module level.  Attempting to use it in class or
+function definitions will raise a &quot;SyntaxError&quot;.</p>
+<p>When specifying what module to import you do not have to specify the
+absolute name of the module. When a module or package is contained
+within another package it is possible to make a relative import within
+the same top package without having to mention the package name. By
+using leading dots in the specified module or package after &quot;from&quot; you
+can specify how high to traverse up the current package hierarchy
+without specifying exact names. One leading dot means the current
+package where the module making the import exists. Two dots means up
+one package level. Three dots is up two levels, etc. So if you execute
+&quot;from . import mod&quot; from a module in the &quot;pkg&quot; package then you will
+end up importing &quot;pkg.mod&quot;. If you execute &quot;from ..subpkg2 import mod&quot;
+from within &quot;pkg.subpkg1&quot; you will import &quot;pkg.subpkg2.mod&quot;. The
+specification for relative imports is contained in the Package
+Relative Imports section.</p>
+<p>&quot;importlib.import_module()&quot; is provided to support applications that
+determine dynamically the modules to be loaded.</p>
+<p>Raises an auditing event &quot;import&quot; with arguments &quot;module&quot;, &quot;filename&quot;,
+&quot;sys.path&quot;, &quot;sys.meta_path&quot;, &quot;sys.path_hooks&quot;.</p>
+<h1 id="future-statements">Future statements</h1>
+<p>A <em>future statement</em> is a directive to the compiler that a particular
+module should be compiled using syntax or semantics that will be
+available in a specified future release of Python where the feature
+becomes standard.</p>
+<p>The future statement is intended to ease migration to future versions
+of Python that introduce incompatible changes to the language.  It
+allows use of the new features on a per-module basis before the
+release in which the feature becomes standard.</p>
+<p>future_stmt ::= &quot;from&quot; &quot;<strong>future</strong>&quot; &quot;import&quot; feature [&quot;as&quot; identifier]
+(&quot;,&quot; feature [&quot;as&quot; identifier])*
+| &quot;from&quot; &quot;<strong>future</strong>&quot; &quot;import&quot; &quot;(&quot; feature [&quot;as&quot; identifier]
+(&quot;,&quot; feature [&quot;as&quot; identifier])* [&quot;,&quot;] &quot;)&quot;
+feature     ::= identifier</p>
+<p>A future statement must appear near the top of the module.  The only
+lines that can appear before a future statement are:</p>
+<ul>
+<li>
+<p>the module docstring (if any),</p>
+</li>
+<li>
+<p>comments,</p>
+</li>
+<li>
+<p>blank lines, and</p>
+</li>
+<li>
+<p>other future statements.</p>
+</li>
+</ul>
+<p>The only feature that requires using the future statement is
+&quot;annotations&quot; (see <strong>PEP 563</strong>).</p>
+<p>All historical features enabled by the future statement are still
+recognized by Python 3.  The list includes &quot;absolute_import&quot;,
+&quot;division&quot;, &quot;generators&quot;, &quot;generator_stop&quot;, &quot;unicode_literals&quot;,
+&quot;print_function&quot;, &quot;nested_scopes&quot; and &quot;with_statement&quot;.  They are all
+redundant because they are always enabled, and only kept for backwards
+compatibility.</p>
+<p>A future statement is recognized and treated specially at compile
+time: Changes to the semantics of core constructs are often
+implemented by generating different code.  It may even be the case
+that a new feature introduces new incompatible syntax (such as a new
+reserved word), in which case the compiler may need to parse the
+module differently.  Such decisions cannot be pushed off until
+runtime.</p>
+<p>For any given release, the compiler knows which feature names have
+been defined, and raises a compile-time error if a future statement
+contains a feature not known to it.</p>
+<p>The direct runtime semantics are the same as for any import statement:
+there is a standard module &quot;<strong>future</strong>&quot;, described later, and it will
+be imported in the usual way at the time the future statement is
+executed.</p>
+<p>The interesting runtime semantics depend on the specific feature
+enabled by the future statement.</p>
+<p>Note that there is nothing special about the statement:</p>
+<p>import <strong>future</strong> [as name]</p>
+<p>That is not a future statement; it’s an ordinary import statement with
+no special semantics or syntax restrictions.</p>
+<p>Code compiled by calls to the built-in functions &quot;exec()&quot; and
+&quot;compile()&quot; that occur in a module &quot;M&quot; containing a future statement
+will, by default, use the new syntax or semantics associated with the
+future statement.  This can be controlled by optional arguments to
+&quot;compile()&quot; — see the documentation of that function for details.</p>
+<p>A future statement typed at an interactive interpreter prompt will
+take effect for the rest of the interpreter session.  If an
+interpreter is started with the &quot;-i&quot; option, is passed a script name
+to execute, and the script includes a future statement, it will be in
+effect in the interactive session started after the script is
+executed.</p>
+<p>See also:</p>
+<p><strong>PEP 236</strong> - Back to the <strong>future</strong>
+The original proposal for the <strong>future</strong> mechanism.</p>
+
+            
+            
+        </body>
+        </html>

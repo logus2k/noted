@@ -1,0 +1,112 @@
+# Machine-readable scenarios for the `compare_runs` tool test doc.
+
+doc_id: compare_runs
+doc_type: tool
+
+# Scenarios covered: S1, S2, S3, S4, S5, S6 (6 of 8).
+# DEFERRED: S7 (compare with non-overlapping metric sets), S8 (compare across experiments).
+
+scenarios:
+  - scenario_id: S1
+    title: "Basic two-run comparison"
+    tags: [read, mlflow, runs, compare]
+    setup:
+      project: noted-testing
+    user_request: "compare runs ad190b73dd6147158fc27f1eda9f1637 and 8921d48aca9b4f328910bceb66778c7c"
+    expected_tools_called:
+      - name: compare_runs
+        exact_count: 1
+        args_match:
+          run_id_a: "ad190b73dd6147158fc27f1eda9f1637"
+          run_id_b: "8921d48aca9b4f328910bceb66778c7c"
+    expected_tools_NOT_called:
+      - get_run_details
+    expected_answer_focus: |
+      - present metrics side-by-side from the tool result
+      - identify which run is better per metric (lower is better for mae/rmse, higher for r2)
+      - the FINAL conclusion must be grounded in actual values; do NOT swap A/B in the table
+
+  - scenario_id: S2
+    title: "Champion vs challenger framing"
+    tags: [read, mlflow, runs, compare, alias]
+    setup:
+      project: noted-testing
+    turns:
+      - user_request: "list versions of Sandbox Forecaster"
+        expected_tools_called:
+          - name: list_model_versions
+            exact_count: 1
+        expected_tools_NOT_called: []
+        expected_answer_focus: "list versions"
+      - user_request: "is v2 (staging) actually better than the champion?"
+        expected_tools_called:
+          - name: compare_runs
+            exact_count: 1
+        expected_tools_NOT_called:
+          - deploy_model
+        expected_answer_focus: |
+          - reuse run_ids from prior turn
+          - call compare_runs with FULL run_ids
+          - conclusion must correctly reflect metric direction
+
+  - scenario_id: S3
+    title: "Same run twice (degenerate)"
+    tags: [read, mlflow, runs, compare, edge]
+    setup:
+      project: noted-testing
+    user_request: "compare ad190b73dd6147158fc27f1eda9f1637 with itself"
+    expected_tools_called:
+      - name: compare_runs
+        exact_count: 1
+        args_match:
+          run_id_a: "ad190b73dd6147158fc27f1eda9f1637"
+          run_id_b: "ad190b73dd6147158fc27f1eda9f1637"
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - all metric deltas should be zero
+      - report this clearly; do not fabricate differences
+
+  - scenario_id: S4
+    title: "Nonexistent run"
+    tags: [read, mlflow, runs, compare, error]
+    setup:
+      project: noted-testing
+    user_request: "compare ad190b73dd6147158fc27f1eda9f1637 with 0000000000000000000000000000abcd"
+    expected_tools_called:
+      - name: compare_runs
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - tool errors on the missing run
+      - report the failure; suggest verifying the second run_id
+
+  - scenario_id: S5
+    title: "Truncated run_id"
+    tags: [read, mlflow, runs, compare, error]
+    setup:
+      project: noted-testing
+    user_request: "compare ad190b73 with 8921d48a"
+    expected_tools_called: []
+    expected_tools_NOT_called:
+      - compare_runs
+    expected_answer_focus: |
+      - Assistant should ASK for full 32-char run_ids before calling compare_runs
+      - calling list_model_versions to get full ids is acceptable
+      - do NOT pad / fabricate the rest
+
+  - scenario_id: S6
+    title: "Best of three"
+    tags: [read, mlflow, runs, compare, workflow]
+    setup:
+      project: noted-testing
+    user_request: "which is the best run between the v1, v2, and v3 model versions of Sandbox Forecaster?"
+    expected_tools_called:
+      - name: list_model_versions
+        exact_count: 1
+    expected_tools_NOT_called:
+      - deploy_model
+    expected_answer_focus: |
+      - list versions to get run_ids
+      - compare_runs is pairwise; explain that strategy (compare v1 vs v2, then winner vs v3)
+      - acceptable to do multiple compare_runs calls or to ask user which two to compare
+      - do NOT auto-deploy

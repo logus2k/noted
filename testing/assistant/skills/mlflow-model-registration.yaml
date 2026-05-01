@@ -1,0 +1,96 @@
+# Machine-readable scenarios for the `mlflow-model-registration` skill test doc.
+
+doc_id: mlflow-model-registration
+doc_type: skill
+
+# Scenarios covered: S1, S2, S3, S4, S5 (5 of 7).
+# DEFERRED: S6 (cross-project registration), S7 (staging gates).
+
+scenarios:
+  - scenario_id: S1
+    title: "Register a run's model"
+    tags: [skill, mlflow, registry]
+    setup:
+      project: noted-testing
+    user_request: "register the model from run ad190b73dd6147158fc27f1eda9f1637 as 'Forecaster A'"
+    expected_tools_called:
+      - name: register_model
+        exact_count: 1
+        args_match:
+          run_id: "ad190b73dd6147158fc27f1eda9f1637"
+          model_name: "Forecaster A"
+    expected_tools_NOT_called:
+      - deploy_model
+    expected_answer_focus: |
+      - direct call; report new version number
+      - do NOT auto-deploy; user must confirm next step
+
+  - scenario_id: S2
+    title: "Logged Model id rejection"
+    tags: [skill, mlflow, registry, antipattern]
+    setup:
+      project: noted-testing
+    user_request: "deploy the logged model m-79bed22a1234"
+    expected_tools_called: []
+    expected_tools_NOT_called:
+      - deploy_model
+    expected_answer_focus: |
+      - m-XXXX is a Logged Model ID, NOT a Registry version
+      - deploy_model only accepts version numbers or aliases
+      - must register_model first; explain the full flow (list_registered_models -> register_model -> deploy_model)
+
+  - scenario_id: S3
+    title: "Register + promote + deploy"
+    tags: [skill, mlflow, registry, workflow]
+    setup:
+      project: noted-testing
+      prerequisites:
+        - fixture: unload_model
+    turns:
+      - user_request: "register run ad190b73dd6147158fc27f1eda9f1637 as Forecaster B"
+        expected_tools_called:
+          - name: register_model
+            exact_count: 1
+        expected_tools_NOT_called:
+          - set_model_alias
+          - deploy_model
+        expected_answer_focus: "report new version N"
+      - user_request: "make it champion and deploy"
+        expected_tools_called:
+          - name: set_model_alias
+            exact_count: 1
+            args_match:
+              alias: "champion"
+        expected_tools_NOT_called: []
+        expected_answer_focus: |
+          - set alias first, then deploy - or deploy by alias directly (the alias resolves)
+          - explain the ordering and what each step does
+
+  - scenario_id: S4
+    title: "Name selection"
+    tags: [skill, mlflow, registry]
+    setup:
+      project: noted-testing
+    user_request: "what should I name my registered model?"
+    expected_tools_called:
+      - name: list_registered_models
+        exact_count: 1
+    expected_tools_NOT_called:
+      - register_model
+    expected_answer_focus: |
+      - show existing names so user can pick a consistent one
+      - mention that re-using an existing name just adds a new VERSION (does not overwrite)
+      - do NOT pick a name for the user
+
+  - scenario_id: S5
+    title: "Artifact path default"
+    tags: [skill, mlflow, registry]
+    setup:
+      project: noted-testing
+    user_request: "what does 'artifact_path' in register_model do?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - sub-path inside the run's artifact tree where the model lives
+      - default is 'model' (matches mlflow.pyfunc.log_model convention)
+      - override only for custom logging schemes

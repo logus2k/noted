@@ -1,0 +1,12 @@
+file: data/my_dataset.csv
+features:
+  - temperature
+  - humidity
+  - pressure
+target: temperature
+lookback: 120
+horizon: 24
+split:
+  train: 0.7
+  val: 0.15
+  test: 0.15

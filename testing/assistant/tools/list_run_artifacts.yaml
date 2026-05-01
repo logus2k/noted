@@ -1,0 +1,131 @@
+# Machine-readable scenarios for the `list_run_artifacts` tool test doc.
+
+doc_id: list_run_artifacts
+doc_type: tool
+
+# Scenarios covered: S1, S2, S3, S4, S5, S6 (6 of 8).
+# DEFERRED: S7 (run with deeply-nested artifacts), S8 (large artifact set).
+
+scenarios:
+  - scenario_id: S1
+    title: "Root listing"
+    tags: [read, mlflow, runs, artifacts]
+    setup:
+      project: noted-testing
+    user_request: "what's at the root of run ad190b73dd6147158fc27f1eda9f1637's artifacts?"
+    expected_tools_called:
+      - name: list_run_artifacts
+        exact_count: 1
+        args_match:
+          run_id: "ad190b73dd6147158fc27f1eda9f1637"
+    expected_tools_NOT_called:
+      - get_run_details
+    expected_answer_focus: |
+      - report top-level entries from the tool result
+      - mention which are dirs vs files
+
+  - scenario_id: S2
+    title: "Drill into model directory"
+    tags: [read, mlflow, runs, artifacts]
+    setup:
+      project: noted-testing
+    user_request: "what's inside the model/ directory of run ad190b73dd6147158fc27f1eda9f1637?"
+    expected_tools_called:
+      - name: list_run_artifacts
+        exact_count: 1
+        args_match:
+          run_id: "ad190b73dd6147158fc27f1eda9f1637"
+          path: "model"
+    expected_tools_NOT_called:
+      - get_run_details
+    expected_answer_focus: |
+      - list entries under model/ (MLmodel, conda.yaml, requirements.txt, python_model.pkl, etc.)
+      - do NOT call get_run_details unless metrics/params are needed
+
+  - scenario_id: S3
+    title: "Drill deeper (model/data)"
+    tags: [read, mlflow, runs, artifacts]
+    setup:
+      project: noted-testing
+    user_request: "show me model/data for run ad190b73dd6147158fc27f1eda9f1637"
+    expected_tools_called:
+      - name: list_run_artifacts
+        exact_count: 1
+        args_match:
+          run_id: "ad190b73dd6147158fc27f1eda9f1637"
+          path: "model/data"
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - report contents at model/data path
+      - if path doesn't exist, report tool error
+
+  - scenario_id: S4
+    title: "Wrong path"
+    tags: [read, mlflow, runs, artifacts, error]
+    setup:
+      project: noted-testing
+    user_request: "list run ad190b73dd6147158fc27f1eda9f1637's artifacts at imaginary/path"
+    expected_tools_called:
+      - name: list_run_artifacts
+        exact_count: 1
+        args_match:
+          run_id: "ad190b73dd6147158fc27f1eda9f1637"
+          path: "imaginary/path"
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - tool returns error or empty
+      - report; do not fabricate contents
+
+  - scenario_id: S5
+    title: "Multi-turn details then drill"
+    tags: [read, mlflow, runs, artifacts, workflow]
+    setup:
+      project: noted-testing
+    turns:
+      - user_request: "show me run ad190b73dd6147158fc27f1eda9f1637 details"
+        expected_tools_called:
+          - name: get_run_details
+            exact_count: 1
+        expected_tools_NOT_called:
+          - list_run_artifacts
+        expected_answer_focus: "report run details"
+      - user_request: "drill into model/"
+        expected_tools_called:
+          - name: list_run_artifacts
+            exact_count: 1
+            args_match:
+              run_id: "ad190b73dd6147158fc27f1eda9f1637"
+              path: "model"
+        expected_tools_NOT_called: []
+        expected_answer_focus: "list model/ contents; reuse run_id"
+
+  - scenario_id: S6
+    title: "Find specific file by name"
+    tags: [read, mlflow, runs, artifacts, search]
+    setup:
+      project: noted-testing
+    user_request: "does run ad190b73dd6147158fc27f1eda9f1637 have an MLmodel file?"
+    # Per the mlflow-artifacts skill, "what artifacts does run X have" -> use
+    # get_run_details (the classified summary lists MLmodel under the Logged
+    # Model section in one call). That's the canonical path the skill calls
+    # out as cheaper than chaining to list_run_artifacts.
+    #
+    # JUSTIFICATION (validated 2026-04-22): a strict-variant run requiring
+    # list_run_artifacts FAILED (Gemma follows the mlflow-artifacts skill
+    # and picks get_run_details). The scenario remains in the
+    # list_run_artifacts doc because S1-S5 exercise the tool directly for
+    # explicit artifact-tree queries; S6 tests that an "does run X have
+    # <file>?" existence question routes to the classified summary, not
+    # to a full directory listing. This is not a soft-cheat; it reflects
+    # the tool-choice rubric the skill actively teaches.
+    expected_tools_called:
+      - name: get_run_details
+        exact_count: 1
+        args_match:
+          run_id: "ad190b73dd6147158fc27f1eda9f1637"
+    expected_tools_NOT_called:
+      - register_model
+      - deploy_model
+    expected_answer_focus: |
+      - confirm presence of MLmodel based on the get_run_details tool output (it lists MLmodel under the Logged Model section)
+      - report grounded in the actual filenames returned (no fabricated names like model.pkl/model.pth)

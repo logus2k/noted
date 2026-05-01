@@ -1,0 +1,78 @@
+# Machine-readable scenarios for the `airflow-dag-overview` skill test doc.
+
+doc_id: airflow-dag-overview
+doc_type: skill
+
+# Scenarios covered: S1, S2, S3, S4, S5 (5 of 7).
+# DEFERRED: S6 (multi-DAG dependencies), S7 (DAG versioning).
+
+scenarios:
+  - scenario_id: S1
+    title: "What are Airflow DAGs here"
+    tags: [skill, airflow]
+    setup:
+      project: noted-testing
+    user_request: "what are Airflow DAGs used for in noted?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - scheduled / parameterized / repeatable pipelines (training, ingestion, drift checks)
+      - DAGs log to same MLflow experiments as Run Manager; shared lineage
+      - mention that noted's standard training DAG composes Hydra config
+
+  - scenario_id: S2
+    title: "Listing DAGs"
+    tags: [skill, airflow]
+    setup:
+      project: noted-testing
+    user_request: "show me the DAGs in this project"
+    expected_tools_called:
+      - name: list_dags
+        exact_count: 1
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - list DAGs
+      - mention active vs paused state
+
+  - scenario_id: S3
+    title: "DAG vs Run Manager"
+    tags: [skill, airflow, workflow]
+    setup:
+      project: noted-testing
+    user_request: "when do I use Airflow instead of the Run Manager?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - Run Manager = interactive, notebook-driven
+      - Airflow = automated / scheduled / parameter sweeps
+      - both log to the same experiment
+
+  - scenario_id: S4
+    title: "Typical DAG shape"
+    tags: [skill, airflow]
+    setup:
+      project: noted-testing
+    user_request: "what does a standard training DAG do?"
+    expected_tools_called: []
+    expected_tools_NOT_called: []
+    expected_answer_focus: |
+      - compose config -> ingest data -> preprocess -> train -> log hydra bundle -> promote (if better) -> drift check
+      - each task produces an MLflow artifact / tag
+
+  - scenario_id: S5
+    title: "DAG status quick check"
+    tags: [skill, airflow, status]
+    setup:
+      project: noted-testing
+    user_request: "is the training pipeline healthy?"
+    expected_tools_called:
+      - name: list_dags
+      - name: get_dag_status
+        exact_count: 1
+    expected_tools_NOT_called:
+      - get_experiment_runs
+    expected_answer_focus: |
+      - identify the project-local training DAG via list_dags
+      - call get_dag_status on that DAG
+      - report its current state (paused/active) and recent-run history
+      - if no runs yet, say so; if any failed, offer task_log drill
