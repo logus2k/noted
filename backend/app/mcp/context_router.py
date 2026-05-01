@@ -105,7 +105,18 @@ DOMAINS = {
 }
 
 # Always-included tools (cheap, universally useful)
-_ALWAYS_INCLUDE = {"get_file_contents", "get_notebook_cells", "scroll_to_cell"}
+# Retrieval tools (search_docs, graph_and_vector_search, research_topic,
+# query_knowledge_graph) are pinned here so the keyword classifier doesn't
+# strip them when the user asks an "ML/general" question that doesn't
+# happen to mention "knowledge graph" / "entity" / "relationship". Upstream
+# tool gating in routers/llm.py already drops the retrieval tool from
+# `_all_tools` when the user disables RAG, so this set only takes effect
+# when retrieval is genuinely available.
+_ALWAYS_INCLUDE = {
+    "get_file_contents", "get_notebook_cells", "scroll_to_cell",
+    "search_docs", "graph_and_vector_search",
+    "research_topic", "query_knowledge_graph",
+}
 
 # Pre-compile keyword patterns per domain
 _COMPILED_KEYWORDS: dict[str, list[re.Pattern]] = {}

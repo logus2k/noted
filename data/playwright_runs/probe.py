@@ -3,102 +3,82 @@ from playwright.sync_api import sync_playwright
 
 with sync_playwright() as pw:
     browser = pw.chromium.launch(args=['--no-sandbox'])
-    ctx = browser.new_context(viewport={'width': 1800, 'height': 1000})
-    page = ctx.new_page()
-    page.on('console', lambda m: print(f'[console.{m.type}] {m.text[:240]}', flush=True))
-    page.on('pageerror', lambda e: print(f'[pageerror] {e.message}', flush=True))
-    page.on('request', lambda r: print(f'[net REQ] {r.method} {r.url}', flush=True) if '/api/' in r.url else None)
-    page.on('response', lambda r: print(f'[net RESP {r.status}] {r.url}', flush=True) if '/api/llm/chat' in r.url else None)
-
-    t0 = time.time()
+    page = browser.new_context(viewport={'width': 1800, 'height': 1000}).new_page()
+    T0 = time.time()
     page.goto('http://noted:8123/', wait_until='domcontentloaded', timeout=30000)
-    print(f'domcontentloaded {(time.time()-t0)*1000:.0f}ms', flush=True)
-    page.wait_for_function("""() => document.querySelectorAll('.chat-message-assistant').length >= 1""", timeout=60000)
-    print(f'welcome rendered at {(time.time()-t0)*1000:.0f}ms', flush=True)
+    page.wait_for_function("""() => document.querySelectorAll('.chat-message-assistant').length >= 1 && (document.querySelectorAll('.chat-message-assistant')[0].textContent||'').length > 5""", timeout=60000)
+    page.wait_for_timeout(5000)
 
-    # Force the chat panel visible: click the assistant tab (just the label,
-    # not the close button), and force-show its element if needed.
+    # Click the Assistant tab to make the chat panel visible
     page.evaluate("""() => {
-        // Click the right-panel tab labeled 'Assistant' (excluding the close X)
         const tabs = document.querySelectorAll('.right-panel-tab');
         for (const t of tabs) {
-            const label = t.querySelector('span:not(.right-panel-tab-close)');
-            if (label && (label.textContent || '').includes('Assistant')) {
-                t.click();
-                break;
-            }
+            const lbl = t.querySelector('span:not(.right-panel-tab-close)');
+            if (lbl && /assistant/i.test(lbl.textContent || '')) { lbl.click(); break; }
         }
-        // Also force-display the chat-panel and the right-panel-content if hidden
-        const cp = document.querySelector('.chat-panel');
-        if (cp) cp.style.display = '';
-        const rpc = document.querySelector('.right-panel-content');
-        if (rpc) rpc.style.display = '';
-        const rp = document.querySelector('.right-panel');
-        if (rp) rp.style.display = '';
     }""")
-    page.wait_for_timeout(300)
-    visible = page.evaluate("""() => {
-        const ti = document.querySelector('.chat-input');
-        if (!ti) return {present: false};
+    page.wait_for_timeout(500)
+
+    # Diagnostic: enumerate checkbox-bearing labels anywhere in DOM
+    diag = page.evaluate("""() => {
+        const all = document.querySelectorAll('.chat-think-checkbox');
         return {
-            present: true,
-            display: getComputedStyle(ti).display,
-            offsetParent: !!ti.offsetParent,
-            rect: ti.getBoundingClientRect().toJSON(),
+            count: all.length,
+            items: Array.from(all).map(c => ({
+                label: (c.parentElement.textContent || '').trim(),
+                checked: c.checked,
+                visible: c.offsetParent !== null,
+            })),
         };
     }""")
-    print(f'chat input state: {visible}', flush=True)
+    print(f'checkboxes found: {diag["count"]}')
+    for it in diag['items']:
+        print(f'  {it}')
 
-    # If still not visible, use evaluate to programmatically dispatch the same
-    # send flow ChatPanel runs on Enter
-    if not visible.get('offsetParent'):
-        print('chat input still hidden — dispatching keydown on the textarea anyway', flush=True)
-        # Make sure RAG flags are on (they default to true per ChatPanel)
-        # Then set input value and dispatch Enter directly.
-        t_send = time.time()
-        page.evaluate("""(question) => {
-            const ti = document.querySelector('.chat-input');
-            ti.value = question;
-            // Dispatch the same keydown the ChatPanel listener handles
-            const ev = new KeyboardEvent('keydown', {key: 'Enter', shiftKey: false, bubbles: true, cancelable: true});
-            ti.dispatchEvent(ev);
-        }""", 'Explain me the difference between supervised and unsupervised learning')
-    else:
-        t_send = time.time()
-        page.fill('.chat-input', 'Explain me the difference between supervised and unsupervised learning')
-        page.press('.chat-input', 'Enter')
-    print(f'-- Enter dispatched at {(time.time()-t0)*1000:.0f}ms (t_send=0) --', flush=True)
+    # Toggle off Extended Thinking, Vector RAG, GraphRAG
+    after = page.evaluate("""() => {
+        const out = [];
+        document.querySelectorAll('.chat-think-checkbox').forEach(c => {
+            const lbl = (c.parentElement.textContent || '').trim();
+            const lo = lbl.toLowerCase();
+            const target = lo.includes('thinking') || lo === 'vector rag' || lo === 'graphrag';
+            if (target && c.checked) c.click();
+            out.push({label: lbl, checked: c.checked});
+        });
+        return out;
+    }""")
+    print(f'\nafter toggling:')
+    for x in after: print(f'  {x}')
 
-    # Watch for content + watch the loading indicator
-    first_think = None
-    first_answer = None
-    deadline = time.time() + 60
-    last_print = 0
+    # Send Hello and watch
+    print('\n--- sending "Hello" ---')
+    t0 = time.time()
+    page.evaluate("""() => {
+        const ti = document.querySelector('.chat-input');
+        ti.focus(); ti.value = 'Hello';
+        ti.dispatchEvent(new Event('input', {bubbles: true}));
+        ti.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', shiftKey: false, bubbles: true, cancelable: true}));
+    }""")
+    deadline = time.time() + 20
+    first = None; prev = 0; stable = None
     while time.time() < deadline:
+        elapsed = (time.time() - t0) * 1000
         st = page.evaluate("""() => {
-            const msgs = document.querySelectorAll('.chat-message-assistant');
-            const last = msgs[msgs.length - 1];
-            const indicator = document.querySelector('.chat-typing-indicator, .chat-loading, .typing-indicator, [class*="loading"], [class*="typing"]');
-            const indState = indicator ? {cls: indicator.className, vis: indicator.offsetParent !== null} : null;
-            if (!last) return {think:0, answer:0, msgs: msgs.length, ind: indState};
-            const tb = last.querySelector('.chat-thinking-body');
-            const thinkLen = (tb && tb.textContent.length) || 0;
-            const all = (last.textContent || '').length;
-            return {think: thinkLen, answer: Math.max(0, all - thinkLen - 30), msgs: msgs.length, ind: indState};
+            const m = document.querySelectorAll('.chat-message-assistant');
+            const last = m[m.length - 1];
+            return {n: m.length, c: last ? (last.textContent||'').length : 0};
         }""")
-        elapsed = (time.time() - t_send) * 1000
-        if first_think is None and st['think'] > 5:
-            first_think = elapsed
-            print(f'  >>> first thinking at {first_think:.0f}ms <<<', flush=True)
-        if first_answer is None and st['answer'] > 30:
-            first_answer = elapsed
-            print(f'  >>> first answer at {first_answer:.0f}ms <<<', flush=True)
-        now = time.time()
-        if now - last_print >= 2:
-            print(f'  t+{elapsed:.0f}ms  msgs={st["msgs"]}  think={st["think"]}  answer={st["answer"]}  ind={st["ind"]}', flush=True)
-            last_print = now
-        if st['answer'] > 400:
-            break
+        if first is None and st['c'] > 5: first = elapsed; print(f'  first content +{elapsed:.0f}ms')
+        if first:
+            if st['c'] != prev: prev = st['c']; stable = time.time()
+            elif stable and time.time() - stable >= 3:
+                print(f'  done +{elapsed:.0f}ms ({st["c"]} chars)')
+                break
         time.sleep(0.3)
-    print(f'\nfinal: first_think={first_think}ms  first_answer={first_answer}ms', flush=True)
+
+    msg = page.evaluate("""() => {
+        const m = document.querySelectorAll('.chat-message-assistant');
+        return m.length ? (m[m.length-1].textContent||'') : '';
+    }""")
+    print(f'\n--- last msg ({len(msg)} chars) ---\n{msg[:500]}')
     browser.close()
