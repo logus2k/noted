@@ -376,7 +376,7 @@ _READ_TOOLS: list[types.Tool] = [
                 "question": {"type": "string", "description": "Natural-language question. Phrase as a full sentence."},
                 "domain_id": {
                     "type": "string",
-                    "description": "Which Domain's knowledge to query. Pick from the active Domains shown in the workspace context (`Active knowledge domains`). Use the domain_id (machine slug like `sw_arch`, `eu_ai`, `noted`), NOT the human-readable name. Omit to use the first active Domain.",
+                    "description": "Which Domain's knowledge to query. Pick from the active Domains shown in the workspace context (`Active knowledge domains`). Use the domain_id (machine slug like `sw_arch`, `eu_ai`, `noted`), NOT the human-readable name. ONLY pass a Domain marked `[knowledge + skills/tools]` — Domains marked `[skills/tools only]` (such as `general`) have no documents and no knowledge graph, so scoping to them returns empty results. If no specific knowledge Domain matches the question topic, OMIT this parameter to fan out across ALL active knowledge Domains rather than picking a skills-only Domain.",
                 },
                 "top_k_chunks": {"type": "integer", "description": "Number of doc chunks to fetch from vector RAG. Defaults to 5.", "minimum": 1, "maximum": 10, "default": 5},
                 "source_paths": {
@@ -397,7 +397,7 @@ _READ_TOOLS: list[types.Tool] = [
                 "question": {"type": "string", "description": "Natural-language question. Phrase as a full sentence, not keywords."},
                 "domain_id": {
                     "type": "string",
-                    "description": "Which Domain's knowledge to query. Pick from the active Domains shown in the workspace context (`Active knowledge domains`). Use the domain_id (machine slug like `sw_arch`, `eu_ai`, `noted`), NOT the human-readable name. Omit to use the first active Domain.",
+                    "description": "Which Domain's knowledge to query. Pick from the active Domains shown in the workspace context (`Active knowledge domains`). Use the domain_id (machine slug like `sw_arch`, `eu_ai`, `noted`), NOT the human-readable name. ONLY pass a Domain marked `[knowledge + skills/tools]` — Domains marked `[skills/tools only]` (such as `general`) have no documents and no knowledge graph, so scoping to them returns empty results. If no specific knowledge Domain matches, OMIT this parameter to fan out.",
                 },
                 "mode": {
                     "type": "string",

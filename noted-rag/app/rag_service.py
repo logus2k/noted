@@ -520,14 +520,13 @@ class RagService:
         if not ranked or float(ranked[0][0]) < config.RERANK_MIN_SCORE:
             logger.info(
                 'SEARCH_MULTI_TIMING %s n_coll=%d total_ms=%.1f embed_ms=%.1f '
-                'chroma_ms=%.1f rerank_ms=%.1f rerank_gpu_ms=%.1f candidates=%d returned=0_below_threshold',
+                'chroma_ms=%.1f rerank_ms=%.1f candidates=%d returned=0_below_threshold',
                 _trace_tag(),
                 len(collections),
                 (_t_rerank - _t0) * 1000,
                 (_t_embed - _t0) * 1000,
                 (_t_chroma - _t_embed) * 1000,
                 (_t_rerank - _t_chroma) * 1000,
-                _gpu_kernel_ms,
                 len(candidates),
             )
             return []
@@ -547,14 +546,13 @@ class RagService:
             })
         logger.info(
             'SEARCH_MULTI_TIMING %s n_coll=%d total_ms=%.1f embed_ms=%.1f '
-            'chroma_ms=%.1f rerank_ms=%.1f rerank_gpu_ms=%.1f candidates=%d returned=%d',
+            'chroma_ms=%.1f rerank_ms=%.1f candidates=%d returned=%d',
             _trace_tag(),
             len(collections),
             (_t_rerank - _t0) * 1000,
             (_t_embed - _t0) * 1000,
             (_t_chroma - _t_embed) * 1000,
             (_t_rerank - _t_chroma) * 1000,
-            _gpu_kernel_ms,
             len(candidates),
             len(out),
         )

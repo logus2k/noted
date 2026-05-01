@@ -29,6 +29,7 @@ import json
 import logging
 import math
 import re
+import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from typing import Any
@@ -512,7 +513,10 @@ class Retriever:
         if not query_vector:
             raise ValueError('local_mode_retrieve_by_vector: query_vector is required')
 
+        _t0 = time.perf_counter()
+
         hits = self._rag.cache_search_by_vector(self.entity_cache_collection, query_vector, top_k=7)
+        _t_entry = time.perf_counter()
         if not hits:
             return {
                 'mode': 'local',
@@ -530,20 +534,31 @@ class Retriever:
         reached_ids: set[str] = set(entry_ids)
         frontier: list[str] = list(entry_ids)
         hops = max(1, min(LOCAL_TRAVERSAL_HOPS, 2))
+        # Stage A — BFS hops. Query rewritten 2026-05-01 per external review:
+        #   - Anchor `a` first via separate MATCH (forces planner to use the
+        #     Entity.id index for the start vertex).
+        #   - Drop DISTINCT; aggregate with max(b.rank) instead. Same
+        #     dedup semantics, planner-friendlier, no extra sort/hash pass.
+        # Pattern stays undirected: `sameAs` and `similar_to` are
+        # semantically symmetric so we cannot safely change to `->` without
+        # adding a UNION reverse branch. `member_of` is directional but
+        # only ~5-10% of edges in our graphs.
+        _t_bfs_start = time.perf_counter()
+        n_hop_rows = 0
         for _hop in range(hops):
             if not frontier:
                 break
             hop_rows = self._db.query(
-                '''MATCH (a:Entity)-[r:RELATES]-(b:Entity)
-                   WHERE a.id IN $front
-                     AND r.type IN $rtypes
-                     AND NOT b.id IN $seen
-                   RETURN DISTINCT b.id AS id, b.rank AS rank
-                   ORDER BY b.rank DESC
+                '''MATCH (a:Entity) WHERE a.id IN $front
+                   MATCH (a)-[r:RELATES]-(b:Entity)
+                   WHERE r.type IN $rtypes AND NOT b.id IN $seen
+                   RETURN b.id AS id, max(b.rank) AS rank
+                   ORDER BY rank DESC
                    LIMIT $cap''',
                 {'front': frontier, 'rtypes': TRAVERSAL_EDGE_TYPES,
                  'seen': list(reached_ids), 'cap': HOP_FRONTIER_CAP},
             )
+            n_hop_rows += len(hop_rows)
             new_ids = [row['id'] for row in hop_rows if row.get('id')]
             if not new_ids:
                 break
@@ -551,6 +566,7 @@ class Retriever:
             frontier = new_ids
             if len(reached_ids) >= SUBGRAPH_CAP:
                 break
+        _t_bfs_end = time.perf_counter()
 
         if reached_ids:
             ids_list = list(reached_ids)
@@ -582,11 +598,13 @@ class Retriever:
 
             # Independent reads against the same reached_ids set; ArcadeDB
             # client is HTTP-per-call, so two concurrent posts are safe.
+            _t_fetch_start = time.perf_counter()
             with ThreadPoolExecutor(max_workers=2) as ex:
                 f_nodes = ex.submit(_fetch_nodes)
                 f_edges = ex.submit(_fetch_edges)
                 nodes_rows = f_nodes.result()
                 edges_rows = f_edges.result()
+            _t_fetch_end = time.perf_counter()
 
             entities_payload = _decode_entity_rows(nodes_rows)
             edges_payload = [
@@ -596,6 +614,7 @@ class Retriever:
             ]
         else:
             entities_payload, edges_payload = [], []
+            _t_fetch_start = _t_fetch_end = time.perf_counter()
 
         # ── Per-entity AND per-relationship chunk grounding (denormalized).
         # Entity records carry `mentioned_in_chunks` (populated at ingestion
@@ -643,6 +662,7 @@ class Retriever:
         # filter (cheap belt-and-suspenders on top of ingestion-side
         # strength sort). One DB query, reused for both filtering and
         # final excerpts.
+        _t_chunks_start = time.perf_counter()
         if candidate_chunk_ids:
             loaded_excerpts = self._chunk_excerpts(list(candidate_chunk_ids))
             text_by_id = {c['id']: (c.get('text') or '') for c in loaded_excerpts}
@@ -672,6 +692,7 @@ class Retriever:
                     break
             if fallback_ids:
                 chunk_excerpts = self._chunk_excerpts(fallback_ids)
+        _t_chunks_end = time.perf_counter()
 
         entity_by_id = {e['id']: e for e in entities_payload}
         entry_payload = [
@@ -683,6 +704,23 @@ class Retriever:
             }
             for h in hits
         ]
+
+        # Per-stage timing summary. Use this to drive optimization decisions:
+        # the BFS Cypher ran with the rewritten anchor-first + max(rank)
+        # form (2026-05-01) — compare bfs_ms vs the prior baseline.
+        logger.info(
+            'RETRIEVE_BY_VECTOR_TIMING entry_n=%d reached_n=%d nodes_n=%d edges_n=%d '
+            'chunks_n=%d total_ms=%.1f entry_lookup_ms=%.1f bfs_ms=%.1f '
+            'fetch_nodes_edges_ms=%.1f chunks_ms=%.1f hops_returned=%d',
+            len(hits), len(reached_ids), len(entities_payload), len(edges_payload),
+            len(chunk_excerpts),
+            (_t_chunks_end - _t0) * 1000,
+            (_t_entry - _t0) * 1000,
+            (_t_bfs_end - _t_bfs_start) * 1000,
+            (_t_fetch_end - _t_fetch_start) * 1000,
+            (_t_chunks_end - _t_chunks_start) * 1000,
+            n_hop_rows,
+        )
 
         return {
             'mode': 'local',
@@ -788,11 +826,13 @@ class Retriever:
 
             # Independent reads against the same reached_ids set; ArcadeDB
             # client is HTTP-per-call, so two concurrent posts are safe.
+            _t_fetch_start = time.perf_counter()
             with ThreadPoolExecutor(max_workers=2) as ex:
                 f_nodes = ex.submit(_fetch_nodes)
                 f_edges = ex.submit(_fetch_edges)
                 nodes_rows = f_nodes.result()
                 edges_rows = f_edges.result()
+            _t_fetch_end = time.perf_counter()
 
             entities_payload = _decode_entity_rows(nodes_rows)
             edges_payload = [
@@ -802,6 +842,7 @@ class Retriever:
             ]
         else:
             entities_payload, edges_payload = [], []
+            _t_fetch_start = _t_fetch_end = time.perf_counter()
 
         # ── Per-entity AND per-relationship chunk grounding (denormalized).
         # Entity records carry `mentioned_in_chunks` (populated at ingestion
@@ -983,11 +1024,13 @@ class Retriever:
 
             # Independent reads against the same reached_ids set; ArcadeDB
             # client is HTTP-per-call, so two concurrent posts are safe.
+            _t_fetch_start = time.perf_counter()
             with ThreadPoolExecutor(max_workers=2) as ex:
                 f_nodes = ex.submit(_fetch_nodes)
                 f_edges = ex.submit(_fetch_edges)
                 nodes_rows = f_nodes.result()
                 edges_rows = f_edges.result()
+            _t_fetch_end = time.perf_counter()
 
             entities_payload = _decode_entity_rows(nodes_rows)
             edges_payload = [
@@ -997,6 +1040,7 @@ class Retriever:
             ]
         else:
             entities_payload, edges_payload = [], []
+            _t_fetch_start = _t_fetch_end = time.perf_counter()
 
         chunks_rows = self._db.query(
             '''MATCH (c:Entity)-[:RELATES {type: "mentions"}]->(e:Entity)

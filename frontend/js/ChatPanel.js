@@ -542,6 +542,15 @@ export class ChatPanel {
         if (thinkingDetails && !thinkingDetails.parentNode) {
             this._streamingMsg.insertBefore(thinkingDetails, this._streamingContent);
         }
+        // Defense-in-depth: re-run citation transform on the (possibly
+        // streamed) thinking body. setLiveThinkingContent calls this at
+        // thinking_end, but if the thinking_end signal was missed or
+        // short-circuited, the live body would still hold raw `[tag]`
+        // text. _renderCitations only mutates matching text nodes, so
+        // a second pass over already-badged content is a no-op.
+        if (thinkingDetails && this._liveThinkingBody) {
+            this._renderCitations(this._liveThinkingBody);
+        }
 
         // Trace button: normally attached early via setPendingGraphTrace
         // when the graph_provenance SSE event arrives (before answer

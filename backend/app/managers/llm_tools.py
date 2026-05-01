@@ -3138,11 +3138,17 @@ async def _tool_graph_and_vector_search(args: dict, managers: dict) -> str:
         if ents_sorted:
             out_parts.append("### Top entities with their supporting chunks")
             for e in ents_sorted:
-                lbl = e.get("label") or e.get("id", "")
+                eid = e.get("id", "") or ""
+                lbl = e.get("label") or eid
                 typ = e.get("type", "")
                 desc = (e.get("properties") or {}).get("description", "")
-                out_parts.append(f"- **{lbl}** ({typ}): {desc[:200]}")
-                grounding = per_entity_chunks.get(e.get("id")) or []
+                # Embed the canonical citation tag inline so the model copies
+                # it verbatim. Citing by label produced 404s because the
+                # /api/citations/E:<id> resolver expects the entity_id, not
+                # the human-readable label.
+                e_tag = f"[E:{eid}] " if eid else ""
+                out_parts.append(f"- {e_tag}**{lbl}** ({typ}): {desc[:200]}")
+                grounding = per_entity_chunks.get(eid) or []
                 for cid in grounding:
                     out_parts.append(_render_chunk_brief(cid))
             out_parts.append("")
@@ -3150,8 +3156,14 @@ async def _tool_graph_and_vector_search(args: dict, managers: dict) -> str:
         if per_edge_chunks:
             out_parts.append("### Relationships with their supporting chunks (chunks that mention BOTH endpoints)")
             for ec in per_edge_chunks[:30]:
-                out_parts.append(
-                    f"- **{ec.get('source','')}** —[{ec.get('type','')}]→ **{ec.get('target','')}**")
+                src = ec.get('source','')
+                tgt = ec.get('target','')
+                etype = ec.get('type','')
+                # R: tag form is `R:src>type>tgt` (parsed by the citation
+                # resolver via str.split('>')). Inject inline to match the
+                # entity-tag pattern.
+                r_tag = f"[R:{src}>{etype}>{tgt}] " if src and tgt else ""
+                out_parts.append(f"- {r_tag}**{src}** —[{etype}]→ **{tgt}**")
                 for cid in ec.get("chunk_ids") or []:
                     out_parts.append(_render_chunk_brief(cid))
             out_parts.append("")
@@ -3159,8 +3171,11 @@ async def _tool_graph_and_vector_search(args: dict, managers: dict) -> str:
             # Fallback: no co-mention chunks found, list relationships unsupported
             out_parts.append("### Relationships (top 30, no co-mention chunks found)")
             for r in edges[:30]:
-                out_parts.append(
-                    f"- `{r.get('source','')}` —[{r.get('type','')}]→ `{r.get('target','')}`")
+                src = r.get('source','')
+                tgt = r.get('target','')
+                etype = r.get('type','')
+                r_tag = f"[R:{src}>{etype}>{tgt}] " if src and tgt else ""
+                out_parts.append(f"- {r_tag}`{src}` —[{etype}]→ `{tgt}`")
             out_parts.append("")
 
     # Side-channel: stash the structured graph payload so the chat router
