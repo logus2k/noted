@@ -292,6 +292,12 @@ services:
     networks:
       - noted-network
     environment:
+      # The image's bin/server.sh enables a remote JMX agent by default
+      # (ports 9998/9999) which can't construct a JMXServiceURL when
+      # InetAddress.getLocalHost() resolution flakes, aborting the JVM.
+      # We don't use JMX, so set the var to a no-op -D so the script's
+      # `if [ -z "$ARCADEDB_JMX" ]` skips the default block.
+      ARCADEDB_JMX: "-Dnoted.jmx.disabled=true"
       # Preserve the image's ZGC GC flags while adding the root password
       # and default database bootstrap. Overwriting JAVA_OPTS without the
       # GC flags is a performance regression.
