@@ -8,6 +8,34 @@ const TTS_URL = 'https://logus2k.com/tts';
 const TTS_PATH = '/tts/socket.io';
 const AGENT_NAME = 'noted';
 
+// Random welcome messages shown when chat opens with no prior history.
+// Static (no LLM call) to avoid a race with the user's first message:
+// a dynamic welcome streams tokens into ChatPanel's single _streamingMsg
+// slot, and a fast user-send before that stream completes makes turn-2
+// tokens append to the welcome bubble.
+const WELCOME_MESSAGES = [
+    "Hi, what can I help you with?",
+    "Hi, what are we working on today?",
+    "Hey, what can I do for you?",
+    "Hi, I'm here to help. What do you need?",
+    "Hi there, what's on your plate?",
+    "Hello, where would you like to start?",
+    "Hi, ask me anything.",
+    "Hey, ready when you are.",
+    "Hi, what's on your mind?",
+    "Hello, how can I help?",
+    "Hi, what would you like to do?",
+    "Ready when you are. What's first?",
+    "Hi, what's the question?",
+    "Hi, let me know what you need.",
+    "Hey, what can I look into for you?",
+    "Hi, where shall we start?",
+    "Hi, fire away.",
+    "Hello, I'm listening.",
+    "Hi, what can I look up or help with?",
+    "Hey, what's the task?",
+];
+
 // Write tools whose `tool_badge` SSE event should NOT render a chip in the
 // chat. The `pending_action(s)` event that follows renders a better-labeled
 // chip ("3 cell changes" vs. raw "batch_update_cells"), and the tool_badge
@@ -74,6 +102,10 @@ export class ChatService {
         this._ttsAudioContext = null;
         this._ttsPlayQueue = Promise.resolve();
         this.ttsEnabled = false;
+
+        // The static greeting shown at chat-open (when there's no prior
+        // history). Stashed so a late TTS-enable can replay it as voice.
+        this._welcomeText = '';
 
         this._userMessagesSent = 0;
 
@@ -496,29 +528,17 @@ export class ChatService {
         // Check LLM health via HTTP (primary indicator)
         await this._checkHealth();
 
-        // Restore previous chat history, or generate a dynamic welcome.
-        // Dynamic welcome flow:
-        //   - send "Hello!" as a hidden user turn (showUserMessage: false)
-        //   - force think_enabled=false (no visible reasoning section)
-        //   - force tools=off (the greeting shouldn't trigger retrieval)
-        //   - the assistant's streamed response renders as the visible
-        //     greeting; both turns persist to memory like any other turn,
-        //     warming up the model's KV cache for the user's first real
-        //     question as a side effect.
-        // On failure (LLM unreachable etc.) fall back to a static random
-        // greeting so the user never stares at an empty chat.
+        // Restore previous chat history, or render a static random welcome.
+        // Static (not dynamic) because a dynamic welcome streams tokens into
+        // ChatPanel's single _streamingMsg slot — a fast user-send before
+        // that stream completes makes turn-2 tokens append to the welcome
+        // bubble (no second assistant message in DOM, GPU pinned, "no
+        // response" perception). See project_static_welcome_fix.md.
         const hasHistory = await this.loadHistory();
         if (!hasHistory) {
-            this.sendMessage('Hello!', {
-                showUserMessage: false,
-                overrides: {
-                    thinkEnabled: false,
-                    vectorRagEnabled: false,
-                    graphRagEnabled: false,
-                },
-            }).catch((err) => {
-                console.warn('[ChatService] Dynamic welcome failed:', err);
-            });
+            this._welcomeText = WELCOME_MESSAGES[Math.floor(Math.random() * WELCOME_MESSAGES.length)];
+            this.chatPanel.addMessage('assistant', this._welcomeText);
+            if (this.ttsEnabled) this._sendVoiceToTTS(this._welcomeText);
         }
     }
 
