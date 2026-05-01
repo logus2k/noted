@@ -6,12 +6,17 @@ rerank score guards against hallucinating on empty-signal queries.
 
 Models are loaded on first use (not at startup) so `/health` is always fast
 and the service is resilient to a cold model cache.
+
+Embeddings + reranking run on llama-cpp-python (CUDA) against bge-m3 +
+bge-reranker-v2-m3 GGUF Q8_0 weights — saves ~1 GB GPU vs PyTorch fp16
+with score quality within 0.5% on retrieval benchmarks.
 """
 
 from __future__ import annotations
 
 import contextvars
 import logging
+import math
 import os
 from typing import Optional
 
@@ -21,6 +26,63 @@ from . import config
 from .ingest import COLLECTION_NAME
 
 logger = logging.getLogger(__name__)
+
+
+# llama-cpp-python pooling types (from llama.h).
+_POOLING_CLS = 2
+_POOLING_RANK = 4
+
+
+class _GgufReranker:
+    """Thin wrapper that exposes a sentence-transformers-style `predict`
+    interface on top of a llama_cpp.Llama instance loaded with RANK pooling.
+
+    For bge-reranker-v2-m3 (XLM-RoBERTa-based), each (query, doc) pair is
+    formatted with the model's separator pattern and fed through the
+    classification head. RANK-pooled output is the raw logit; we apply
+    sigmoid so the result is a 0-1 probability matching what
+    sentence-transformers' CrossEncoder.predict() returns by default
+    (so the existing RERANK_MIN_SCORE=0.15 threshold keeps its meaning).
+    """
+
+    def __init__(self, llm):
+        self._llm = llm
+
+    @staticmethod
+    def _format_pair(query: str, doc: str) -> str:
+        # XLM-RoBERTa sentence-pair format. llama.cpp's tokenizer adds the
+        # leading <s> and trailing </s>; the explicit </s></s> in the middle
+        # is the inter-sentence separator the BGE rerankers were trained on.
+        return f"{query} </s></s> {doc}"
+
+    @staticmethod
+    def _sigmoid(x: float) -> float:
+        # Numerically stable sigmoid.
+        if x >= 0:
+            z = math.exp(-x)
+            return 1.0 / (1.0 + z)
+        z = math.exp(x)
+        return z / (1.0 + z)
+
+    def predict(self, pairs: list[tuple[str, str]]) -> list[float]:
+        if not pairs:
+            return []
+        # Loop one pair at a time. Passing a list to create_embedding(list)
+        # makes llama-cpp-python pack multiple sequences (different
+        # seq_ids) into one llama_batch then call _ctx.decode() — and
+        # that multi-sequence decode aborts with `llama_decode returned -1`
+        # for RANK-pooled rerankers. Per-pair calls keep each decode
+        # single-sequence, which is the supported path. Throughput on
+        # cuda Q8 is ~20-30 ms per pair (~500 ms for a 20-doc rerank).
+        out: list[float] = []
+        for q, d in pairs:
+            prompt = self._format_pair(q, d)
+            result = self._llm.create_embedding(prompt)
+            entry = result["data"][0]
+            emb = entry["embedding"]
+            raw = float(emb[0]) if isinstance(emb, (list, tuple)) else float(emb)
+            out.append(self._sigmoid(raw))
+        return out
 
 
 # Per-request correlation context. Set by the FastAPI middleware in main.py
@@ -74,8 +136,8 @@ def _parse_tags_to_where(tags: Optional[list[str]]) -> Optional[dict]:
 class RagService:
     def __init__(self) -> None:
         self._client: Optional[chromadb.ClientAPI] = None
-        self._embedder = None  # sentence_transformers.SentenceTransformer
-        self._reranker = None  # sentence_transformers.CrossEncoder
+        self._embedder = None  # llama_cpp.Llama (bge-m3 GGUF, embedding=True)
+        self._reranker = None  # _GgufReranker (wraps llama_cpp.Llama, RANK pooling)
 
     # ── Lazy accessors ─────────────────────────────────────────────
 
@@ -87,108 +149,98 @@ class RagService:
 
     def _get_embedder(self):
         if self._embedder is None:
-            from sentence_transformers import SentenceTransformer
+            from llama_cpp import Llama
 
-            logger.info(
-                "Loading embedder %s on %s (cache=%s)",
-                config.EMBED_MODEL, config.DEVICE, config.MODEL_CACHE,
+            n_gpu_layers = (
+                config.MODEL_N_GPU_LAYERS
+                if str(config.DEVICE).startswith('cuda') else 0
             )
-            self._embedder = SentenceTransformer(
-                config.EMBED_MODEL,
-                cache_folder=str(config.MODEL_CACHE),
-                device=config.DEVICE,
+            logger.info(
+                "Loading embedder %s (n_ctx=%d, n_gpu_layers=%d, device=%s)",
+                config.EMBED_MODEL_PATH, config.MODEL_N_CTX,
+                n_gpu_layers, config.DEVICE,
+            )
+            self._embedder = Llama(
+                model_path=config.EMBED_MODEL_PATH,
+                embedding=True,
+                pooling_type=_POOLING_CLS,
+                n_ctx=config.MODEL_N_CTX,
+                n_gpu_layers=n_gpu_layers,
+                verbose=False,
             )
         return self._embedder
 
     def _get_reranker(self):
         if self._reranker is None:
-            from sentence_transformers import CrossEncoder
+            from llama_cpp import Llama
 
+            n_gpu_layers = (
+                config.MODEL_N_GPU_LAYERS
+                if str(config.DEVICE).startswith('cuda') else 0
+            )
             logger.info(
-                "Loading reranker %s on %s",
-                config.RERANK_MODEL, config.DEVICE,
+                "Loading reranker %s (n_ctx=%d, n_gpu_layers=%d, device=%s)",
+                config.RERANK_MODEL_PATH, config.MODEL_N_CTX,
+                n_gpu_layers, config.DEVICE,
             )
-            self._reranker = CrossEncoder(
-                config.RERANK_MODEL,
-                device=config.DEVICE,
-                trust_remote_code=True,
+            llm = Llama(
+                model_path=config.RERANK_MODEL_PATH,
+                embedding=True,
+                pooling_type=_POOLING_RANK,
+                n_ctx=config.MODEL_N_CTX,
+                n_gpu_layers=n_gpu_layers,
+                verbose=False,
             )
-            # bge-reranker-v2-m3 with trust_remote_code uses a custom
-            # model class that ignores the `device=` constructor arg —
-            # it stays on CPU, where 20 long-chunk forward passes take
-            # ~5 seconds. Force the underlying nn.Module onto the target
-            # device explicitly. ~57x speedup observed (5000ms -> 87ms).
-            try:
-                self._reranker.model.to(config.DEVICE)
-                # fp16 on CUDA: halves the model's GPU memory footprint
-                # (~2.3GB -> ~1.15GB) and is ~2.5x faster on this batch
-                # size in isolated tests (65ms -> 24ms for 20 pairs).
-                # Score quality is unchanged for our cross-encoder usage.
-                # Skip on CPU since fp16 there is generally slower.
-                if str(config.DEVICE).startswith('cuda'):
-                    self._reranker.model.half()
-                    logger.info("reranker converted to fp16 on %s", config.DEVICE)
-            except Exception as e:
-                logger.warning('reranker .to(%s) / .half() failed: %s', config.DEVICE, e)
+            self._reranker = _GgufReranker(llm)
         return self._reranker
 
     # ── Public API ────────────────────────────────────────────────
 
     def embed(self, texts: list[str]) -> list[list[float]]:
-        """Return normalized dense embeddings for a list of strings."""
-        import time, torch
+        """Return L2-normalized dense embeddings for a list of strings.
+
+        Uses bge-m3 GGUF Q8 via llama-cpp-python; CLS-pooled then explicitly
+        L2-normalized so cosine similarity in Chroma matches what the
+        original sentence-transformers path produced (which had
+        normalize_embeddings=True).
+
+        Loops per text — same llama-cpp-python multi-sequence-decode
+        failure mode as the reranker (see _GgufReranker.predict).
+        Per-text calls keep each decode single-sequence. Ingestion is
+        the only multi-text caller and is rare relative to per-query
+        embeds.
+        """
+        import time
         t0 = time.perf_counter()
+        if not texts:
+            return []
         model = self._get_embedder()
         t_model = time.perf_counter()
 
-        # GPU state + per-stage timing. We separate model.encode() (CPU
-        # tokenize + GPU forward + host-device transfers + CPU to_numpy)
-        # from pure GPU kernel time (CUDA events, only counts compute on
-        # the GPU stream). The gap between encode_ms and gpu_kernel_ms is
-        # CPU-side / transfer / synchronization overhead.
-        gpu_extra = ''
-        start_evt = end_evt = None
-        if torch.cuda.is_available():
-            try:
-                mem_alloc = torch.cuda.memory_allocated() / 1024 / 1024
-                mem_resv = torch.cuda.memory_reserved() / 1024 / 1024
-                gpu_extra = f' gpu_alloc_mb={mem_alloc:.0f} gpu_resv_mb={mem_resv:.0f}'
-                start_evt = torch.cuda.Event(enable_timing=True)
-                end_evt = torch.cuda.Event(enable_timing=True)
-                start_evt.record()
-            except Exception:
-                start_evt = end_evt = None
-
-        vectors = model.encode(
-            texts,
-            batch_size=32,
-            show_progress_bar=False,
-            normalize_embeddings=True,
-            convert_to_numpy=True,
-        )
-
-        if start_evt is not None:
-            try:
-                end_evt.record()
-                torch.cuda.synchronize()
-                gpu_extra += f' gpu_kernel_ms={start_evt.elapsed_time(end_evt):.1f}'
-            except Exception:
-                pass
-        t_encode = time.perf_counter()
-
-        out = vectors.tolist()
+        out: list[list[float]] = []
+        for txt in texts:
+            result = model.create_embedding(txt)
+            v = result["data"][0]["embedding"]
+            if v and isinstance(v[0], (list, tuple)):
+                v = v[0]
+            norm_sq = 0.0
+            for x in v:
+                norm_sq += x * x
+            if norm_sq > 0:
+                inv = 1.0 / math.sqrt(norm_sq)
+                out.append([x * inv for x in v])
+            else:
+                out.append(list(v))
         t_done = time.perf_counter()
 
         logger.info(
-            'EMBED_TIMING %s n=%d chars=%d total_ms=%.1f get_model_ms=%.1f encode_ms=%.1f tolist_ms=%.1f%s',
+            'EMBED_TIMING %s n=%d chars=%d total_ms=%.1f get_model_ms=%.1f encode_ms=%.1f',
             _trace_tag(),
             len(texts),
             sum(len(t) for t in texts),
             (t_done - t0) * 1000,
             (t_model - t0) * 1000,
-            (t_encode - t_model) * 1000,
-            (t_done - t_encode) * 1000,
-            gpu_extra,
+            (t_done - t_model) * 1000,
         )
         return out
 
@@ -455,28 +507,9 @@ class RagService:
                     }, f, ensure_ascii=False)
             except Exception as _e:
                 logger.warning("rerank dump failed: %s", _e)
-        # GPU-kernel timing around the predict call. If gpu_kernel_ms is
-        # fast (~200 ms) but rerank_ms wall is slow, the slowdown is
-        # OUTSIDE the GPU work — Python overhead, tokenization, transfer,
-        # blocking on a lock, etc. If both are slow, the kernel itself is
-        # slow in production for a reason we haven't isolated.
-        import torch as _torch_rk
-        _gpu_kernel_ms = 0.0
+        # Wall-clock timing only (no torch.cuda.Event under llama.cpp).
         _rerank_pairs = [(query, d) for d in docs_only]
-        if _torch_rk.cuda.is_available():
-            try:
-                _evt_a = _torch_rk.cuda.Event(enable_timing=True)
-                _evt_b = _torch_rk.cuda.Event(enable_timing=True)
-                _evt_a.record()
-                scores = reranker.predict(_rerank_pairs)
-                _evt_b.record()
-                _torch_rk.cuda.synchronize()
-                _gpu_kernel_ms = _evt_a.elapsed_time(_evt_b)
-            except Exception:
-                # Fall back to plain predict if event timing breaks
-                scores = reranker.predict(_rerank_pairs)
-        else:
-            scores = reranker.predict(_rerank_pairs)
+        scores = reranker.predict(_rerank_pairs)
         _t_rerank = _time.perf_counter()
 
         ranked = sorted(

@@ -400,8 +400,10 @@ services:
     environment:
       - CHROMA_DIR=/data/vectordb
       - MODEL_CACHE=/data/models
-      - EMBED_MODEL=/data/models/bge-m3
-      - RERANK_MODEL=/data/models/bge-reranker-v2-m3
+      - EMBED_MODEL_PATH=/data/models/bge-m3-q8/bge-m3-Q8_0.gguf
+      - RERANK_MODEL_PATH=/data/models/bge-reranker-v2-m3-q8/bge-reranker-v2-m3-Q8_0.gguf
+      - MODEL_N_CTX=8192
+      - MODEL_N_GPU_LAYERS=-1
       - DOC_ROOT=/docs
       - DEVICE=cpu
     volumes:
