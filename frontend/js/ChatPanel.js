@@ -437,6 +437,13 @@ export class ChatPanel {
                 // appear as raw text on page reload.
                 this._renderCitations(answerDiv);
                 msg.appendChild(answerDiv);
+                // Stash raw text so the top-right action bar's Copy and
+                // Copy-All buttons can copy the original tagged text rather
+                // than the rendered DOM (rendered badges have textContent
+                // = ordinal "1", "2", etc., which is useless when copied).
+                msg._answerRaw = text || '';
+                msg._thinkingRaw = (thinkingContent || '').trim();
+                this._createMessageActions(msg);
             }
         } else {
             // Action badge for assistant menu actions
@@ -473,6 +480,12 @@ export class ChatPanel {
         this._streamingMsg.appendChild(this._streamingContent);
         this._streamingRaw = '';
         this._messagesArea.insertBefore(this._streamingMsg, this._typingIndicator);
+        // Top-right action bar (Copy All / Copy answer) — created immediately
+        // so a Show graph icon can be lazily attached when graph_provenance
+        // arrives. Raw text is empty until finalizeStreamingMessage stashes it.
+        this._streamingMsg._answerRaw = '';
+        this._streamingMsg._thinkingRaw = '';
+        this._createMessageActions(this._streamingMsg);
     }
 
     /** Show skill badges for statically injected skills. */
@@ -585,6 +598,12 @@ export class ChatPanel {
         this._addCopyButtons(this._streamingContent);
         this._renderCitations(this._streamingContent);
         this._streamingContent.classList.remove('chat-streaming-content');
+
+        // Stash the raw text on the message element so the action bar's
+        // Copy and Copy-All buttons read original tagged text rather than
+        // the rendered DOM (which has badge ordinals, not chunk ids).
+        this._streamingMsg._answerRaw = this._streamingRaw || '';
+        this._streamingMsg._thinkingRaw = (thinkingContent || '').trim();
 
         this._streamingMsg = null;
         this._streamingContent = null;
@@ -760,35 +779,32 @@ export class ChatPanel {
      * callback with the payload so the app can open the GraphPanel in
      * trace mode. */
     _attachTraceButton(thinkingDetails, payload) {
-        const span = document.createElement('span');
-        span.className = 'chat-trace-btn';
-        span.setAttribute('role', 'button');
-        span.setAttribute('tabindex', '0');
-        span.innerHTML = '<i class="fa-solid fa-share-nodes"></i>Show graph';
-        span.title = 'Open the entities and relationships used to ground this answer';
-        const fire = (e) => {
-            // Stop propagation so the click doesn't ALSO toggle the
-            // <details> when the button lives inside <summary>.
-            if (e) { e.preventDefault(); e.stopPropagation(); }
-            if (this._onShowGraphTrace) this._onShowGraphTrace(payload);
-        };
-        span.addEventListener('click', fire);
-        span.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-                fire(e);
-            }
+        const btn = document.createElement('button');
+        btn.className = 'chat-msg-action-btn chat-trace-btn-icon';
+        btn.type = 'button';
+        btn.title = 'Show Graph';
+        btn.innerHTML = '<i class="fa-solid fa-share-nodes"></i>';
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            // Pass the button as second arg so the handler can track a
+            // per-button GraphPanel ref and reuse it instead of opening a
+            // duplicate panel on every click of the same icon.
+            if (this._onShowGraphTrace) this._onShowGraphTrace(payload, btn);
         });
-        // Place the button INSIDE the summary so it sits beside
-        // "Show thinking" on the same line. With the previous
-        // sibling-after-details placement, expanding the section
-        // pushed the body in between, dropping the button below.
-        const summary = thinkingDetails && thinkingDetails.querySelector('summary');
-        if (summary) {
-            summary.appendChild(span);
+        // Insert at the START of the message-level action bar (top-right).
+        // Falls back to placing next to the streaming content if the bar
+        // isn't there yet (defensive — startStreamingMessage normally
+        // creates it before this method ever runs).
+        const msg = this._streamingMsg
+            || (thinkingDetails && thinkingDetails.closest('.chat-message-assistant'));
+        const bar = msg && msg._actionsBar;
+        if (bar) {
+            bar.insertBefore(btn, bar.firstChild);
         } else if (this._streamingMsg && this._streamingContent) {
-            this._streamingMsg.insertBefore(span, this._streamingContent);
+            this._streamingMsg.insertBefore(btn, this._streamingContent);
         }
-        return span;
+        return btn;
     }
 
     /** Called by ChatService as soon as the `graph_provenance` SSE event
@@ -992,6 +1008,47 @@ export class ChatPanel {
                 throwOnError: false,
             });
         }
+    }
+
+    /** Create the top-right action bar for an assistant message bubble.
+     * Holds (left → right): Show graph icon (lazy-attached when
+     * graph_provenance arrives), Copy All (thinking + answer). The Copy
+     * button reads the raw text stashed on the message element by
+     * addMessage / finalizeStreamingMessage — copying from the rendered
+     * DOM would lose the citation tags (badges have textContent = ordinal
+     * number) so the stashed raw is the source of truth. */
+    _createMessageActions(messageEl) {
+        const bar = document.createElement('div');
+        bar.className = 'chat-msg-actions';
+
+        // Two-square icon (a back document + a front document) for "Copy All"
+        // — the classic "copy multiple" affordance.
+        const copyAllIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+        const checkIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22863a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+
+        const copyAll = document.createElement('button');
+        copyAll.className = 'chat-msg-action-btn';
+        copyAll.type = 'button';
+        copyAll.title = 'Copy Answer';
+        copyAll.innerHTML = copyAllIcon;
+        copyAll.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const t = messageEl._thinkingRaw || '';
+            const a = messageEl._answerRaw || '';
+            const text = t ? (t.trim() + '\n\n---\n\n' + a.trim()) : a.trim();
+            if (!text) return;
+            navigator.clipboard.writeText(text).then(() => {
+                copyAll.innerHTML = checkIcon;
+                setTimeout(() => { copyAll.innerHTML = copyAllIcon; }, 1200);
+            }).catch(() => { /* swallow */ });
+        });
+
+        // Order in DOM: trace (lazy, prepended later) | Copy All.
+        bar.appendChild(copyAll);
+        messageEl.appendChild(bar);
+        messageEl._actionsBar = bar;
+        return bar;
     }
 
     /** Add copy buttons to all <pre> blocks in a container. */

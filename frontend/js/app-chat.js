@@ -153,10 +153,36 @@ export function initChat(app) {
         // Per-answer KG trace: clicking the trace button on an assistant
         // message opens the GraphPanel in trace mode with the subgraph the
         // model actually used to ground that answer.
-        app._chatPanel.onShowGraphTrace(async (payload) => {
+        app._chatPanel.onShowGraphTrace(async (payload, btn) => {
+            // Per-button panel reuse. If the SAME trace icon was already
+            // clicked and its panel is still open, just bring it to front
+            // (jsPanel.front()) instead of spawning a duplicate. The panel
+            // ref is stashed on the button element; cleared on close so
+            // the next click opens a fresh panel.
+            const existing = btn && btn._tracePanel;
+            if (existing && existing._panel && document.body.contains(existing._panel)) {
+                if (typeof existing._panel.front === 'function') {
+                    existing._panel.front();
+                }
+                return;
+            }
             const { GraphPanel } = await import('./knowledge-graph/GraphPanel.js');
-            const panel = new GraphPanel(null, { traceData: payload });
+            const panel = new GraphPanel(null, {
+                traceData: payload,
+                onClose: () => { if (btn) btn._tracePanel = null; },
+            });
             panel.open();
+            // jsPanel exposes events via `.options.onclosed`, but our
+            // GraphPanel doesn't expose a public hook. Watch for DOM removal
+            // as a fallback so reopening works after manual close.
+            if (btn) {
+                btn._tracePanel = panel;
+                if (panel._panel && typeof panel._panel.addEventListener === 'function') {
+                    panel._panel.addEventListener('jspanelclosed', () => {
+                        btn._tracePanel = null;
+                    });
+                }
+            }
         });
 
         // Citation badge click: resolve via the citation API and dispatch

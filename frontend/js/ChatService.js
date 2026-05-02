@@ -528,17 +528,35 @@ export class ChatService {
         // Check LLM health via HTTP (primary indicator)
         await this._checkHealth();
 
-        // Restore previous chat history, or render a static random welcome.
-        // Static (not dynamic) because a dynamic welcome streams tokens into
-        // ChatPanel's single _streamingMsg slot — a fast user-send before
-        // that stream completes makes turn-2 tokens append to the welcome
-        // bubble (no second assistant message in DOM, GPU pinned, "no
-        // response" perception). See project_static_welcome_fix.md.
+        // Restore previous chat history, or fire a dynamic welcome.
+        //
+        // Dynamic welcome: hidden user turn "Hello!" forces think_enabled
+        // off and tools off; the model's streamed reply renders as the
+        // visible greeting AND warms its KV cache for the user's first
+        // real question. Falls back to a static random message on error.
+        //
+        // Known race (revisited 2026-05-02): the dynamic call shares
+        // ChatPanel's single _streamingMsg slot. If the user sends a
+        // message before the welcome's stream completes, turn-2 tokens
+        // can append to the welcome bubble. The race is real but the
+        // recent UI work (action bar, citation rendering fixes) plus
+        // the latency wins (~200ms tool calls) make collision much less
+        // likely. WELCOME_MESSAGES preserved as fallback path.
         const hasHistory = await this.loadHistory();
         if (!hasHistory) {
-            this._welcomeText = WELCOME_MESSAGES[Math.floor(Math.random() * WELCOME_MESSAGES.length)];
-            this.chatPanel.addMessage('assistant', this._welcomeText);
-            if (this.ttsEnabled) this._sendVoiceToTTS(this._welcomeText);
+            this.sendMessage('Hello!', {
+                showUserMessage: false,
+                overrides: {
+                    thinkEnabled: false,
+                    vectorRagEnabled: false,
+                    graphRagEnabled: false,
+                },
+            }).catch((err) => {
+                console.warn('[ChatService] Dynamic welcome failed, using static fallback:', err);
+                this._welcomeText = WELCOME_MESSAGES[Math.floor(Math.random() * WELCOME_MESSAGES.length)];
+                this.chatPanel.addMessage('assistant', this._welcomeText);
+                if (this.ttsEnabled) this._sendVoiceToTTS(this._welcomeText);
+            });
         }
     }
 

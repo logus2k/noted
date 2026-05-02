@@ -94,11 +94,11 @@
     flex: 1;
     overflow-y: auto;
     overscroll-behavior: contain;
-    padding: 10px;
+    padding: 15px 25px;
     margin-right: 5px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 12px;
     min-height: 0;
 }
 
@@ -156,7 +156,58 @@
     border-bottom-left-radius: 3px;
     box-shadow: rgba(60, 64, 67, 0.3) 0px 1px 2px 0px, rgba(60, 64, 67, 0.15) 0px 1px 3px 1px;
     white-space: normal;
+    position: relative;
+    /* Reserve space at the right for the absolute-positioned action bar
+       (Show graph + Copy All). Without this, short single-line messages
+       have their last word overlapped by the icon. */
+    padding-right: 60px;
 }
+
+/* Top-right per-message action bar: [Show graph icon (lazy)] [Copy All] [Copy answer]. */
+.chat-msg-actions {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    z-index: 1;
+}
+
+.chat-msg-action-btn {
+    background: transparent;
+    border: none;
+    padding: 3px;
+    margin: 0;
+    cursor: pointer;
+    color: #555;
+    border-radius: 3px;
+    line-height: 0;
+    transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.chat-msg-action-btn:hover {
+    color: #1d1d1d;
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+.chat-msg-action-btn i {
+    font-size: 13px;
+}
+
+/* Trace (Show graph) icon: white fill with the same outline color and
+   width as the Copy icon's SVG stroke. `-webkit-text-stroke` strokes the
+   icon glyph; `color` is the fill. Hover deepens the stroke to match the
+   Copy icon's `:hover` color shift. */
+.chat-trace-btn-icon i {
+    color: #ffffff;
+    -webkit-text-stroke: 1.5px #555;
+}
+
+.chat-trace-btn-icon:hover i {
+    -webkit-text-stroke-color: #1d1d1d;
+}
+
 
 /* Action badge on user messages */
 .chat-action-badge {
