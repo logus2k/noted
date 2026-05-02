@@ -430,6 +430,12 @@ export class ChatPanel {
                 });
                 this._renderMath(answerDiv);
                 this._addCopyButtons(answerDiv);
+                // History-restored messages must run the citation transform too;
+                // finalizeStreamingMessage handles fresh streams, this handles
+                // anything reloaded from server-side memory. Without this call
+                // the bracket tags (`[markdown_chunk:hex]`, `[E:..]`, etc.)
+                // appear as raw text on page reload.
+                this._renderCitations(answerDiv);
                 msg.appendChild(answerDiv);
             }
         } else {
@@ -640,6 +646,14 @@ export class ChatPanel {
             'C\\d+',
         ].join('|');
         const GROUP_RE = new RegExp(`\\[((?:${_PART})(?:\\s*,\\s*(?:${_PART}))*)\\]`, 'g');
+        // Stateless clone (no /g) for the walker's yes/no acceptNode test.
+        // Using GROUP_RE.test() here is a JS gotcha: /g-flag .test() advances
+        // lastIndex between calls, so when the walker visits multiple text
+        // nodes that each contain a tag, every subsequent .test() resumes
+        // from the previous lastIndex and returns false if the new node's
+        // text is shorter than that index — silently rejecting valid nodes
+        // and stranding their tags as raw bracket text.
+        const TEST_RE = new RegExp(`\\[((?:${_PART})(?:\\s*,\\s*(?:${_PART}))*)\\]`);
         const TAG_RE = new RegExp(_PART, 'g');
         const numbering = new Map(); // canonical tag -> ordinal
         const walker = document.createTreeWalker(rootEl, NodeFilter.SHOW_TEXT, {
@@ -647,7 +661,7 @@ export class ChatPanel {
                 if (node.parentElement && node.parentElement.closest('pre, code')) {
                     return NodeFilter.FILTER_REJECT;
                 }
-                return GROUP_RE.test(node.nodeValue) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+                return TEST_RE.test(node.nodeValue) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
             },
         });
         const targets = [];
