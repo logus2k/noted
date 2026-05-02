@@ -428,28 +428,28 @@ class Retriever:
         if reached_ids:
             ids_list = list(reached_ids)
 
+            # Switched 2026-05-02 from Cypher to ArcadeDB native SQL.
+            # Cypher 129 ms → SQL 2.6 ms (49× speedup) for nodes, and
+            # Cypher 146 ms → SQL 5.8 ms (25×) for edges, both with
+            # identical row sets. The SQL forms anchor on Entity (uses
+            # the `id` UNIQUE index) then expand outE — same logic as
+            # the Cypher node-centric pattern but without the
+            # Cypher→Gremlin translation overhead.
             def _fetch_nodes() -> list[dict]:
-                return self._db.query(
-                    '''MATCH (n:Entity)
-                       WHERE n.id IN $ids
-                       RETURN n.id AS id, n.label AS label, n.type AS type,
-                              n.community_id AS community_id, n.rank AS rank,
-                              n.properties_json AS props''',
+                return self._db.command_sql(
+                    '''SELECT id, label, type, community_id, rank,
+                              properties_json AS props
+                       FROM Entity WHERE id IN :ids''',
                     {'ids': ids_list},
                 )
 
             def _fetch_edges() -> list[dict]:
-                # Node-centric pattern (3.4x faster than the global
-                # MATCH (a)-[r]-(b) WHERE a.id IN $ids AND b.id IN $ids
-                # form): start from the indexed Entity vertices, then
-                # traverse outgoing RELATES edges. ArcadeDB's Cypher-on-
-                # Gremlin engine appears to use the vertex index for the
-                # first MATCH and only walk relevant edges; the global
-                # form pays a join-like scan instead.
-                return self._db.query(
-                    '''MATCH (n:Entity) WHERE n.id IN $ids
-                       MATCH (n)-[r:RELATES]->(m:Entity) WHERE m.id IN $ids
-                       RETURN n.id AS source, m.id AS target, r.type AS type, r.properties_json AS props''',
+                return self._db.command_sql(
+                    '''SELECT outV().id AS source, inV().id AS target,
+                              type, properties_json AS props
+                       FROM (SELECT expand(outE('RELATES'))
+                             FROM (SELECT FROM Entity WHERE id IN :ids))
+                       WHERE inV().id IN :ids''',
                     {'ids': ids_list},
                 )
 
@@ -534,27 +534,27 @@ class Retriever:
         reached_ids: set[str] = set(entry_ids)
         frontier: list[str] = list(entry_ids)
         hops = max(1, min(LOCAL_TRAVERSAL_HOPS, 2))
-        # Stage A — BFS hops. Query rewritten 2026-05-01 per external review:
-        #   - Anchor `a` first via separate MATCH (forces planner to use the
-        #     Entity.id index for the start vertex).
-        #   - Drop DISTINCT; aggregate with max(b.rank) instead. Same
-        #     dedup semantics, planner-friendlier, no extra sort/hash pass.
-        # Pattern stays undirected: `sameAs` and `similar_to` are
-        # semantically symmetric so we cannot safely change to `->` without
-        # adding a UNION reverse branch. `member_of` is directional but
-        # only ~5-10% of edges in our graphs.
+        # Stage A — BFS hops. Switched 2026-05-02 from Cypher to ArcadeDB
+        # native SQL after benchmarking: Cypher 122 ms → SQL 4.4 ms (28×
+        # speedup, identical results). The Cypher engine in ArcadeDB is a
+        # translation layer over the native engine and pays substantial
+        # parse/translate overhead per call; native SQL skips that.
+        # Earlier rewrite (anchor-first + max(rank) aggregate) is preserved
+        # in the SQL form. Pattern stays undirected via `bothE().bothV()`:
+        # `sameAs` and `similar_to` are semantically symmetric.
         _t_bfs_start = time.perf_counter()
         n_hop_rows = 0
         for _hop in range(hops):
             if not frontier:
                 break
-            hop_rows = self._db.query(
-                '''MATCH (a:Entity) WHERE a.id IN $front
-                   MATCH (a)-[r:RELATES]-(b:Entity)
-                   WHERE r.type IN $rtypes AND NOT b.id IN $seen
-                   RETURN b.id AS id, max(b.rank) AS rank
-                   ORDER BY rank DESC
-                   LIMIT $cap''',
+            hop_rows = self._db.command_sql(
+                '''SELECT id, MAX(rank) AS rank FROM (
+                     SELECT expand(bothE('RELATES')[type IN :rtypes].bothV())
+                     FROM (SELECT FROM Entity WHERE id IN :front)
+                   )
+                   WHERE id NOT IN :seen
+                   GROUP BY id
+                   ORDER BY rank DESC LIMIT :cap''',
                 {'front': frontier, 'rtypes': TRAVERSAL_EDGE_TYPES,
                  'seen': list(reached_ids), 'cap': HOP_FRONTIER_CAP},
             )
@@ -571,28 +571,28 @@ class Retriever:
         if reached_ids:
             ids_list = list(reached_ids)
 
+            # Switched 2026-05-02 from Cypher to ArcadeDB native SQL.
+            # Cypher 129 ms → SQL 2.6 ms (49× speedup) for nodes, and
+            # Cypher 146 ms → SQL 5.8 ms (25×) for edges, both with
+            # identical row sets. The SQL forms anchor on Entity (uses
+            # the `id` UNIQUE index) then expand outE — same logic as
+            # the Cypher node-centric pattern but without the
+            # Cypher→Gremlin translation overhead.
             def _fetch_nodes() -> list[dict]:
-                return self._db.query(
-                    '''MATCH (n:Entity)
-                       WHERE n.id IN $ids
-                       RETURN n.id AS id, n.label AS label, n.type AS type,
-                              n.community_id AS community_id, n.rank AS rank,
-                              n.properties_json AS props''',
+                return self._db.command_sql(
+                    '''SELECT id, label, type, community_id, rank,
+                              properties_json AS props
+                       FROM Entity WHERE id IN :ids''',
                     {'ids': ids_list},
                 )
 
             def _fetch_edges() -> list[dict]:
-                # Node-centric pattern (3.4x faster than the global
-                # MATCH (a)-[r]-(b) WHERE a.id IN $ids AND b.id IN $ids
-                # form): start from the indexed Entity vertices, then
-                # traverse outgoing RELATES edges. ArcadeDB's Cypher-on-
-                # Gremlin engine appears to use the vertex index for the
-                # first MATCH and only walk relevant edges; the global
-                # form pays a join-like scan instead.
-                return self._db.query(
-                    '''MATCH (n:Entity) WHERE n.id IN $ids
-                       MATCH (n)-[r:RELATES]->(m:Entity) WHERE m.id IN $ids
-                       RETURN n.id AS source, m.id AS target, r.type AS type, r.properties_json AS props''',
+                return self._db.command_sql(
+                    '''SELECT outV().id AS source, inV().id AS target,
+                              type, properties_json AS props
+                       FROM (SELECT expand(outE('RELATES'))
+                             FROM (SELECT FROM Entity WHERE id IN :ids))
+                       WHERE inV().id IN :ids''',
                     {'ids': ids_list},
                 )
 
@@ -799,28 +799,28 @@ class Retriever:
         if reached_ids:
             ids_list = list(reached_ids)
 
+            # Switched 2026-05-02 from Cypher to ArcadeDB native SQL.
+            # Cypher 129 ms → SQL 2.6 ms (49× speedup) for nodes, and
+            # Cypher 146 ms → SQL 5.8 ms (25×) for edges, both with
+            # identical row sets. The SQL forms anchor on Entity (uses
+            # the `id` UNIQUE index) then expand outE — same logic as
+            # the Cypher node-centric pattern but without the
+            # Cypher→Gremlin translation overhead.
             def _fetch_nodes() -> list[dict]:
-                return self._db.query(
-                    '''MATCH (n:Entity)
-                       WHERE n.id IN $ids
-                       RETURN n.id AS id, n.label AS label, n.type AS type,
-                              n.community_id AS community_id, n.rank AS rank,
-                              n.properties_json AS props''',
+                return self._db.command_sql(
+                    '''SELECT id, label, type, community_id, rank,
+                              properties_json AS props
+                       FROM Entity WHERE id IN :ids''',
                     {'ids': ids_list},
                 )
 
             def _fetch_edges() -> list[dict]:
-                # Node-centric pattern (3.4x faster than the global
-                # MATCH (a)-[r]-(b) WHERE a.id IN $ids AND b.id IN $ids
-                # form): start from the indexed Entity vertices, then
-                # traverse outgoing RELATES edges. ArcadeDB's Cypher-on-
-                # Gremlin engine appears to use the vertex index for the
-                # first MATCH and only walk relevant edges; the global
-                # form pays a join-like scan instead.
-                return self._db.query(
-                    '''MATCH (n:Entity) WHERE n.id IN $ids
-                       MATCH (n)-[r:RELATES]->(m:Entity) WHERE m.id IN $ids
-                       RETURN n.id AS source, m.id AS target, r.type AS type, r.properties_json AS props''',
+                return self._db.command_sql(
+                    '''SELECT outV().id AS source, inV().id AS target,
+                              type, properties_json AS props
+                       FROM (SELECT expand(outE('RELATES'))
+                             FROM (SELECT FROM Entity WHERE id IN :ids))
+                       WHERE inV().id IN :ids''',
                     {'ids': ids_list},
                 )
 
@@ -997,28 +997,28 @@ class Retriever:
         if reached_ids:
             ids_list = list(reached_ids)
 
+            # Switched 2026-05-02 from Cypher to ArcadeDB native SQL.
+            # Cypher 129 ms → SQL 2.6 ms (49× speedup) for nodes, and
+            # Cypher 146 ms → SQL 5.8 ms (25×) for edges, both with
+            # identical row sets. The SQL forms anchor on Entity (uses
+            # the `id` UNIQUE index) then expand outE — same logic as
+            # the Cypher node-centric pattern but without the
+            # Cypher→Gremlin translation overhead.
             def _fetch_nodes() -> list[dict]:
-                return self._db.query(
-                    '''MATCH (n:Entity)
-                       WHERE n.id IN $ids
-                       RETURN n.id AS id, n.label AS label, n.type AS type,
-                              n.community_id AS community_id, n.rank AS rank,
-                              n.properties_json AS props''',
+                return self._db.command_sql(
+                    '''SELECT id, label, type, community_id, rank,
+                              properties_json AS props
+                       FROM Entity WHERE id IN :ids''',
                     {'ids': ids_list},
                 )
 
             def _fetch_edges() -> list[dict]:
-                # Node-centric pattern (3.4x faster than the global
-                # MATCH (a)-[r]-(b) WHERE a.id IN $ids AND b.id IN $ids
-                # form): start from the indexed Entity vertices, then
-                # traverse outgoing RELATES edges. ArcadeDB's Cypher-on-
-                # Gremlin engine appears to use the vertex index for the
-                # first MATCH and only walk relevant edges; the global
-                # form pays a join-like scan instead.
-                return self._db.query(
-                    '''MATCH (n:Entity) WHERE n.id IN $ids
-                       MATCH (n)-[r:RELATES]->(m:Entity) WHERE m.id IN $ids
-                       RETURN n.id AS source, m.id AS target, r.type AS type, r.properties_json AS props''',
+                return self._db.command_sql(
+                    '''SELECT outV().id AS source, inV().id AS target,
+                              type, properties_json AS props
+                       FROM (SELECT expand(outE('RELATES'))
+                             FROM (SELECT FROM Entity WHERE id IN :ids))
+                       WHERE inV().id IN :ids''',
                     {'ids': ids_list},
                 )
 
@@ -1161,10 +1161,11 @@ class Retriever:
         # type index can hold stale references after recluster's heavy
         # DETACH DELETE pass; ids are unique (sha1-based) so the filter is
         # redundant. Same defensive pattern as graph_storage.py P2 fix.
-        rows = self._db.query(
-            '''MATCH (c:Entity)
-               WHERE c.id IN $ids
-               RETURN c.id AS id, c.properties_json AS props''',
+        # Native SQL via id-IN-list — Entity.id UNIQUE index is used,
+        # same fast path as the fetch_nodes call.
+        rows = self._db.command_sql(
+            '''SELECT id, properties_json AS props
+               FROM Entity WHERE id IN :ids''',
             {'ids': chunk_ids[:30]},
         )
         out = []

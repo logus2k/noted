@@ -620,6 +620,12 @@ async def llm_chat(request: ChatRequest):
     set_call_source("chat")
     logger.info("CHAT_TURN_START turn_id=%s client_id=%s project_id=%s",
                 turn_id, request.client_id, project_id)
+    # TEMP-DIAG 2026-05-02: trace what the user's message looks like at
+    # request entry. Investigating "model said 'no specific request' for a
+    # turn the user clearly typed". Strip if confirmed unrelated.
+    _msg_preview = (request.message or "")
+    logger.info("CHAT_TURN_USER_MESSAGE turn_id=%s len=%d repr=%r",
+                turn_id, len(_msg_preview), _msg_preview[:200])
 
     try:
         # ── 1. Compaction check ──────────────────────────────────
@@ -704,6 +710,14 @@ async def llm_chat(request: ChatRequest):
         # Estimate input tokens (~4 chars per token)
         input_chars = sum(len(m.get("content", "")) for m in messages)
         input_tokens_est = input_chars // 4
+
+        # TEMP-DIAG 2026-05-02: dump the role+last-100-chars of each
+        # message about to be sent to the LLM. Shows whether the user's
+        # question actually reached the model. Strip if confirmed unrelated.
+        for _i, _m in enumerate(messages):
+            _c = _m.get("content", "") or ""
+            logger.info("CHAT_TURN_LLM_MSG turn_id=%s idx=%d role=%s len=%d tail=%r",
+                        turn_id, _i, _m.get("role"), len(_c), _c[-200:])
 
         # Early usage emit so the chat-bar bottom counter shows real input +
         # budget BEFORE the answer streams. Output ticks up live on the
