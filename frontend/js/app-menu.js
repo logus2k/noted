@@ -262,35 +262,35 @@ export function initMenuCommands(app) {
             app._openDocumentTab({
                 name: 'noted Platform User Manual',
                 category: 'Manuals',
-                location: 'files/noted_platform_user_manual.pdf',
+                location: 'noted/noted_platform_user_manual.pdf',
             });
         });
         mb.registerCommand('help.developerManual', () => {
             app._openDocumentTab({
                 name: 'noted Platform Developer Manual',
                 category: 'Manuals',
-                location: 'files/noted_platform_developer_manual.pdf',
+                location: 'noted/noted_platform_developer_manual.pdf',
             });
         });
         mb.registerCommand('help.projectCompanion', () => {
             app._openDocumentTab({
                 name: 'noted Project Notebook Companion',
                 category: 'Manuals',
-                location: 'files/noted_project_notebook_companion.pdf',
+                location: 'noted/noted_project_notebook_companion.pdf',
             });
         });
         mb.registerCommand('help.setup', () => {
             app._openDocumentTab({
                 name: 'noted Platform - Setup and Installation Manual',
                 category: 'Manuals',
-                location: 'files/noted_platform_setup_and_installation_manual.pdf',
+                location: 'noted/noted_platform_setup_and_installation_manual.pdf',
             });
         });
         mb.registerCommand('help.architecture', () => {
             app._openDocumentTab({
                 name: 'noted Platform Technical Architecture',
                 category: 'Manuals',
-                location: 'files/noted_platform_technical_architecture.pdf',
+                location: 'noted/noted_platform_technical_architecture.pdf',
             });
         });
         mb.registerCommand('help.github', () => {
