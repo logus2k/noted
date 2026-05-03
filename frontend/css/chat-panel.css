@@ -166,8 +166,8 @@
 /* Top-right per-message action bar: [Show graph icon (lazy)] [Copy All] [Copy answer]. */
 .chat-msg-actions {
     position: absolute;
-    top: 6px;
-    right: 6px;
+    top: 10px;
+    right: 10px;
     display: flex;
     gap: 4px;
     align-items: center;
@@ -467,7 +467,7 @@
 /* Thinking / reasoning collapsible */
 .chat-thinking {
     display: inline-block;
-    margin-bottom: 10px;
+    margin-bottom: 6px;
     font-size: 12px;
 }
 

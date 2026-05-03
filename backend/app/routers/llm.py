@@ -15,7 +15,7 @@ from typing import Optional
 from app.managers.llm_router import LLMRouter
 from app.managers.llm_context import build_context_message, clean_history
 from app.managers.llm_memory import ProjectMemory
-from app.managers.llm_tools import parse_tool_call, parse_all_tool_calls, execute_tool, is_write_tool, prepare_write_action, execute_write_tool, expand_batch_tool, expand_find_replace_tool
+from app.managers.llm_tools import parse_tool_call, parse_all_tool_calls, execute_tool, is_write_tool, prepare_write_action, execute_write_tool, expand_batch_tool, expand_find_replace_tool, _tool_graph_and_vector_search
 from app.managers.llm_debug import get_debug_log
 from app.mcp.tools import is_write_tier
 from app.mcp.tool_formats import to_anthropic_tools, to_openai_tools
@@ -664,15 +664,86 @@ async def llm_chat(request: ChatRequest):
             "_tool_metadata": {},
         }
 
-        # Speculative retrieval was an experiment that fired
-        # graph_and_vector_search in parallel with the chat call, hoping
-        # to hide retrieval latency behind Gemma's thinking. Disabled
-        # because measured prod-side rerank_gpu_ms = 2-5s when overlapping
-        # with Gemma's prefill (vs ~200 ms when run alone). The GPU's
-        # time-slicer rations bge-reranker work behind Gemma's heavy
-        # prefill kernels. Net cost > net win. Leaving the dispatch hook
-        # in execute_tool harmless: with no _speculative slot, it falls
-        # through to a fresh dispatch.
+        # Speculative retrieval — re-enabled 2026-05-03 after the unified
+        # llama-server router refactor (Phase 9). Original disable reason
+        # was measured prod-side rerank_gpu_ms = 2-5s when overlapping with
+        # Gemma's prefill under the SPLIT architecture (bge in noted-rag's
+        # separate llama-cpp-python process). Re-measured under the unified
+        # router (gemma-4 + bge-m3 + bge-reranker in one llama-server
+        # process with continuous batching): overlap rerank ≈ 322 ms, only
+        # ~2× warm-baseline 157 ms. See `/tmp/spec_contention_probe.py`
+        # results in conversation history 2026-05-03. Net win is ~500 ms-
+        # 1 s per tool-using turn (the entire pre-call thinking window
+        # gets hidden behind the speculative call's wall time).
+        #
+        # Eligibility: only when graph_and_vector_search is in the toolset
+        # (both vector_rag + graph_rag enabled) AND the user message is
+        # substantive (≥10 chars). Cache-hit logic in
+        # llm_tools.execute_tool requires exact match on `args.question`;
+        # we speculate using the user's verbatim message which the model
+        # tends to lightly rephrase, so hit rate isn't 100%. Misses fall
+        # through to fresh dispatch with the discarded spec task cancelled
+        # in the cleanup at the end of this request (around line ~1573).
+        if (
+            request.vector_rag_enabled
+            and request.graph_rag_enabled
+            and request.message
+            and len(request.message.strip()) >= 10
+        ):
+            # Build the spec query. For follow-up questions ("how does this
+            # relate to X", "tell me more"), the model uses prior-turn
+            # context to resolve "this" → "<prior topic>" before forming
+            # its tool_call. The verbatim user message alone often misses
+            # those tokens, blowing the Jaccard match. Solution: enrich
+            # the spec query with the tail of the previous assistant
+            # message, restoring the topic tokens the model will use.
+            # First-turn questions (no prior assistant) fall back to
+            # verbatim — no enrichment, no harm.
+            spec_question = request.message.strip()
+            try:
+                _hist = await memory.get_messages_for_llm(memory_key)
+                _last_asst = next(
+                    (m.get("content", "") for m in reversed(_hist or [])
+                     if m.get("role") == "assistant" and m.get("content")),
+                    "",
+                )
+                if _last_asst:
+                    # Defensive strip of thinking blocks even though stored
+                    # history is supposed to be clean.
+                    _clean = re.sub(r"<think>.*?</think>\s*", "", _last_asst, flags=re.DOTALL).strip()
+                    if _clean:
+                        # Take the last full sentence (period-bounded) if
+                        # close enough to the end; otherwise fall back to
+                        # the last 300 chars. Bounds keep the spec query
+                        # focused — too much prior context dilutes the
+                        # retrieval signal.
+                        _last_dot = _clean.rfind(".", 0, max(0, len(_clean) - 1))
+                        if _last_dot >= len(_clean) - 400 and _last_dot > 0:
+                            _tail = _clean[_last_dot + 1:].strip()
+                        else:
+                            _tail = _clean[-300:].strip()
+                        if _tail:
+                            spec_question = f"{_tail} {spec_question}"
+            except Exception:
+                pass  # best-effort enrichment; fall back to user verbatim
+            spec_metadata: dict = {}
+            spec_managers = {**req_managers, "_tool_metadata": spec_metadata}
+            spec_args = {"question": spec_question}
+            spec_task = asyncio.create_task(
+                _tool_graph_and_vector_search(spec_args, spec_managers)
+            )
+            req_managers["_speculative"] = {
+                "args": spec_args,
+                "task": spec_task,
+                "metadata": spec_metadata,
+                "started_at": time.perf_counter(),
+                "consumed": False,
+            }
+            logger.info(
+                "SPECULATIVE_LAUNCH tool=graph_and_vector_search question=%r (enriched=%s)",
+                spec_args["question"][:200],
+                "yes" if spec_question != request.message.strip() else "no",
+            )
 
         ctx_message, active_skills = await build_context_message(ctx_dict, _managers)
         dbg = get_debug_log()
@@ -1951,6 +2022,13 @@ def _text_before_tool_call(text: str) -> str:
 def _strip_thinking_and_tools(text: str) -> str:
     """Remove <think>, <tool_call>, and <voice> blocks from text before storing in memory."""
     import re
+    # TEMP-DIAG 2026-05-03: log voice block content so we can inspect what
+    # TTS spoke (the FE extracts <voice> from the stream and ships it to TTS;
+    # by the time we strip here the audio is already playing, but the source
+    # text isn't visible elsewhere in our logs). Strip after analysis when
+    # not needed any more.
+    for _vb in re.findall(r'<voice>([\s\S]*?)</voice>', text):
+        logger.info("VOICE_CAPTURED chars=%d content=%r", len(_vb), _vb[:500])
     text = re.sub(r'<think>[\s\S]*?</think>\s*', '', text)
     text = re.sub(r'<tool_call>[\s\S]*?</tool_call>\s*', '', text)
     text = re.sub(r'<voice>[\s\S]*?</voice>\s*', '', text)
@@ -1962,6 +2040,9 @@ def _strip_thinking_and_voice(text: str) -> str:
     serialized turn transcript (see _serialize_turn_for_memory) retains its
     tool history."""
     import re
+    # TEMP-DIAG 2026-05-03: see _strip_thinking_and_tools above for context.
+    for _vb in re.findall(r'<voice>([\s\S]*?)</voice>', text):
+        logger.info("VOICE_CAPTURED chars=%d content=%r", len(_vb), _vb[:500])
     text = re.sub(r'<think>[\s\S]*?</think>\s*', '', text)
     text = re.sub(r'<voice>[\s\S]*?</voice>\s*', '', text)
     return text.strip()

@@ -138,6 +138,8 @@ class SearchRequest(BaseModel):
         default=None,
         description="Optional restriction to chunks whose source_path is in this list (per-document scoping).",
     )
+    embed_model: str | None = Field(default=None, description="Phase 12: override embed model id (e.g. 'bge-m3'). Defaults to noted-rag's configured EMBED_MODEL_NAME.")
+    rerank_model: str | None = Field(default=None, description="Phase 12: override rerank model id. Defaults to noted-rag's configured RERANK_MODEL_NAME.")
 
 
 class SearchResponse(BaseModel):
@@ -147,6 +149,7 @@ class SearchResponse(BaseModel):
 
 class EmbedRequest(BaseModel):
     texts: list[str] = Field(..., min_length=1, description="Strings to embed")
+    embed_model: str | None = Field(default=None, description="Phase 12: override embed model id. Defaults to noted-rag's configured EMBED_MODEL_NAME.")
 
 
 class EmbedResponse(BaseModel):
@@ -202,6 +205,7 @@ class SearchByVectorRequest(BaseModel):
         default=None,
         description="Optional restriction to chunks whose source_path is in this list (per-document scoping).",
     )
+    rerank_model: str | None = Field(default=None, description="Phase 12: override rerank model id.")
 
 
 class CacheSearchHit(BaseModel):
@@ -233,6 +237,7 @@ def search(req: SearchRequest) -> SearchResponse:
         chunks = rag.search(
             req.query, tags=req.tags, top_k=req.top_k,
             collection=req.collection, source_paths=req.source_paths,
+            embed_model=req.embed_model, rerank_model=req.rerank_model,
         )
         return SearchResponse(status="ok", chunks=chunks)
     except Exception as e:
@@ -296,6 +301,7 @@ def search_by_vector(req: SearchByVectorRequest) -> SearchResponse:
             query_text=req.query_text, query_vec=req.vector,
             tags=req.tags, top_k=req.top_k,
             collection=req.collection, source_paths=req.source_paths,
+            rerank_model=req.rerank_model,
         )
         return SearchResponse(status="ok", chunks=chunks)
     except Exception as e:
@@ -320,6 +326,8 @@ class SearchMultiRequest(BaseModel):
         default=None,
         description="Optional pre-computed query vector to skip the embed step.",
     )
+    embed_model: str | None = Field(default=None, description="Phase 12: override embed model id.")
+    rerank_model: str | None = Field(default=None, description="Phase 12: override rerank model id.")
 
 
 @app.post("/search_multi", response_model=SearchResponse)
@@ -341,6 +349,8 @@ def search_multi(req: SearchMultiRequest) -> SearchResponse:
             merge_top_n=req.merge_top_n,
             source_paths=req.source_paths,
             query_vec=req.vector,
+            embed_model=req.embed_model,
+            rerank_model=req.rerank_model,
         )
         return SearchResponse(status="ok", chunks=chunks)
     except Exception as e:
@@ -361,7 +371,7 @@ def embed(req: EmbedRequest) -> EmbedResponse:
     routing, and local-mode entry-entity vector search.
     """
     try:
-        vectors = rag.embed(req.texts)
+        vectors = rag.embed(req.texts, model=req.embed_model)
         dim = len(vectors[0]) if vectors else 0
         return EmbedResponse(status="ok", dim=dim, vectors=vectors)
     except Exception as e:

@@ -115,8 +115,20 @@ export function initTabs(app) {
         // Detach reusable elements (workspace, docs) before clearing transient content
         const wsDetail = serviceContainer.querySelector('.explorer-detail-pane');
         if (wsDetail) wsDetail.remove();
+        // Stash scroll position of the outgoing doc viewer so we can
+        // restore it when the tab is re-activated. Without this, removing
+        // the wrapper from DOM (next line) resets scrollTop to 0 and
+        // PDFs reopen at page 1 even though the per-tab viewer instance
+        // preserves its PDF.js render state.
         const docViewer = serviceContainer.querySelector('.document-viewer-wrapper');
-        if (docViewer) docViewer.remove();
+        if (docViewer) {
+            const outgoingTabKey = docViewer.dataset.tabKey;
+            if (outgoingTabKey) {
+                app._docScrollPositions = app._docScrollPositions || {};
+                app._docScrollPositions[outgoingTabKey] = docViewer.scrollTop;
+            }
+            docViewer.remove();
+        }
         const pyfileWrapper = serviceContainer.querySelector('.file-editor-wrapper');
         if (pyfileWrapper) pyfileWrapper.remove();
         const mediaWrapper = serviceContainer.querySelector('.media-viewer-wrapper');
@@ -204,41 +216,61 @@ export function initTabs(app) {
                 serviceContainer.appendChild(wrapper);
             }
         } else if (key.startsWith('doc:')) {
-            // Show document viewer
+            // Show document viewer. Each doc tab owns its own DocumentViewer
+            // instance (kept in app._documentViewers) so PDF scroll position +
+            // page state survive tab switches. Switching back to a previously-
+            // viewed tab no longer reloads the doc to page 1.
             notebookContainer.style.display = 'none';
             serviceContainer.style.display = 'flex';
             serviceContainer.appendChild(app._buildDocumentBars(key));
-            serviceContainer.appendChild(app._documentViewer.element);
-            // Re-show the correct document if switching between doc tabs
             const doc = app._documentTabs.get(key);
-            const wasNew = doc && app._documentViewer._currentDoc !== doc;
-            if (wasNew) {
-                app._documentViewer.show(doc).then(() => {
+            let viewer = app._documentViewers.get(key);
+            const isFirstShow = !viewer;
+            if (isFirstShow) {
+                viewer = new DocumentViewer();
+                viewer.element.dataset.tabKey = key;  // for scroll-restore on tab switch
+                app._documentViewers.set(key, viewer);
+            }
+            serviceContainer.appendChild(viewer.element);
+            // Restore scroll position from a previous activation of this
+            // tab (the outgoing-cleanup block above stashed it on blur).
+            const savedScroll = app._docScrollPositions?.[key];
+            if (typeof savedScroll === 'number' && savedScroll > 0) {
+                // Defer until layout settles; scrollTop on a freshly-appended
+                // element is silently clamped to 0 if set before paint.
+                requestAnimationFrame(() => {
+                    viewer.element.scrollTop = savedScroll;
+                });
+            }
+            if (isFirstShow && doc) {
+                // Defer show() until the viewer is in the DOM so its
+                // IntersectionObserver resolves intersections correctly.
+                viewer.show(doc).then(() => {
                     if (app._tabBar.activeKey === key) {
                         app._updateTocForTab(key);
                     }
-                    // Citation deep-jump: a click on a `[N]` badge sets
-                    // `_pendingCitationJump` then opens the tab. After
-                    // show() resolves we run the jump here so the page
-                    // is rendered before we try to scroll/highlight.
+                    // Citation deep-jump: pending jump set by chat citation
+                    // click before the tab opened. Apply after show resolves
+                    // so pages are rendered before we scroll/highlight.
                     if (app._pendingCitationJump) {
                         const j = app._pendingCitationJump;
                         app._pendingCitationJump = null;
                         if (j.regions && j.regions.length) {
-                            app._documentViewer.showBboxHighlights(j.regions);
+                            viewer.showBboxHighlights(j.regions);
                         } else if (j.section_path) {
-                            app._documentViewer.scrollToHeading(j.section_path);
+                            viewer.scrollToHeading(j.section_path);
                         }
                     }
                 });
             } else if (app._pendingCitationJump) {
-                // Tab already shows this doc; jump immediately.
+                // Re-activated tab with a pending jump from a citation click;
+                // viewer already loaded so apply jump immediately.
                 const j = app._pendingCitationJump;
                 app._pendingCitationJump = null;
                 if (j.regions && j.regions.length) {
-                    app._documentViewer.showBboxHighlights(j.regions);
+                    viewer.showBboxHighlights(j.regions);
                 } else if (j.section_path) {
-                    app._documentViewer.scrollToHeading(j.section_path);
+                    viewer.scrollToHeading(j.section_path);
                 }
             }
         } else if (key.startsWith('detail:')) {

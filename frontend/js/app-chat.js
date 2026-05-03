@@ -219,15 +219,20 @@ export function initChat(app) {
                     // If the document tab is already active AND showing
                     // this same document, the tab handler won't fire
                     // (TabBar.activate early-returns when activeKey is
-                    // unchanged). Apply the jump directly instead.
+                    // unchanged). Apply the jump directly instead. Now
+                    // checks the per-tab viewer in app._documentViewers
+                    // (since the singleton _documentViewer is no longer the
+                    // primary doc-tab renderer post-PDF-state-preservation
+                    // fix).
                     const sameTabActive = app._tabBar?.activeKey === tabKey;
-                    const sameDocLoaded = !!app._documentViewer?._currentDoc &&
-                        (app._documentViewer._currentDoc.location === doc.location);
+                    const activeViewer = app._documentViewers?.get(tabKey);
+                    const sameDocLoaded = !!activeViewer?._currentDoc &&
+                        (activeViewer._currentDoc.location === doc.location);
                     if (sameTabActive && sameDocLoaded) {
                         if (jump.regions && jump.regions.length) {
-                            app._documentViewer.showBboxHighlights(jump.regions);
+                            activeViewer.showBboxHighlights(jump.regions);
                         } else if (jump.section_path) {
-                            app._documentViewer.scrollToHeading(jump.section_path);
+                            activeViewer.scrollToHeading(jump.section_path);
                         }
                         return;
                     }

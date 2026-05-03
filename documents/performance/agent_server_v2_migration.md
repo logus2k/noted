@@ -262,3 +262,178 @@ type — Anthropic still benefits from text-format instructions).
 The agent_server scrub is a workaround, not the proper fix. Open a
 noted-side PR for this once `apt-get update` against Launchpad is
 reliable again.
+
+## Backlog (single source of truth)
+
+All open items. Each has a corresponding memory entry under
+`~/.claude/projects/-home-logus-env-assets-noted/memory/` for full
+context.
+
+### Blocked on noted backend rebuild (Launchpad outage)
+
+- [ ] **Phase 6** — noted UI renders `reasoning_content` natively
+  (Claude/ChatGPT-style thinking pane). Removes the `_ThinkingSplice`
+  translator from agent_server.
+- [ ] **Phase 7** — Image attach in chat (paste/drop screenshot →
+  llama-server vision via OpenAI multimodal content blocks). Needs
+  frontend work + backend wiring.
+- [ ] **Drop noted's `TOOL_DESCRIPTIONS` injection** in
+  `noted/backend/app/managers/llm_tools.py` (or gate it on backend
+  type — Anthropic still benefits from the text-format teaching). The
+  agent_server-side `_scrub_legacy_tool_template` is a workaround,
+  not the proper fix. Memory:
+  [`feedback_noted_tool_descriptions_conflicts_with_native.md`](../../../../.claude/projects/-home-logus-env-assets-noted/memory/feedback_noted_tool_descriptions_conflicts_with_native.md)
+
+### Future phases (design + implementation)
+
+- [ ] **Phase 11** — Anthropic `/v1/messages` API unification.
+  llama-server speaks Anthropic Messages API natively; noted already
+  does too for Claude. Unifying both paths obsoletes the
+  `_ThinkingSplice` translator and simplifies tool-call handling.
+- [ ] **Phase 12** — User-facing model CRUD on top of the
+  always-loaded baseline. llama-server has `/models/load`,
+  `/models/unload`, `/models` endpoints. Baseline (gemma-4 + bge-m3 +
+  bge-reranker) stays `load-on-startup = true`; CRUD is for opt-in
+  extras. LAST stage of agent_server's journey. **Detailed plan in
+  [`phase_12_models_crud_plan.md`](phase_12_models_crud_plan.md).**
+
+### UI bugs surfaced during this migration (defer until v2 done)
+
+- [ ] **PDF tab state lost on switch** — clicking a citation opens
+  PDF deep-jumped correctly, but switching to a second doc tab and
+  back reloads the first doc to page 1 (loses scroll/page state).
+  Likely fix: hide-on-blur instead of unmount-on-blur, fire
+  page-jump only on first open. Memory:
+  [`project_pdf_tab_state_lost.md`](../../../../.claude/projects/-home-logus-env-assets-noted/memory/project_pdf_tab_state_lost.md)
+- [ ] **Gemma mangled citation ids** — Gemma occasionally drops
+  separators in compound ids (e.g. `term:mlflowrun` instead of
+  `term:mlflow_run`), producing 404s on `/api/citations/`. Possible
+  fixes: citation resolver fuzzy-match fallback, tool-result format
+  with explicit spacers, stronger grounding-policy phrasing. Memory:
+  [`project_gemma_mangled_citation_ids.md`](../../../../.claude/projects/-home-logus-env-assets-noted/memory/project_gemma_mangled_citation_ids.md)
+
+### Cleanup (low priority, no rebuild dependencies)
+
+- [ ] Delete dead code in agent_server now that forwarding is the
+  only mode: `app/chat_handlers/__init__.py` + `gemma4_vision.py`
+  (in-process vision handler, unused), `agent_config.json`'s
+  `mmproj_path` field (no longer consulted by `LlamaServerEngine`).
+- [ ] Verify `Dockerfile.fat` (the in-process rollback) still
+  builds cleanly so it remains a viable escape hatch.
+- [ ] Sustained-load validation of the tool-leak fix: extended probe
+  (50+ turns or concurrent sessions) under simultaneous chat + embed
+  + rerank load to confirm the strip + scrub layers don't degrade.
+- [ ] **PDF blur regression (3rd recurrence)** — PDF panels render
+  with unwanted blur effect. Has been fixed twice before; keeps
+  coming back. Indicates prior fixes were overrides rather than
+  root-cause patches of the source CSS rule. Memory:
+  [`project_pdf_blur_regression.md`](../../../../.claude/projects/-home-logus-env-assets-noted/memory/project_pdf_blur_regression.md)
+
+### Build-system improvements (added 2026-05-03 during Phase 12)
+
+- [ ] **noted Dockerfile multi-stage refactor** — current Dockerfile is
+  linear; any early-layer change invalidates the 80-min R install.
+  Refactor to parallel multi-stage: `python-stage`, `node-stage`,
+  `r-stage`, `final` (composes with `COPY --from=...`). Each stack's
+  cache becomes independent; BuildKit can build stages in parallel.
+  Memory: [`project_dockerfile_multistage_refactor.md`](../../../../.claude/projects/-home-logus-env-assets-noted/memory/project_dockerfile_multistage_refactor.md)
+- [ ] **Phase 13 candidate — Runtime language CRUD** — let users
+  install / uninstall Python / Node / R versions at runtime via API,
+  rather than baking a fixed matrix into the image. Mirrors Phase 12's
+  model CRUD pattern. Three patterns documented (A: build args, B:
+  target stages, C: runtime install). Pattern C preferred for
+  long-term consistency with noted's CRUD philosophy. Memory:
+  [`project_runtime_language_crud.md`](../../../../.claude/projects/-home-logus-env-assets-noted/memory/project_runtime_language_crud.md)
+- [ ] **Publish per-language stacks as distributable modules** —
+  after the multi-stage refactor, extract each stage into a published
+  artifact (Docker Hub / GHCR image, or OCI Artifact via ORAS). Other
+  deployments compose by `COPY --from=notedstacks/python-multi:1.0`
+  instead of rebuilding the same stacks. Bridge between the
+  multi-stage refactor (precursor) and Phase 13 runtime-CRUD (consumer
+  — at runtime noted pulls modules from this registry/CDN). Memory:
+  [`project_publish_runtime_stacks_as_modules.md`](../../../../.claude/projects/-home-logus-env-assets-noted/memory/project_publish_runtime_stacks_as_modules.md)
+- [ ] **Bump noted's CUDA base** — `nvidia/cuda:13.1.1-runtime-ubuntu24.04`
+  → `nvidia/cuda:13.2.1-runtime-ubuntu24.04`. Widens compat with newer
+  PyTorch/TF wheels in user venvs. Safe for noted (doesn't load GGUFs;
+  Unsloth's no-13.2 warning targets GGUF runtimes only — `llama-vision`
+  must stay below 13.2). One-line FROM change but invalidates the whole
+  image → bundle with the next opportunistic full rebuild. Memory:
+  [`project_noted_bump_cuda_base.md`](../../../../.claude/projects/-home-logus-env-assets-noted/memory/project_noted_bump_cuda_base.md)
+
+## 2026-05-03 (later in session): more shipped, more captured
+
+Beyond the original 2026-05-03 update above:
+
+**Speculative retrieval re-enabled under unified router arch**:
+- Old code (then-disabled) lived at `routers/llm.py:667-675` with a
+  comment about 2-5s contention vs Gemma prefill (under split arch).
+- Re-measured under unified llama-server router: contention ~322 ms
+  (~2× warm baseline), down from 10-25× under split arch.
+- Re-enabled with **token-set Jaccard cache match** (threshold 0.7)
+  in `llm_tools.py` + **context-aware spec query** that enriches the
+  user's verbatim message with the tail of the prior assistant turn
+  (handles pronoun-resolution rephrasing in follow-ups).
+- Logs: `SPECULATIVE_LAUNCH (enriched=yes|no)` /
+  `SPECULATIVE_HIT match_ratio=X wait_for_completion_ms=Y` /
+  `SPECULATIVE_NEAR_MISS spec_q=... actual_q=...`
+- Memory: [`feedback_speculative_retrieval_live.md`](../../../../.claude/projects/-home-logus-env-assets-noted/memory/feedback_speculative_retrieval_live.md)
+
+**Phase 12 backend SHIPPED (Models CRUD)**:
+- `noted/backend/app/managers/model_manager.py` + `routers/models.py`
+- `/api/models` (GET), `/api/models/health` (GET), `/api/models/active`
+  (POST), `/api/models/{id}/load` and `/unload` (POST),
+  `/api/models/{id}/name` (PUT)
+- Persistence: `data/model_registry.json`
+- Bind mounts added so noted can stat model files for vram_estimate
+- UI panel still pending (Phase 12.6)
+- Memory: [`feedback_phase_12_models_crud_live.md`](../../../../.claude/projects/-home-logus-env-assets-noted/memory/feedback_phase_12_models_crud_live.md)
+
+**Launchpad workaround SHIPPED — permanent independence**:
+- noted's Dockerfile no longer uses deadsnakes PPA at all
+- Python interpreters install from pre-downloaded
+  python-build-standalone tarballs in `data/python-builds/` (gitignored)
+- Refresh script: `noted/scripts/fetch-python-builds.sh`
+- ENV PATH addition: `/opt/python-3.12/bin` so `uvicorn` etc. resolve
+- `noted/Dockerfile.BAK` preserves the pre-switch version
+- Memory: [`feedback_noted_dockerfile_local_python_tarballs.md`](../../../../.claude/projects/-home-logus-env-assets-noted/memory/feedback_noted_dockerfile_local_python_tarballs.md)
+
+**PDF tab state preservation + scroll-first citation jump**:
+- Per-tab `DocumentViewer` instances (`app._documentViewers` Map),
+  not the singleton, so scroll/page state survives tab switches.
+- Scroll save/restore on tab blur/activate (data-tabkey on the
+  wrapper, scroll position stashed in `app._docScrollPositions`).
+- Citation jump scrolls FIRST, then paints bbox — user lands on the
+  target page on the first frame, no perceived "smooth scroll".
+
+**Icon polish**: `<i class="fa-solid fa-share-nodes"></i>` replaced
+with inline SVG matching the copy icon's stroke-width 1.5; copy-all
+icon now filled `#ffe6bd`.
+
+**System prompt boundary clarification (thinking ↔ answer)**:
+- Gemma was duplicating its planning headings (`# Reasoning`,
+  `# Drafting Voice Output`, etc.) into the user-visible answer.
+- Root cause: prompt said "structure the content with headings"
+  without specifying WHICH content (reasoning channel vs answer body).
+- Fix: split into "Thinking section format (applies ONLY to your
+  internal reasoning block)" + "Answer section format (the user-
+  visible body)" with positive framing for what good answer headings
+  look like.
+- Also added: "Output formatting is internal plumbing — describe
+  WHAT you do, never describe the literal markup you use" to stop
+  the model from reciting `<voice>` etc. when users ask about its
+  behavior.
+- Voice tag rules updated: ALWAYS emit voice (even on tool-call
+  turns where it serves as "about to do X" narration); brief +
+  speakable.
+- Memory: [`feedback_thinking_section_format_must_scope_to_thinking_only.md`](../../../../.claude/projects/-home-logus-env-assets-noted/memory/feedback_thinking_section_format_must_scope_to_thinking_only.md)
+
+### Post-session pending
+
+- Phase 12.6 UI Models panel (frontend) — backend API is fully ready
+- Verify the voice-tag-always rule produces correct UX on tool-call
+  turns (parser may need adjusting if voice in tool turns confuses
+  noted's chat router; observe real traffic)
+- Tune Jaccard threshold from real `SPECULATIVE_NEAR_MISS` log data
+- Backlog items still as listed above + the just-added cluster
+  (multi-stage / publish-modules / runtime-CRUD / CUDA bump / PDF
+  blur regression / noted TOOL_DESCRIPTIONS PR)

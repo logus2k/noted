@@ -18,6 +18,48 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 
+# Speculative-retrieval cache hit threshold. The chat router fires a
+# graph_and_vector_search using the user's verbatim message as the
+# question; the model then rephrases lightly when constructing its
+# actual tool_call (e.g. "Explain me X" → "What is X?"). Strict
+# equality misses these. Token-set Jaccard (after stopword/punct
+# filter) catches them: same nouns + same intent. Threshold 0.7 is
+# permissive enough for "explain X" ↔ "what is X" while strict enough
+# to reject genuinely different questions about overlapping topics.
+SPECULATIVE_MATCH_THRESHOLD = 0.7
+
+# Common English stopwords that don't carry retrieval signal. Kept
+# small + tight to avoid over-filtering. The reranker does the heavy
+# semantic work; this set just stops "the/of/a" from inflating Jaccard.
+_STOPWORDS = frozenset({
+    "a", "an", "and", "are", "as", "at", "be", "but", "by", "do", "for",
+    "from", "has", "have", "in", "is", "it", "its", "me", "of", "on",
+    "or", "so", "that", "the", "this", "to", "was", "what", "when",
+    "where", "which", "who", "why", "with", "you",
+})
+
+
+def _question_key_tokens(s: str) -> set:
+    """Lowercase + tokenize + drop stopwords + drop tokens shorter than
+    3 chars (typically articles or noise). Returns a set for Jaccard."""
+    return {t for t in re.findall(r"\w+", (s or "").lower())
+            if len(t) > 2 and t not in _STOPWORDS}
+
+
+def _question_match_ratio(spec_q: str, actual_q: str) -> float:
+    """Token-set Jaccard similarity. Returns 1.0 on exact-string match
+    (cheap fast-path) and 0.0 if either input has no key tokens."""
+    if not spec_q or not actual_q:
+        return 0.0
+    if spec_q == actual_q:
+        return 1.0
+    s = _question_key_tokens(spec_q)
+    a = _question_key_tokens(actual_q)
+    if not s or not a:
+        return 0.0
+    return len(s & a) / len(s | a)
+
+
 # ── Tool Definitions (injected into system prompt) ────────────────
 
 TOOL_DESCRIPTIONS = """
@@ -821,10 +863,13 @@ async def execute_tool(tool_call: dict, managers: dict, ctx: dict = None) -> str
             # running the retrieval again. Saves the retrieval-time portion
             # of stop #1 (the gap between thinking-end and "Show graph").
             spec = managers.get("_speculative") if isinstance(managers, dict) else None
+            spec_q = (spec or {}).get("args", {}).get("question", "") if spec else ""
+            actual_q = args.get("question", "") or ""
+            match_ratio = _question_match_ratio(spec_q, actual_q) if spec else 0.0
             if (
                 spec
-                and spec.get("args", {}).get("question") == args.get("question")
                 and spec.get("task") is not None
+                and match_ratio >= SPECULATIVE_MATCH_THRESHOLD
             ):
                 import time as _t
                 _t_wait_start = _t.perf_counter()
@@ -839,8 +884,8 @@ async def execute_tool(tool_call: dict, managers: dict, ctx: dict = None) -> str
                     if isinstance(live_meta, dict) and isinstance(spec_meta, dict):
                         live_meta.update(spec_meta)
                     logger.info(
-                        "SPECULATIVE_HIT tool=graph_and_vector_search wait_for_completion_ms=%.1f total_speculative_ms=%.1f",
-                        wait_ms, elapsed_ms,
+                        "SPECULATIVE_HIT tool=graph_and_vector_search wait_for_completion_ms=%.1f total_speculative_ms=%.1f match_ratio=%.2f",
+                        wait_ms, elapsed_ms, match_ratio,
                     )
                     # Mark the speculative slot consumed so the cleanup path
                     # at the end of the request doesn't try to cancel it.
@@ -852,6 +897,14 @@ async def execute_tool(tool_call: dict, managers: dict, ctx: dict = None) -> str
                         type(e).__name__,
                     )
                     # Fall through to a fresh dispatch
+            # If we had a spec but it didn't qualify (below threshold),
+            # log the near-miss so the threshold can be tuned from real
+            # data over time.
+            if spec and 0.0 < match_ratio < SPECULATIVE_MATCH_THRESHOLD:
+                logger.info(
+                    "SPECULATIVE_NEAR_MISS tool=graph_and_vector_search match_ratio=%.2f spec_q=%r actual_q=%r",
+                    match_ratio, spec_q[:100], actual_q[:100],
+                )
             return await _tool_graph_and_vector_search(args, managers)
         else:
             return f"Error: Unknown tool '{name}'"

@@ -5,13 +5,25 @@ FROM nvidia/cuda:13.1.1-runtime-ubuntu24.04 AS base
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# System packages (no Python — those come from python-build-standalone tarballs
-# below to avoid the deadsnakes PPA dependency, which goes through Launchpad
-# and breaks during Launchpad outages or DDoS-mitigation throttling).
+# System packages + deadsnakes PPA for multiple Python versions
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
+        software-properties-common gpg-agent && \
+    add-apt-repository -y ppa:deadsnakes/ppa && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+        # Python interpreters (latest patch auto-resolved by deadsnakes)
+        python3.10 python3.10-venv python3.10-dev \
+        python3.11 python3.11-venv python3.11-dev \
+        python3.12 python3.12-venv python3.12-dev \
+        python3.13 python3.13-venv python3.13-dev \
+        python3.13-nogil \
+        python3.14 python3.14-venv python3.14-dev \
+        python3.14-nogil \
         # Build deps for native extensions (pyzmq, zeromq/node-gyp, etc.)
         gcc g++ make libzmq3-dev \
+        # pip bootstrap
+        python3-pip \
         # curl for health checks
         curl \
         # git for DVC and version control
@@ -25,59 +37,14 @@ RUN apt-get update && \
         libgtk-3-0 libdbus-glib-1-2 libasound2t64 libx11-xcb1 libxcomposite1 \
         libxdamage1 libxrandr2 libgbm1 libpango-1.0-0 libcairo2 libatk1.0-0 \
         libxshmfence1 libxfixes3 && \
-    rm -rf /var/lib/apt/lists/*
-
-# Multi-Python interpreters from python-build-standalone tarballs.
-# Source: https://github.com/astral-sh/python-build-standalone/releases
-# Pre-fetched into data/python-builds/ via scripts/fetch-python-builds.sh.
-# This bypasses Launchpad entirely (vs the previous deadsnakes PPA path).
-# Each tarball extracts to ./python/{bin,lib,include,share}; we rename to
-# /opt/python-<ver>/ to coexist, then symlink into /usr/local/bin/ so
-# noted's existing venv-creation code (which calls `python3.10 -m venv ...`)
-# keeps working unchanged.
-COPY data/python-builds/ /tmp/python-builds/
-RUN set -e; \
-    mkdir -p /opt; \
-    for tarball in /tmp/python-builds/cpython-*-install_only.tar.gz; do \
-        fname=$(basename "$tarball"); \
-        # Extract major.minor (e.g. 3.13) and detect freethreaded variant
-        ver=$(echo "$fname" | sed -E 's/cpython-([0-9]+\.[0-9]+)\..*/\1/'); \
-        if echo "$fname" | grep -q freethreaded; then \
-            target_dir="/opt/python-${ver}t"; \
-            bin_name="python${ver}t"; \
-        else \
-            target_dir="/opt/python-${ver}"; \
-            bin_name="python${ver}"; \
-        fi; \
-        echo "Installing ${bin_name} -> ${target_dir}"; \
-        tar -xzf "$tarball" -C /tmp/; \
-        mv /tmp/python "$target_dir"; \
-        ln -sf "${target_dir}/bin/${bin_name}" "/usr/local/bin/${bin_name}"; \
-    done; \
-    # Compat aliases: noted's existing code may call `python3.13-nogil` /
-    # `python3.14-nogil` (deadsnakes naming). python-build-standalone ships
-    # the same binary as `python3.Xt`. Symlink both names to the same target.
-    ln -sf /opt/python-3.13t/bin/python3.13t /usr/local/bin/python3.13-nogil; \
-    ln -sf /opt/python-3.14t/bin/python3.14t /usr/local/bin/python3.14-nogil; \
-    # Provide a default `python3` for tooling that doesn't pin a version
-    ln -sf /usr/local/bin/python3.12 /usr/local/bin/python3; \
-    rm -rf /tmp/python-builds /tmp/python
-
-# Add the primary Python's bin/ to PATH so console scripts installed via
-# `uv pip install --python python3.12` (uvicorn, pip3, gunicorn, etc.) are
-# discoverable by bare-name invocation. Without this the entrypoint's
-# `exec uvicorn ...` fails with "uvicorn: not found" because the script
-# lives at /opt/python-3.12/bin/uvicorn — python-build-standalone keeps
-# console scripts inside the interpreter's prefix instead of pushing them
-# to the system PATH the way Ubuntu's apt-installed python3-pip did.
-ENV PATH="/opt/python-3.12/bin:${PATH}"
+    rm -rf /var/lib/apt/lists/* && \
+    # Remove broken distutils-precedence.pth (references missing _distutils_hack)
+    rm -f /usr/lib/python3/dist-packages/distutils-precedence.pth
 
 # Install uv — fast Python package installer (used internally for env setup)
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
-# Ensure pip is available for each Python version (python-build-standalone
-# ships pip pre-installed, but this is idempotent + matches the previous
-# behaviour for any tooling that explicitly looks for it).
+# Ensure pip is available for each Python version
 RUN for py in python3.10 python3.11 python3.12 python3.13 python3.14; do \
         $py -m ensurepip --upgrade 2>/dev/null || true; \
     done

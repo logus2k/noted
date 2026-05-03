@@ -783,7 +783,9 @@ export class ChatPanel {
         btn.className = 'chat-msg-action-btn chat-trace-btn-icon';
         btn.type = 'button';
         btn.title = 'Show Graph';
-        btn.innerHTML = '<i class="fa-solid fa-share-nodes"></i>';
+        // Inline SVG (not FontAwesome) so the stroke thickness matches
+        // the sibling copy icon (both use stroke-width 1.5).
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3" fill="#a8d8a0"/><circle cx="6" cy="12" r="3" fill="#a8d8a0"/><circle cx="18" cy="19" r="3" fill="#a8d8a0"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>';
         btn.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -1023,7 +1025,7 @@ export class ChatPanel {
 
         // Two-square icon (a back document + a front document) for "Copy All"
         // — the classic "copy multiple" affordance.
-        const copyAllIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+        const copyAllIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" fill="#ffe6bd"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
         const checkIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22863a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
 
         const copyAll = document.createElement('button');

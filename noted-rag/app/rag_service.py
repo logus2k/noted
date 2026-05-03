@@ -113,19 +113,17 @@ class RagService:
 
     # ── Public API ────────────────────────────────────────────────
 
-    def embed(self, texts: list[str]) -> list[list[float]]:
+    def embed(self, texts: list[str], model: Optional[str] = None) -> list[list[float]]:
         """Return L2-normalized dense embeddings for a list of strings.
 
-        Forwards to llama-server's `/v1/embeddings` with the bge-m3 model.
-        Batched in a single POST — the multi-sequence-decode bug that
-        forced per-input loops in the in-process path does not affect
-        llama-server (different code path).
+        Forwards to llama-server's `/v1/embeddings`. The `model` param
+        lets callers override the configured default (Phase 12: per-
+        request model selection from noted's model_manager). Defaults
+        to `config.EMBED_MODEL_NAME` if unspecified — backward-
+        compatible with existing callers.
 
-        bge-m3 is CLS-pooled server-side; we explicitly L2-normalize
-        client-side so cosine similarity in Chroma matches what the
-        sentence-transformers path produced (which had
-        normalize_embeddings=True). Cheap relative to network +
-        embedding cost.
+        Batched in a single POST; CLS-pooled server-side; client-side
+        L2-normalize for cosine compatibility with stored vectors.
         """
         import time
         t0 = time.perf_counter()
@@ -136,7 +134,7 @@ class RagService:
 
         resp = http.post(
             "/v1/embeddings",
-            json={"model": config.EMBED_MODEL_NAME, "input": list(texts)},
+            json={"model": model or config.EMBED_MODEL_NAME, "input": list(texts)},
         )
         resp.raise_for_status()
         body = resp.json()
@@ -172,13 +170,14 @@ class RagService:
         )
         return out
 
-    def _rerank(self, query: str, documents: list[str]) -> list[float]:
+    def _rerank(self, query: str, documents: list[str], model: Optional[str] = None) -> list[float]:
         """Return one 0-1 relevance score per document, in input order.
 
-        Forwards to llama-server's `/v1/rerank` with bge-reranker-v2-m3.
-        Server returns raw logits; we apply sigmoid client-side so
-        RERANK_MIN_SCORE=0.15 keeps the meaning it had under the
-        in-process sigmoid-of-RANK-pool path.
+        Forwards to llama-server's `/v1/rerank`. The `model` param lets
+        callers override the configured default (Phase 12: per-request
+        model selection); defaults to `config.RERANK_MODEL_NAME`.
+        Server returns raw logits; client-side sigmoid keeps
+        RERANK_MIN_SCORE thresholds calibrated.
         """
         if not documents:
             return []
@@ -186,7 +185,7 @@ class RagService:
         resp = http.post(
             "/v1/rerank",
             json={
-                "model": config.RERANK_MODEL_NAME,
+                "model": model or config.RERANK_MODEL_NAME,
                 "query": query,
                 "documents": list(documents),
             },
@@ -212,22 +211,19 @@ class RagService:
         top_k: int = config.FINAL_TOP_K,
         collection: Optional[str] = None,
         source_paths: Optional[list[str]] = None,
+        embed_model: Optional[str] = None,
+        rerank_model: Optional[str] = None,
     ) -> list[dict]:
         """Dense retrieve top-N, then cross-encoder rerank down to top_k.
 
-        Returns chunks with rerank score >= config.RERANK_MIN_SCORE. If
-        the top-1 score is below that threshold, returns an empty list
-        (the tool layer turns this into a 'no strong match' message so
-        the Assistant won't hallucinate from noise).
-
-        `collection` selects per-Domain ChromaDB collection name.
-        `source_paths` (optional) restricts the search to chunks whose
-        `source_path` metadata is in the given list - used by Assistant
-        tools that scope a query to specific document(s)."""
-        query_vec = self.embed([query])[0]
+        `embed_model` / `rerank_model` (optional) override the configured
+        defaults (Phase 12 per-request model selection). Both default to
+        config values for backward compatibility."""
+        query_vec = self.embed([query], model=embed_model)[0]
         return self.search_by_vector(
             query, query_vec, tags=tags, top_k=top_k,
             collection=collection, source_paths=source_paths,
+            rerank_model=rerank_model,
         )
 
     def search_by_vector(
@@ -238,6 +234,7 @@ class RagService:
         top_k: int = config.FINAL_TOP_K,
         collection: Optional[str] = None,
         source_paths: Optional[list[str]] = None,
+        rerank_model: Optional[str] = None,
     ) -> list[dict]:
         """Same shape as search() but takes a pre-computed query vector,
         skipping the bge-m3 embed step. The reranker still needs the
@@ -293,7 +290,7 @@ class RagService:
             return []
 
         _t_rerank_start = _time.perf_counter()
-        scores = self._rerank(query_text, docs)
+        scores = self._rerank(query_text, docs, model=rerank_model)
         _t_rerank = _time.perf_counter()
         logger.info(
             'SEARCH_TIMING %s coll=%s coll_count=%d dense_k=%d returned=%d '
@@ -338,6 +335,8 @@ class RagService:
         merge_top_n: Optional[int] = None,
         source_paths: Optional[list[str]] = None,
         query_vec: Optional[list[float]] = None,
+        embed_model: Optional[str] = None,
+        rerank_model: Optional[str] = None,
     ) -> list[dict]:
         """Multi-collection search with single-batch rerank.
 
@@ -365,7 +364,7 @@ class RagService:
         _t0 = _time.perf_counter()
         # 1. Embed once.
         if query_vec is None:
-            q_vec = self.embed([query])[0]
+            q_vec = self.embed([query], model=embed_model)[0]
         else:
             q_vec = query_vec
         _t_embed = _time.perf_counter()
@@ -438,7 +437,7 @@ class RagService:
 
         # 4. Single reranker batch.
         docs_only = [c[2] for c in candidates]
-        scores = self._rerank(query, docs_only)
+        scores = self._rerank(query, docs_only, model=rerank_model)
         _t_rerank = _time.perf_counter()
 
         ranked = sorted(
@@ -498,9 +497,11 @@ class RagService:
         ids: list[str],
         texts: list[str],
         replace: bool = True,
+        embed_model: Optional[str] = None,
     ) -> tuple[int, bool]:
         """Embed `texts` and upsert into `collection`. If replace, delete
-        the entire collection first (atomic-rebuild semantics)."""
+        the entire collection first (atomic-rebuild semantics).
+        `embed_model` overrides the configured default (Phase 12)."""
         if len(ids) != len(texts):
             raise ValueError("ids and texts must be same length")
         client = self._get_client()
@@ -512,7 +513,7 @@ class RagService:
             except Exception:
                 pass  # collection didn't exist, that's fine
         col = client.get_or_create_collection(collection)
-        vectors = self.embed(texts)
+        vectors = self.embed(texts, model=embed_model)
         # Upsert in batches to keep memory reasonable
         BATCH = 256
         n = len(ids)
@@ -525,10 +526,12 @@ class RagService:
             )
         return n, replaced
 
-    def cache_search(self, collection: str, query: str, top_k: int) -> list[dict]:
+    def cache_search(self, collection: str, query: str, top_k: int,
+                     embed_model: Optional[str] = None) -> list[dict]:
         """Vector-search a cached collection. Returns list of
-        {id, score, text} ordered by descending score."""
-        q_vec = self.embed([query])[0]
+        {id, score, text} ordered by descending score. `embed_model`
+        overrides the configured default (Phase 12)."""
+        q_vec = self.embed([query], model=embed_model)[0]
         return self.cache_search_by_vector(collection, q_vec, top_k)
 
     def cache_search_by_vector(

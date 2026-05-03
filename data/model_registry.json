@@ -1,0 +1,10 @@
+{
+  "active": {
+    "chat": null,
+    "embed": "bge-m3",
+    "rerank": null
+  },
+  "aliases": {
+    "gemma-4": "Gemma 4 (E4B Q4)"
+  }
+}

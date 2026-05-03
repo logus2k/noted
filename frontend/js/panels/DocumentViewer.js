@@ -88,19 +88,24 @@ export class DocumentViewer {
         // highlighted page.
         this._clearAllBboxHighlights();
 
-        // Paint each region's page in order. The first region is the
-        // chunk's anchor (earliest page seen at ingest time); scroll to
-        // it after painting so the user lands on the start of the chunk.
-        for (const r of regions) {
-            await this._paintBboxOnPage(r.page_no, r.bbox);
-        }
-
+        // Scroll FIRST so the user lands on the target page immediately
+        // and the IntersectionObserver kicks off rendering for THAT page
+        // instead of wasting a render cycle on page 1 (which is briefly
+        // visible at the initial scrollTop=0). PageDiv positions are
+        // aspect-ratio-locked placeholders, so the scroll math is valid
+        // even before any page has rendered.
         const firstIdx = (regions[0].page_no || 1) - 1;
         const firstPage = this._pdfState.pageDivs[firstIdx];
         if (firstPage && this._wrapper) {
             const hostRect = this._wrapper.getBoundingClientRect();
             const targetRect = firstPage.getBoundingClientRect();
             this._wrapper.scrollTop += targetRect.top - hostRect.top;
+        }
+
+        // Then paint bbox on each region. Page renders proceed in
+        // parallel with the user's first frame at the target page.
+        for (const r of regions) {
+            await this._paintBboxOnPage(r.page_no, r.bbox);
         }
     }
 

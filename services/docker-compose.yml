@@ -56,6 +56,11 @@ services:
     volumes:
       - ../data:/app/data
       - ../.noted:/app/.noted
+      # Phase 12 model_manager: mount the GGUF directories at the SAME
+      # container paths llama-vision uses, so /api/models can stat the
+      # files for vram_estimate without path translation. Both read-only.
+      - ${HOME}/env/assets/agent_server/data/models:/agent_server_models:ro
+      - ../data/models:/noted_models:ro
       # Mount volumes are auto-generated in ../data/docker-compose.mounts.yml
       # Include with: -f ../data/docker-compose.mounts.yml
     networks:

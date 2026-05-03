@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse
 
 import os
 from app.config import FRONTEND_DIR, PROJECTS_DIR, MOUNTS_DIR
-from app.routers import notebooks, venvs, documents, git, files, dvc, minio, projects, mlflow, export, hydra, airflow, snapshots, registry, serving, reports, graph_proxy, llm, lsp, dap, evidently, rag, kb, citations
+from app.routers import notebooks, venvs, documents, git, files, dvc, minio, projects, mlflow, export, hydra, airflow, snapshots, registry, serving, reports, graph_proxy, llm, lsp, dap, evidently, rag, kb, citations, models as models_router
 from app.managers.kernel_manager import KernelManagerService
 from app.managers.execution_bridge import ExecutionBridge
 from app.managers.auto_instrumentation import AutoInstrumentation
@@ -153,6 +153,7 @@ app.include_router(evidently.router)
 app.include_router(rag.router)
 app.include_router(kb.router)
 app.include_router(citations.router)
+app.include_router(models_router.router)
 from app.routers import file_debug
 app.include_router(file_debug.router)
 

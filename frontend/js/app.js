@@ -68,6 +68,12 @@ class App {
         this._documentViewer = null;
         /** @type {Map<string, object>} keyed by tab key "doc:category:name" → doc object */
         this._documentTabs = new Map();
+        /** @type {Map<string, DocumentViewer>} keyed by tab key "doc:category:name".
+         *  One DocumentViewer instance per open doc tab so each preserves its own
+         *  scroll position + rendered PDF state across tab switches. The
+         *  singleton _documentViewer above stays for shared markdown-rendering
+         *  helpers used by md preview tabs and other non-doc-tab callers. */
+        this._documentViewers = new Map();
         /** @type {Map<string, FileEditor>} keyed by tab key "pyfile:{projectId}:{filename}" */
         this._fileEditors = new Map();
         /** @type {Map<string, MediaViewer>} keyed by tab key "media:{projectId}:{filename}" */
@@ -1349,9 +1355,17 @@ class App {
         // Clean up document viewer when its tab is closed
         if (key.startsWith('doc:')) {
             this._documentTabs.delete(key);
-            // Only clear viewer if no other doc tabs remain
+            // Dispose the per-tab viewer so its PDF.js doc + rendered page
+            // canvases get freed (otherwise the bitmaps leak in browser RAM).
+            const perTab = this._documentViewers.get(key);
+            if (perTab) {
+                perTab.clear();
+                this._documentViewers.delete(key);
+            }
+            // Singleton helper: clear if no doc tabs remain so its
+            // _currentDoc state doesn't linger.
             const hasOtherDocTabs = [...this._documentTabs.keys()].length > 0;
-            if (!hasOtherDocTabs) {
+            if (!hasOtherDocTabs && this._documentViewer) {
                 this._documentViewer.clear();
             }
         }
