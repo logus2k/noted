@@ -83,6 +83,11 @@ class LLMRouter:
                                           model=self._active_model)
         return await manager.complete(prompt, max_tokens=max_tokens)
 
+    async def voice_summarize(self, answer_text: str) -> str:
+        """Voice fallback summary. Always uses the local model — fast,
+        cheap, and not worth billing Anthropic for."""
+        return await self._local.voice_summarize(answer_text)
+
     async def close(self):
         await self._local.close()
         if self._anthropic:

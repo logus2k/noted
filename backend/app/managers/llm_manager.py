@@ -130,6 +130,43 @@ class LLMManager:
         ]
         return await self.chat(messages, temperature=0.7, max_tokens=max_tokens)
 
+    # ── Voice summarizer (TTS fallback when model skipped <voice>) ─
+
+    async def voice_summarize(self, answer_text: str) -> str:
+        """One-shot summarization of an answer body for TTS playback. Uses
+        the `voice_summary` agent_server preset (dedicated short prompt,
+        no thinking, no tools, low max_tokens). Gemma still emits a
+        reasoning block which agent_server folds into the content as
+        `<think>...</think>...`; strip that here so TTS never speaks it.
+        Also strip any stray <voice> tags the preset might emit."""
+        import re
+        session = await self._get_session()
+        payload = {
+            "model": "voice_summary",
+            "messages": [{"role": "user", "content": answer_text}],
+            "stream": False,
+            "temperature": 0.3,
+            "max_tokens": 160,
+        }
+        async with session.post(f"{self.base_url}/v1/chat/completions",
+                                json=payload) as resp:
+            resp.raise_for_status()
+            data = await resp.json()
+        choices = data.get("choices", [])
+        raw = choices[0]["message"]["content"] if choices else ""
+        if not raw:
+            logger.info("VOICE_SUMMARY raw=empty (no choices)")
+            return ""
+        cleaned = re.sub(r'<think>[\s\S]*?</think>\s*', '', raw)
+        cleaned = re.sub(r'</?voice>', '', cleaned)
+        cleaned = cleaned.strip()
+        # TEMP-DIAG 2026-05-03: track stripping outcome so we can tell when
+        # the preset spent its budget on reasoning and left an empty
+        # summary. Remove once max_tokens budget proves stable.
+        logger.info("VOICE_SUMMARY raw_chars=%d cleaned_chars=%d cleaned=%r",
+                    len(raw), len(cleaned), cleaned[:200])
+        return cleaned
+
     # ── Health check ──────────────────────────────────────────────
 
     async def health(self) -> dict:

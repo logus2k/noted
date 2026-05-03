@@ -1,5 +1,13 @@
 import { AgentClient } from './AgentClient.js';
 import { AudioResampler } from './AudioResampler.js';
+// Client-side VAD: @ricky0123/vad-web (Silero v4 model + ONNX Runtime
+// Web). Used for two things: (1) detect user speech start mid-TTS to
+// trigger barge-in (stop the assistant), (2) gate the STT-streaming
+// pipe so TTS audio bleeding into the mic can't be transcribed (kills
+// the "Thank you" / "Okay" Whisper hallucination feedback loop).
+// vad-web is a UMD bundle that needs window.ort + window.vad globals,
+// loaded via <script> tags in index.html (see vendor/vad/ + vendor/
+// onnxruntime-web/). MIT + ISC licensed.
 
 const AGENT_URL = 'https://logus2k.com/llm';
 const STT_URL = 'https://logus2k.com/stt';
@@ -7,6 +15,14 @@ const STT_PATH = '/stt/socket.io';
 const TTS_URL = 'https://logus2k.com/tts';
 const TTS_PATH = '/tts/socket.io';
 const AGENT_NAME = 'noted';
+
+// Voice TTS fallback — when the chat model fails to emit a <voice>...</voice>
+// block, we still want speech to play. Strategy: clean the answer body
+// (strip markdown / citations / whitespace), then if the cleaned length
+// is at most VOICE_FALLBACK_MAX_CHARS, speak it verbatim; otherwise call
+// the backend voice_summary preset for a one-shot short summary and speak
+// that. Configurable here. See _voiceFallback() below.
+const VOICE_FALLBACK_MAX_CHARS = 150;
 
 // Random welcome messages shown when chat opens with no prior history.
 // Static (no LLM call) to avoid a race with the user's first message:
@@ -108,6 +124,28 @@ export class ChatService {
         this._welcomeText = '';
 
         this._userMessagesSent = 0;
+
+        // Tracks the AbortController of the in-flight chat request so a
+        // new sendMessage can cancel the previous one. Conversational
+        // interruption: when the user fires a new message before the
+        // current answer finishes, we abort the old SSE stream + drop
+        // its queued TTS so the two turns never overlap in the chat.
+        this._activeAbortController = null;
+
+        // Client VAD + barge-in / echo-loop prevention. vad-web manages
+        // its own internal AudioContext + worklet on the MediaStream we
+        // hand it; we just register the speech-start callback that fires
+        // _bargeIn() when the user starts talking during TTS playback.
+        this._vad = null;
+        // Flips true when at least one TTS audio chunk is queued or
+        // playing. While true, mic audio is NOT forwarded to STT
+        // (echo prevention).
+        this._ttsActive = false;
+        this._ttsActiveCount = 0;     // queued + playing chunk count
+        this._currentTtsSource = null; // most recent AudioBufferSourceNode
+        // Set true on barge-in; chunks arriving from the cancelled turn
+        // are dropped until the next _sendVoiceToTTS call clears it.
+        this._ttsBargedIn = false;
 
         this._wirePanel();
     }
@@ -576,6 +614,23 @@ export class ChatService {
     // --- Text chat ---
 
     async sendMessage(text, { showUserMessage = true, overrides = null } = {}) {
+        // Conversational interruption: if a previous turn is still streaming,
+        // abort it before opening the new one. Without this, the two SSE
+        // streams race into the chat and tokens from both turns interleave
+        // in whatever bubble is "current".
+        if (this._activeAbortController) {
+            this._activeAbortController.abort();
+            this._activeAbortController = null;
+            // Drop queued TTS for the cancelled turn so the user doesn't
+            // keep hearing the old answer over the new one. In-progress
+            // audio buffers play to completion (a few hundred ms tail).
+            this._ttsPlayQueue = Promise.resolve();
+            // Finalize any in-flight streaming bubble as a partial message
+            // so it stays in history with whatever rendered up to now.
+            this.chatPanel.finalizeStreamingMessage();
+            this.chatPanel.setLoading(false);
+            this.chatPanel.setThinkingIndicator(false);
+        }
         // Remove stale error messages from previous failed requests
         this.chatPanel.clearTransientErrors();
         // Show user message in chat (unless already shown by ChatPanel._handleSend)
@@ -614,6 +669,14 @@ export class ChatService {
         // assistant message via finalizeStreamingMessage so the user can open
         // the per-answer KG trace.
         let graphProvenance = null;
+        // Set when the model emits a write tool that needs user approval —
+        // voice (and the voice fallback) must stay silent until confirm.
+        let pendingActionSeen = false;
+        // Voice-first: the model emits <voice>...</voice> at the START of its
+        // visible response (right after </think>), so we can dispatch TTS
+        // mid-stream and let it play in parallel with the answer body. Once
+        // dispatched, the finalize-time fallback path must not double-fire.
+        let voiceDispatched = false;
 
         // Resolve per-call overrides (welcome path uses these to force
         // think_enabled=false and tools off without affecting the panel
@@ -621,6 +684,9 @@ export class ChatService {
         const _think = overrides?.thinkEnabled ?? this.chatPanel.thinkEnabled;
         const _vec = overrides?.vectorRagEnabled ?? this.chatPanel.vectorRagEnabled;
         const _graph = overrides?.graphRagEnabled ?? this.chatPanel.graphRagEnabled;
+
+        const abortController = new AbortController();
+        this._activeAbortController = abortController;
 
         try {
             const response = await fetch('api/llm/chat', {
@@ -636,6 +702,7 @@ export class ChatService {
                     vector_rag_enabled: _vec,
                     graph_rag_enabled: _graph,
                 }),
+                signal: abortController.signal,
             });
 
             if (!response.ok) {
@@ -718,11 +785,13 @@ export class ChatService {
                     // tool_call event separately.
                     if (data.pending_actions) {
                         parser.voiceText = ''; // suppress voice - change not confirmed yet
+                        pendingActionSeen = true;
                         this._showBatchConfirmationPanel(data.pending_actions);
                         continue;
                     }
                     if (data.pending_action) {
                         parser.voiceText = ''; // suppress voice - change not confirmed yet
+                        pendingActionSeen = true;
                         this._showBatchConfirmationPanel([data.pending_action]);
                         continue;
                     }
@@ -762,6 +831,15 @@ export class ChatService {
                                 fullAnswer += result.answer;
                                 this.chatPanel.appendToken(result.answer);
                             }
+                            // Voice-first: same-chunk extraction in the parser
+                            // sets parser.voiceText without firing a 'voice'
+                            // event. Dispatch immediately so TTS plays in
+                            // parallel with the answer body that just started
+                            // streaming above.
+                            if (!voiceDispatched && this.ttsEnabled && parser.voiceText && !pendingActionSeen) {
+                                this._sendVoiceToTTS(parser.voiceText);
+                                voiceDispatched = true;
+                            }
                             break;
                         case 'thinking_token':
                             this.chatPanel.appendLiveThinkingToken(result.token);
@@ -770,7 +848,14 @@ export class ChatService {
                             // Tool badges no longer render in chat - moved to Debug panel
                             break;
                         case 'voice':
-                            // Voice text collected - will be sent to TTS after finalization
+                            // Voice-first: dispatch TTS the moment the parser
+                            // closes the <voice> block. With the model emitting
+                            // voice BEFORE the answer body, audio starts playing
+                            // while the answer is still streaming on screen.
+                            if (!voiceDispatched && this.ttsEnabled && parser.voiceText && !pendingActionSeen) {
+                                this._sendVoiceToTTS(parser.voiceText);
+                                voiceDispatched = true;
+                            }
                             break;
                         case 'answer_token':
                             // First answer token marks "real content arriving" -
@@ -784,26 +869,119 @@ export class ChatService {
                 }
             }
         } catch (err) {
+            // Aborted by a new sendMessage — silent exit. The new turn
+            // has already cleaned up loading/thinking indicators and
+            // finalized whatever bubble was on screen.
+            if (err.name === 'AbortError' || abortController.signal.aborted) {
+                if (this._activeAbortController === abortController) {
+                    this._activeAbortController = null;
+                }
+                return;
+            }
             this.chatPanel.setLoading(false);
             this.chatPanel.setThinkingIndicator(false);
             this.chatPanel.addMessage('assistant', `Error: ${err.message}`);
+            if (this._activeAbortController === abortController) {
+                this._activeAbortController = null;
+            }
             return;
+        }
+
+        // Clear the in-flight pointer first so any post-completion work
+        // (voice dispatch, fallback) can't be aborted retroactively by a
+        // stale pointer if a new sendMessage races in right at this line.
+        if (this._activeAbortController === abortController) {
+            this._activeAbortController = null;
         }
 
         this.chatPanel.setThinkingIndicator(false);
         this.chatPanel.finalizeStreamingMessage(thinkingContent, graphProvenance);
 
-        // Send voice summary to TTS if active
-        if (this.ttsEnabled && parser.voiceText) {
+        // Voice dispatch (only if the mid-stream path didn't already fire).
+        // Voice-first ordering means voiceDispatched is normally true by
+        // here; this branch handles the legacy/old-prompt path or a parser
+        // miss where voice didn't surface as an event during the stream.
+        if (voiceDispatched) {
+            // Already speaking — nothing to do.
+        } else if (this.ttsEnabled && parser.voiceText) {
             this._sendVoiceToTTS(parser.voiceText);
+        } else if (this.ttsEnabled && !pendingActionSeen && fullAnswer) {
+            // Defensive fallback: model skipped <voice>. Speak the answer
+            // (or a one-shot summary of it) instead of going silent.
+            // TEMP-DIAG 2026-05-03: log so we can correlate with backend
+            // VOICE_CAPTURED logs. If the backend captured voice for the
+            // same turn, the frontend parser missed something; investigate
+            // the streaming ThinkingParser. Remove once the parser-miss
+            // bug is found and fixed.
+            console.info('[ChatService] voice fallback fired - parser.voiceText empty, fullAnswer length=', fullAnswer.length);
+            this._voiceFallback(fullAnswer, abortController.signal);
         }
 
         // History is managed server-side by ProjectMemory
     }
 
+    /** Strip markdown, citation tags, code, URLs, and collapse whitespace
+     *  so the result is plain prose suitable for TTS. */
+    _cleanAnswerForVoice(text) {
+        if (!text) return '';
+        let s = text;
+        // Citation tags: [markdown_chunk:hex], [E:type:id], [R:...], bare hex too.
+        s = s.replace(/\[(?:markdown_chunk|E|R|C\d+):[^\]]+\]/g, '');
+        // Code fences (``` ... ```) - drop the whole block; speaking code is awful.
+        s = s.replace(/```[\s\S]*?```/g, ' ');
+        // Inline code `like this` -> like this
+        s = s.replace(/`([^`]+)`/g, '$1');
+        // Markdown links [text](url) -> text
+        s = s.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
+        // Emphasis: **bold**, *italic*, __bold__, _italic_  -> bare text
+        s = s.replace(/\*\*([^*]+)\*\*/g, '$1').replace(/\*([^*]+)\*/g, '$1');
+        s = s.replace(/__([^_]+)__/g, '$1').replace(/_([^_]+)_/g, '$1');
+        // Headings: ## Section -> Section
+        s = s.replace(/^\s*#{1,6}\s+/gm, '');
+        // Bullets / numbered list markers at line start
+        s = s.replace(/^\s*[-*+]\s+/gm, '');
+        s = s.replace(/^\s*\d+\.\s+/gm, '');
+        // Collapse all whitespace (newlines too) to single spaces.
+        s = s.replace(/\s+/g, ' ').trim();
+        return s;
+    }
+
+    /** Fired when the model produced an answer but no <voice> block. Speaks
+     *  the cleaned answer if it fits, otherwise asks the backend for a
+     *  one-shot summary. Silent on error (no fallback-of-fallback).
+     *  Accepts the originating turn's AbortSignal so a user interruption
+     *  also cancels the summary call and prevents stale audio. */
+    async _voiceFallback(rawAnswer, signal = null) {
+        const cleaned = this._cleanAnswerForVoice(rawAnswer);
+        if (!cleaned) return;
+        if (signal?.aborted) return;
+        if (cleaned.length <= VOICE_FALLBACK_MAX_CHARS) {
+            this._sendVoiceToTTS(cleaned);
+            return;
+        }
+        try {
+            const resp = await fetch('api/llm/voice_summary', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ answer: cleaned }),
+                signal,
+            });
+            if (!resp.ok || signal?.aborted) return;
+            const data = await resp.json();
+            const summary = (data?.summary || '').trim();
+            if (summary && !signal?.aborted) this._sendVoiceToTTS(summary);
+        } catch {
+            // Stay silent — fallback failure (or abort) is preferable to noise.
+        }
+    }
+
     /** Send extracted <voice> text to TTS for speech output. */
     _sendVoiceToTTS(text) {
         if (!this._ttsSocket?.connected || !text) return;
+        // New TTS request — re-open the audio chunk pipeline that
+        // _bargeIn closed. Without this, every turn after the first
+        // barge-in would be silent.
+        this._ttsBargedIn = false;
         try {
             this._ttsSocket.emit('tts_text_chunk', {
                 chunk: text,
@@ -813,6 +991,24 @@ export class ChatService {
         } catch (err) {
             console.warn('[ChatService] Voice TTS failed:', err);
         }
+    }
+
+    /** Hard-stop TTS playback. Called when VAD detects user speech
+     *  while TTS is active (barge-in), or when the server emits
+     *  tts_stop_immediate. Drains the play queue, stops the in-flight
+     *  AudioBufferSourceNode (so the cut is instant, not the ~200 ms
+     *  tail of the last buffer), and arms the stale-chunk guard so
+     *  audio still in flight from the cancelled turn is dropped on
+     *  arrival rather than enqueued. */
+    _bargeIn() {
+        this._ttsPlayQueue = Promise.resolve();
+        if (this._currentTtsSource) {
+            try { this._currentTtsSource.stop(); } catch {}
+            this._currentTtsSource = null;
+        }
+        this._ttsActive = false;
+        this._ttsActiveCount = 0;
+        this._ttsBargedIn = true;
     }
 
     // --- Voice (STT) ---
@@ -829,6 +1025,35 @@ export class ChatService {
             const source = this._audioContext.createMediaStreamSource(this._mediaStream);
             this._workletNode = new AudioWorkletNode(this._audioContext, 'recorder-worklet');
             this._resampler = new AudioResampler(48000, 16000);
+
+            // Initialize Silero VAD via vad-web. Runs in its own internal
+            // worklet on the same MediaStream; fires onSpeechStart when
+            // the user begins speaking. We only act on it during TTS
+            // playback (barge-in). Globals (window.vad, window.ort) come
+            // from <script> tags in index.html.
+            try {
+                if (window.vad?.MicVAD && window.ort) {
+                    // Point ONNX runtime at the vendored WASM binary
+                    // (default fetches from same path as the JS, which
+                    // would 404 since the JS is at vendor/onnxruntime-
+                    // web/ but we serve via /static/ alias).
+                    window.ort.env.wasm.wasmPaths = 'static/vendor/onnxruntime-web/';
+                    this._vad = await window.vad.MicVAD.new({
+                        stream: this._mediaStream,
+                        modelURL: 'static/vendor/vad/silero_vad_legacy.onnx',
+                        workletURL: 'static/vendor/vad/vad.worklet.bundle.min.js',
+                        onSpeechStart: () => {
+                            if (this._ttsActive) this._bargeIn();
+                        },
+                    });
+                    this._vad.start();
+                } else {
+                    console.warn('[ChatService] VAD globals missing; barge-in disabled');
+                }
+            } catch (vadErr) {
+                console.warn('[ChatService] VAD init failed; barge-in disabled:', vadErr);
+                this._vad = null;
+            }
 
             // Connect STT socket
             const sttOrigin = new URL(STT_URL, window.location.origin).origin;
@@ -855,6 +1080,13 @@ export class ChatService {
                 const chunk = event.data;
                 if (!chunk?.length) return;
 
+                // VAD runs in vad-web's own internal worklet on the same
+                // MediaStream — no per-frame work needed here. The only
+                // gate this handler enforces is STT echo prevention:
+                // accumulate to ~100ms packet, resample to 16k, ship to
+                // STT socket — SUPPRESSED while TTS is playing so the
+                // assistant's own voice (bleeding through speakers /
+                // imperfect echo cancellation) can't be transcribed.
                 pending.push(chunk);
                 pendingLength += chunk.length;
 
@@ -867,6 +1099,14 @@ export class ChatService {
                     }
                     pending = [];
                     pendingLength = 0;
+
+                    if (this._ttsActive) {
+                        // Drop the packet but still pump the resampler so
+                        // its internal phase stays correct for when we
+                        // resume streaming after barge-in.
+                        this._resampler.pushFloat32(merged);
+                        return;
+                    }
 
                     const pcm16 = this._resampler.pushFloat32(merged);
                     if (pcm16?.length > 0 && this._sttSocket?.connected) {
@@ -905,6 +1145,11 @@ export class ChatService {
         if (this._mediaStream) { this._mediaStream.getTracks().forEach(t => t.stop()); this._mediaStream = null; }
         if (this._resampler) { this._resampler.reset(); this._resampler = null; }
         if (this._sttSocket) { this._sttSocket.disconnect(); this._sttSocket = null; }
+        if (this._vad) {
+            try { this._vad.pause(); } catch {}
+            try { this._vad.destroy(); } catch {}
+            this._vad = null;
+        }
         if (this.agentClient && this.clientId) {
             try { await this.agentClient.sttUnsubscribe({ sttUrl: STT_URL, clientId: this.clientId }); } catch {}
         }
@@ -950,6 +1195,11 @@ export class ChatService {
             this._ttsSocket.on('tts_audio_chunk', async (evt) => {
                 const buf = evt?.audio_buffer;
                 if (!buf) return;
+                // Stale-chunk guard: if barge-in fired and we haven't yet
+                // sent a new tts_text_chunk, drop chunks still arriving
+                // from the cancelled turn so they don't play after the
+                // user already interrupted. Cleared in _sendVoiceToTTS.
+                if (this._ttsBargedIn) return;
 
                 const actx = this._ensureTtsAudioContext();
                 let audioBuf;
@@ -960,22 +1210,41 @@ export class ChatService {
                     return;
                 }
 
+                // Mark TTS active for the worklet's STT-gating logic
+                // (suppress sending mic packets to STT while we're
+                // playing audio — kills the echo hallucination loop).
+                this._ttsActive = true;
+                this._ttsActiveCount++;
+
                 this._ttsPlayQueue = this._ttsPlayQueue.then(() => {
                     const src = actx.createBufferSource();
                     src.buffer = audioBuf;
                     src.connect(actx.destination);
+                    this._currentTtsSource = src;
                     src.start();
-                    return new Promise(res => { src.onended = res; });
+                    return new Promise(res => {
+                        src.onended = () => {
+                            if (this._currentTtsSource === src) {
+                                this._currentTtsSource = null;
+                            }
+                            this._ttsActiveCount = Math.max(0, this._ttsActiveCount - 1);
+                            if (this._ttsActiveCount === 0) {
+                                this._ttsActive = false;
+                            }
+                            res();
+                        };
+                    });
                 });
             });
 
             this._ttsSocket.on('tts_stop_immediate', () => {
-                // DO NOT close the AudioContext - it was created during the
-                // user-gesture stack of the TTS-toggle click; closing it
-                // means the next message has to recreate it OUTSIDE any
-                // gesture, which Chrome forces into `suspended` state and
-                // silently swallows playback. Just drain the play queue.
-                this._ttsPlayQueue = Promise.resolve();
+                // Server-initiated stop. Treat the same as a local barge-in:
+                // drain the queue, hard-stop the in-flight source, mark
+                // inactive. AudioContext stays open (created in the
+                // user-gesture stack of the TTS toggle click; closing it
+                // means future messages would need to recreate it OUTSIDE
+                // any gesture, which Chrome forces into `suspended` state).
+                this._bargeIn();
             });
 
             this.ttsEnabled = true;
@@ -1264,6 +1533,10 @@ export class ChatService {
             const parser = new ThinkingParser();
             let thinkingContent = '';
             let fullAnswer = '';
+            // Voice-first: dispatch TTS the moment the parser surfaces the
+            // <voice> block (mid-stream), not at end-of-stream. See the
+            // primary consumer in _sendWithContext for full rationale.
+            let voiceDispatched = false;
 
             while (true) {
                 const { done, value } = await reader.read();
@@ -1323,8 +1596,16 @@ export class ChatService {
                                 fullAnswer += result.answer;
                                 this.chatPanel.appendToken(result.answer);
                             }
+                            if (!voiceDispatched && this.ttsEnabled && parser.voiceText) {
+                                this._sendVoiceToTTS(parser.voiceText);
+                                voiceDispatched = true;
+                            }
                             break;
                         case 'voice':
+                            if (!voiceDispatched && this.ttsEnabled && parser.voiceText) {
+                                this._sendVoiceToTTS(parser.voiceText);
+                                voiceDispatched = true;
+                            }
                             break;
                         case 'answer_token':
                             // First answer token marks "real content arriving" -
@@ -1338,8 +1619,12 @@ export class ChatService {
                 }
             }
             this.chatPanel.finalizeStreamingMessage(thinkingContent);
-            if (this.ttsEnabled && parser.voiceText) {
+            if (voiceDispatched) {
+                // Already speaking — nothing to do.
+            } else if (this.ttsEnabled && parser.voiceText) {
                 this._sendVoiceToTTS(parser.voiceText);
+            } else if (this.ttsEnabled && fullAnswer) {
+                this._voiceFallback(fullAnswer);
             }
 
         } catch (err) {
@@ -1480,13 +1765,30 @@ class ThinkingParser {
      *  returns the cleaned answer with the voice block removed. Without this,
      *  responses that arrive as one big token (think + answer + voice all
      *  together) leak the voice text into the visible chat AND leave
-     *  voiceText empty so TTS never fires. */
+     *  voiceText empty so TTS never fires.
+     *
+     *  Voice-first added a new edge case: with the model emitting <voice>
+     *  immediately after </think>, the chunk that closes thinking often
+     *  contains the OPENER but not the CLOSER (e.g. "</think><voice>partial
+     *  spoken te"). The simple regex-or-nothing path used to leak that
+     *  partial as literal chat text and never set voiceText. Now we also
+     *  detect the unclosed opener, enter `_inVoice` so the streaming
+     *  state machine catches the </voice> in the next chunk, and stash
+     *  the post-opener content in _voiceBuffer. */
     _extractVoiceFromAnswer(answer) {
         if (!answer) return answer;
         const m = answer.match(/<voice>([\s\S]*?)<\/voice>/);
-        if (!m) return answer;
-        this.voiceText = (this.voiceText ? this.voiceText + ' ' : '') + m[1].trim();
-        return (answer.slice(0, m.index) + answer.slice(m.index + m[0].length)).trim();
+        if (m) {
+            this.voiceText = (this.voiceText ? this.voiceText + ' ' : '') + m[1].trim();
+            return (answer.slice(0, m.index) + answer.slice(m.index + m[0].length)).trim();
+        }
+        const openIdx = answer.indexOf('<voice>');
+        if (openIdx >= 0) {
+            this._inVoice = true;
+            this._voiceBuffer = answer.slice(openIdx + '<voice>'.length);
+            return answer.slice(0, openIdx).trim();
+        }
+        return answer;
     }
 
     processToken(token) {

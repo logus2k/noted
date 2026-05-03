@@ -1962,6 +1962,26 @@ async def llm_complete(prompt: str, max_tokens: int = 256):
         raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {e}")
 
 
+class VoiceSummaryRequest(BaseModel):
+    answer: str
+
+
+@router.post("/voice_summary")
+async def llm_voice_summary(request: VoiceSummaryRequest):
+    """Summarize an answer body for TTS playback. Frontend calls this when
+    the chat model failed to emit a <voice> block AND the answer is too
+    long to speak verbatim."""
+    text = (request.answer or "").strip()
+    if not text:
+        return {"summary": ""}
+    try:
+        summary = await llm_mgr.voice_summarize(text)
+        return {"summary": summary}
+    except Exception as e:
+        logger.exception("Voice summary failed")
+        raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {e}")
+
+
 _NOTED_SECRET = os.environ.get("NOTED_TERMINAL_SECRET", "")
 
 
@@ -2027,8 +2047,14 @@ def _strip_thinking_and_tools(text: str) -> str:
     # by the time we strip here the audio is already playing, but the source
     # text isn't visible elsewhere in our logs). Strip after analysis when
     # not needed any more.
-    for _vb in re.findall(r'<voice>([\s\S]*?)</voice>', text):
+    _matches = re.findall(r'<voice>([\s\S]*?)</voice>', text)
+    for _vb in _matches:
         logger.info("VOICE_CAPTURED chars=%d content=%r", len(_vb), _vb[:500])
+    if not _matches:
+        _has_open = '<voice>' in text
+        _tail = text[-300:] if len(text) > 300 else text
+        logger.info("VOICE_MISSING has_open=%s text_len=%d tail=%r",
+                    _has_open, len(text), _tail)
     text = re.sub(r'<think>[\s\S]*?</think>\s*', '', text)
     text = re.sub(r'<tool_call>[\s\S]*?</tool_call>\s*', '', text)
     text = re.sub(r'<voice>[\s\S]*?</voice>\s*', '', text)
@@ -2041,8 +2067,14 @@ def _strip_thinking_and_voice(text: str) -> str:
     tool history."""
     import re
     # TEMP-DIAG 2026-05-03: see _strip_thinking_and_tools above for context.
-    for _vb in re.findall(r'<voice>([\s\S]*?)</voice>', text):
+    _matches = re.findall(r'<voice>([\s\S]*?)</voice>', text)
+    for _vb in _matches:
         logger.info("VOICE_CAPTURED chars=%d content=%r", len(_vb), _vb[:500])
+    if not _matches:
+        _has_open = '<voice>' in text
+        _tail = text[-300:] if len(text) > 300 else text
+        logger.info("VOICE_MISSING has_open=%s text_len=%d tail=%r",
+                    _has_open, len(text), _tail)
     text = re.sub(r'<think>[\s\S]*?</think>\s*', '', text)
     text = re.sub(r'<voice>[\s\S]*?</voice>\s*', '', text)
     return text.strip()

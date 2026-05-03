@@ -118,6 +118,12 @@
     <script src="static/vendor/notyf.min.js"></script>
     <script src="static/vendor/echarts.min.js"></script>
     <script src="static/vendor/dagre.min.js"></script>
+    <!-- Voice Activity Detection (Silero VAD via ONNX Runtime Web). Loaded
+         as globals (window.ort + window.vad) because @ricky0123/vad-web is
+         a UMD bundle. Used by ChatService for barge-in + STT-during-TTS
+         echo prevention. ort.min.js MUST come before bundle.min.js. -->
+    <script src="static/vendor/onnxruntime-web/ort.wasm.min.js"></script>
+    <script src="static/vendor/vad/bundle.min.js"></script>
 
     <script type="module" src="static/js/app.js"></script>
 </body>
