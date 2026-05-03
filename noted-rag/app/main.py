@@ -40,38 +40,67 @@ _jobs: dict[str, dict] = {}
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("noted-rag starting; CHROMA_DIR=%s MODEL_CACHE=%s DOC_ROOT=%s DEVICE=%s",
-                config.CHROMA_DIR, config.MODEL_CACHE, config.DOC_ROOT, config.DEVICE)
+    logger.info("noted-rag starting; CHROMA_DIR=%s DOC_ROOT=%s LLAMA_SERVER_URL=%s",
+                config.CHROMA_DIR, config.DOC_ROOT, config.LLAMA_SERVER_URL)
     config.ensure_dirs()
 
-    # Pre-load the embedder + reranker so the FIRST /search request hits
-    # warm GPU instead of racing the noted-side 8 s client timeout against
-    # a ~30 s cold model load. Without this warm-up the first user-facing
-    # search reliably comes back as "unavailable" even though the service
-    # is healthy. asyncio.to_thread keeps the event loop responsive
-    # (only matters if anything else were running during startup, which
-    # it isn't, but keeps the pattern correct).
-    #
-    # If a model fails to load we let the exception propagate. Per
-    # `feedback_no_silent_degradation` partial readiness (/health OK but
-    # /search broken) is worse than a crash loop the operator can see.
+    # Probe the llama-server router for our two models. The router has
+    # `load-on-startup = true` for both, so by the time we reach this
+    # point the upstream models are warm — but if the router is unreachable
+    # or the model names don't match the router preset, we want a loud
+    # crash now rather than per-request 500s once traffic arrives. Per
+    # `feedback_no_silent_degradation`, partial readiness is worse than a
+    # crash loop the operator can see.
     t0 = time.perf_counter()
-    await asyncio.to_thread(rag._get_embedder)
-    t_embed = time.perf_counter() - t0
-    await asyncio.to_thread(rag._get_reranker)
-    t_rerank = (time.perf_counter() - t0) - t_embed
+    try:
+        probe = await asyncio.to_thread(_probe_upstream_models)
+        logger.info("upstream models reachable: %s", ", ".join(probe))
+    except Exception as e:
+        logger.exception("upstream llama-server probe failed: %s", e)
+        raise
+    t_probe = time.perf_counter() - t0
     # Also warm the chroma client. Without this, the FIRST /search_multi
     # call after startup races chromadb's internal `_instances` dict with
     # any concurrent caller (e.g., a speculative + chat call landing
     # near-simultaneously), surfacing as
     # `RuntimeError: dictionary changed size during iteration`.
     await asyncio.to_thread(rag._get_client)
-    t_chroma = (time.perf_counter() - t0) - t_embed - t_rerank
-    logger.info("noted-rag warm-up done: embedder=%.1fs reranker=%.1fs chroma=%.1fs total=%.1fs",
-                t_embed, t_rerank, t_chroma, time.perf_counter() - t0)
+    t_chroma = (time.perf_counter() - t0) - t_probe
+    logger.info("noted-rag warm-up done: upstream_probe=%.1fs chroma=%.1fs total=%.1fs",
+                t_probe, t_chroma, time.perf_counter() - t0)
 
     yield
     logger.info("noted-rag shutting down")
+
+
+def _probe_upstream_models() -> list[str]:
+    """List model ids reported by the llama-server router and assert
+    that both EMBED_MODEL_NAME and RERANK_MODEL_NAME are present and in
+    `loaded` state. Returns the discovered ids for logging."""
+    import httpx
+    expected = {config.EMBED_MODEL_NAME, config.RERANK_MODEL_NAME}
+    with httpx.Client(base_url=config.LLAMA_SERVER_URL, timeout=10.0) as c:
+        r = c.get("/v1/models")
+        r.raise_for_status()
+        body = r.json()
+    seen: dict[str, str] = {}
+    for entry in body.get("data", []):
+        mid = entry.get("id") or ""
+        status = ((entry.get("status") or {}).get("value")) or "unknown"
+        seen[mid] = status
+    missing = [m for m in expected if m not in seen]
+    if missing:
+        raise RuntimeError(
+            f"llama-server is missing required model(s) {missing}; "
+            f"got {sorted(seen.keys())}"
+        )
+    not_loaded = [m for m in expected if seen.get(m) != "loaded"]
+    if not_loaded:
+        raise RuntimeError(
+            f"llama-server has model(s) {not_loaded} in non-loaded state: "
+            f"{ {m: seen.get(m) for m in not_loaded} }"
+        )
+    return [f"{m}={seen[m]}" for m in sorted(expected)]
 
 
 app = FastAPI(title="noted-rag", version="0.1.0", lifespan=lifespan)
@@ -195,7 +224,7 @@ class CacheDropRequest(BaseModel):
 
 @app.get("/health")
 async def health() -> dict:
-    return {"status": "ok", "device": config.DEVICE}
+    return {"status": "ok", "llama_server_url": config.LLAMA_SERVER_URL}
 
 
 @app.post("/search", response_model=SearchResponse)

@@ -31,17 +31,6 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
-  noted-rag:
-    environment:
-      - NVIDIA_VISIBLE_DEVICES=all
-      - DEVICE=cuda
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
   noted-graph:
     # GPU used for the sameAs pairwise cosine pass via CuPy.
     # Brief sub-second spikes during rebuild, no sustained load.

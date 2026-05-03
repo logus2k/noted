@@ -1,15 +1,14 @@
-"""Core RAG service: lazy model loading, dense retrieval + cross-encoder rerank.
+"""Core RAG service: dense retrieval + cross-encoder rerank.
 
 Single `noted_corpus` collection. `search` runs over the whole corpus by
 default; optional `tags` narrow via Chroma `where` filters. A minimum
 rerank score guards against hallucinating on empty-signal queries.
 
-Models are loaded on first use (not at startup) so `/health` is always fast
-and the service is resilient to a cold model cache.
-
-Embeddings + reranking run on llama-cpp-python (CUDA) against bge-m3 +
-bge-reranker-v2-m3 GGUF Q8_0 weights — saves ~1 GB GPU vs PyTorch fp16
-with score quality within 0.5% on retrieval benchmarks.
+Embeddings + reranking are forwarded over HTTP to a llama-server router
+(default `http://llama-vision:8500`) hosting bge-m3 (CLS pool) and
+bge-reranker-v2-m3 (RANK pool). The previous in-process llama-cpp-python
+path is gone — the router is shared with agent_server so the bge models
+are loaded once GPU-side instead of once per service.
 """
 
 from __future__ import annotations
@@ -17,72 +16,15 @@ from __future__ import annotations
 import contextvars
 import logging
 import math
-import os
 from typing import Optional
 
 import chromadb
+import httpx
 
 from . import config
 from .ingest import COLLECTION_NAME
 
 logger = logging.getLogger(__name__)
-
-
-# llama-cpp-python pooling types (from llama.h).
-_POOLING_CLS = 2
-_POOLING_RANK = 4
-
-
-class _GgufReranker:
-    """Thin wrapper that exposes a sentence-transformers-style `predict`
-    interface on top of a llama_cpp.Llama instance loaded with RANK pooling.
-
-    For bge-reranker-v2-m3 (XLM-RoBERTa-based), each (query, doc) pair is
-    formatted with the model's separator pattern and fed through the
-    classification head. RANK-pooled output is the raw logit; we apply
-    sigmoid so the result is a 0-1 probability matching what
-    sentence-transformers' CrossEncoder.predict() returns by default
-    (so the existing RERANK_MIN_SCORE=0.15 threshold keeps its meaning).
-    """
-
-    def __init__(self, llm):
-        self._llm = llm
-
-    @staticmethod
-    def _format_pair(query: str, doc: str) -> str:
-        # XLM-RoBERTa sentence-pair format. llama.cpp's tokenizer adds the
-        # leading <s> and trailing </s>; the explicit </s></s> in the middle
-        # is the inter-sentence separator the BGE rerankers were trained on.
-        return f"{query} </s></s> {doc}"
-
-    @staticmethod
-    def _sigmoid(x: float) -> float:
-        # Numerically stable sigmoid.
-        if x >= 0:
-            z = math.exp(-x)
-            return 1.0 / (1.0 + z)
-        z = math.exp(x)
-        return z / (1.0 + z)
-
-    def predict(self, pairs: list[tuple[str, str]]) -> list[float]:
-        if not pairs:
-            return []
-        # Loop one pair at a time. Passing a list to create_embedding(list)
-        # makes llama-cpp-python pack multiple sequences (different
-        # seq_ids) into one llama_batch then call _ctx.decode() — and
-        # that multi-sequence decode aborts with `llama_decode returned -1`
-        # for RANK-pooled rerankers. Per-pair calls keep each decode
-        # single-sequence, which is the supported path. Throughput on
-        # cuda Q8 is ~20-30 ms per pair (~500 ms for a 20-doc rerank).
-        out: list[float] = []
-        for q, d in pairs:
-            prompt = self._format_pair(q, d)
-            result = self._llm.create_embedding(prompt)
-            entry = result["data"][0]
-            emb = entry["embedding"]
-            raw = float(emb[0]) if isinstance(emb, (list, tuple)) else float(emb)
-            out.append(self._sigmoid(raw))
-        return out
 
 
 # Per-request correlation context. Set by the FastAPI middleware in main.py
@@ -133,11 +75,24 @@ def _parse_tags_to_where(tags: Optional[list[str]]) -> Optional[dict]:
     return {"$and": filters}
 
 
+def _sigmoid(x: float) -> float:
+    # Numerically stable sigmoid. /v1/rerank returns raw logits; we map
+    # to 0-1 so RERANK_MIN_SCORE keeps the same meaning the in-process
+    # path established (sentence-transformers default + sigmoid).
+    if x >= 0:
+        z = math.exp(-x)
+        return 1.0 / (1.0 + z)
+    z = math.exp(x)
+    return z / (1.0 + z)
+
+
 class RagService:
     def __init__(self) -> None:
         self._client: Optional[chromadb.ClientAPI] = None
-        self._embedder = None  # llama_cpp.Llama (bge-m3 GGUF, embedding=True)
-        self._reranker = None  # _GgufReranker (wraps llama_cpp.Llama, RANK pooling)
+        # Shared httpx.Client with keep-alive to llama-vision. Keeps the
+        # TCP connection warm across requests so a chat turn's two embed
+        # calls + rerank batch don't pay handshake cost three times.
+        self._http: Optional[httpx.Client] = None
 
     # ── Lazy accessors ─────────────────────────────────────────────
 
@@ -147,80 +102,52 @@ class RagService:
             self._client = chromadb.PersistentClient(path=str(config.CHROMA_DIR))
         return self._client
 
-    def _get_embedder(self):
-        if self._embedder is None:
-            from llama_cpp import Llama
-
-            n_gpu_layers = (
-                config.MODEL_N_GPU_LAYERS
-                if str(config.DEVICE).startswith('cuda') else 0
+    def _get_http(self) -> httpx.Client:
+        if self._http is None:
+            self._http = httpx.Client(
+                base_url=config.LLAMA_SERVER_URL,
+                timeout=httpx.Timeout(60.0, connect=5.0),
+                limits=httpx.Limits(max_keepalive_connections=4, max_connections=8),
             )
-            logger.info(
-                "Loading embedder %s (n_ctx=%d, n_gpu_layers=%d, device=%s)",
-                config.EMBED_MODEL_PATH, config.MODEL_N_CTX,
-                n_gpu_layers, config.DEVICE,
-            )
-            self._embedder = Llama(
-                model_path=config.EMBED_MODEL_PATH,
-                embedding=True,
-                pooling_type=_POOLING_CLS,
-                n_ctx=config.MODEL_N_CTX,
-                n_gpu_layers=n_gpu_layers,
-                verbose=False,
-            )
-        return self._embedder
-
-    def _get_reranker(self):
-        if self._reranker is None:
-            from llama_cpp import Llama
-
-            n_gpu_layers = (
-                config.MODEL_N_GPU_LAYERS
-                if str(config.DEVICE).startswith('cuda') else 0
-            )
-            logger.info(
-                "Loading reranker %s (n_ctx=%d, n_gpu_layers=%d, device=%s)",
-                config.RERANK_MODEL_PATH, config.MODEL_N_CTX,
-                n_gpu_layers, config.DEVICE,
-            )
-            llm = Llama(
-                model_path=config.RERANK_MODEL_PATH,
-                embedding=True,
-                pooling_type=_POOLING_RANK,
-                n_ctx=config.MODEL_N_CTX,
-                n_gpu_layers=n_gpu_layers,
-                verbose=False,
-            )
-            self._reranker = _GgufReranker(llm)
-        return self._reranker
+        return self._http
 
     # ── Public API ────────────────────────────────────────────────
 
     def embed(self, texts: list[str]) -> list[list[float]]:
         """Return L2-normalized dense embeddings for a list of strings.
 
-        Uses bge-m3 GGUF Q8 via llama-cpp-python; CLS-pooled then explicitly
-        L2-normalized so cosine similarity in Chroma matches what the
-        original sentence-transformers path produced (which had
-        normalize_embeddings=True).
+        Forwards to llama-server's `/v1/embeddings` with the bge-m3 model.
+        Batched in a single POST — the multi-sequence-decode bug that
+        forced per-input loops in the in-process path does not affect
+        llama-server (different code path).
 
-        Loops per text — same llama-cpp-python multi-sequence-decode
-        failure mode as the reranker (see _GgufReranker.predict).
-        Per-text calls keep each decode single-sequence. Ingestion is
-        the only multi-text caller and is rare relative to per-query
-        embeds.
+        bge-m3 is CLS-pooled server-side; we explicitly L2-normalize
+        client-side so cosine similarity in Chroma matches what the
+        sentence-transformers path produced (which had
+        normalize_embeddings=True). Cheap relative to network +
+        embedding cost.
         """
         import time
         t0 = time.perf_counter()
         if not texts:
             return []
-        model = self._get_embedder()
-        t_model = time.perf_counter()
+        http = self._get_http()
+        t_client = time.perf_counter()
 
+        resp = http.post(
+            "/v1/embeddings",
+            json={"model": config.EMBED_MODEL_NAME, "input": list(texts)},
+        )
+        resp.raise_for_status()
+        body = resp.json()
+        t_http = time.perf_counter()
+
+        # Server returns entries possibly in input order with an `index`
+        # field. Sort by index defensively, then normalize.
+        entries = sorted(body.get("data", []), key=lambda e: int(e.get("index", 0)))
         out: list[list[float]] = []
-        for txt in texts:
-            result = model.create_embedding(txt)
-            v = result["data"][0]["embedding"]
+        for entry in entries:
+            v = entry["embedding"]
             if v and isinstance(v[0], (list, tuple)):
                 v = v[0]
             norm_sq = 0.0
@@ -234,15 +161,42 @@ class RagService:
         t_done = time.perf_counter()
 
         logger.info(
-            'EMBED_TIMING %s n=%d chars=%d total_ms=%.1f get_model_ms=%.1f encode_ms=%.1f',
+            'EMBED_TIMING %s n=%d chars=%d total_ms=%.1f get_client_ms=%.1f http_ms=%.1f normalize_ms=%.1f',
             _trace_tag(),
             len(texts),
             sum(len(t) for t in texts),
             (t_done - t0) * 1000,
-            (t_model - t0) * 1000,
-            (t_done - t_model) * 1000,
+            (t_client - t0) * 1000,
+            (t_http - t_client) * 1000,
+            (t_done - t_http) * 1000,
         )
         return out
+
+    def _rerank(self, query: str, documents: list[str]) -> list[float]:
+        """Return one 0-1 relevance score per document, in input order.
+
+        Forwards to llama-server's `/v1/rerank` with bge-reranker-v2-m3.
+        Server returns raw logits; we apply sigmoid client-side so
+        RERANK_MIN_SCORE=0.15 keeps the meaning it had under the
+        in-process sigmoid-of-RANK-pool path.
+        """
+        if not documents:
+            return []
+        http = self._get_http()
+        resp = http.post(
+            "/v1/rerank",
+            json={
+                "model": config.RERANK_MODEL_NAME,
+                "query": query,
+                "documents": list(documents),
+            },
+        )
+        resp.raise_for_status()
+        body = resp.json()
+        # Defensive sort by `index` — server returns input-order today
+        # but the API contract puts the index field there for a reason.
+        results = sorted(body.get("results", []), key=lambda r: int(r.get("index", 0)))
+        return [_sigmoid(float(r["relevance_score"])) for r in results]
 
     def list_collections(self) -> list[dict]:
         client = self._get_client()
@@ -338,9 +292,8 @@ class RagService:
             )
             return []
 
-        reranker = self._get_reranker()
         _t_rerank_start = _time.perf_counter()
-        scores = reranker.predict([(query_text, d) for d in docs])
+        scores = self._rerank(query_text, docs)
         _t_rerank = _time.perf_counter()
         logger.info(
             'SEARCH_TIMING %s coll=%s coll_count=%d dense_k=%d returned=%d '
@@ -484,32 +437,8 @@ class RagService:
         candidates = candidates[:merge_top_n]
 
         # 4. Single reranker batch.
-        reranker = self._get_reranker()
         docs_only = [c[2] for c in candidates]
-        # DEBUG: dump (query, docs) to disk so an isolated probe can
-        # reproduce the reranker call and isolate its latency. Set
-        # RERANK_DUMP_DIR=/data/rerank_dumps in noted-rag's env to enable.
-        _dump_dir = os.environ.get("RERANK_DUMP_DIR")
-        if _dump_dir:
-            try:
-                os.makedirs(_dump_dir, exist_ok=True)
-                import json as _json, time as _ts
-                fname = f"{int(_ts.time()*1000)}_{_turn_id_var.get()}_search_multi.json"
-                with open(os.path.join(_dump_dir, fname), "w") as f:
-                    _json.dump({
-                        "turn_id": _turn_id_var.get(),
-                        "source": _source_var.get(),
-                        "kind": "search_multi",
-                        "n_coll": len(collections),
-                        "n_candidates": len(docs_only),
-                        "query": query,
-                        "docs": docs_only,
-                    }, f, ensure_ascii=False)
-            except Exception as _e:
-                logger.warning("rerank dump failed: %s", _e)
-        # Wall-clock timing only (no torch.cuda.Event under llama.cpp).
-        _rerank_pairs = [(query, d) for d in docs_only]
-        scores = reranker.predict(_rerank_pairs)
+        scores = self._rerank(query, docs_only)
         _t_rerank = _time.perf_counter()
 
         ranked = sorted(

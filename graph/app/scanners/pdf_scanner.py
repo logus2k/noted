@@ -31,6 +31,15 @@ from app.scanners.md_scanner import MdChunk
 
 logger = logging.getLogger(__name__)
 
+# Drop chunks whose underlying doc_items are mostly TOC / index entries.
+# Docling's layout model already classifies these as DocItemLabel.DOCUMENT_INDEX,
+# so we just filter on the label — no string heuristics, no language coupling.
+# Default ratio = 1.0 means "only drop chunks that are 100 % DOCUMENT_INDEX
+# items" (strict, near-zero false positives). Lower to 0.5 for majority vote
+# if mixed-content TOC merges become a problem in practice. Set to 0.0
+# (or any negative value) to disable the filter entirely.
+TOC_FILTER_RATIO: float = float(os.environ.get('TOC_FILTER_RATIO', '1.0'))
+
 
 _converter = None
 _chunker = None
@@ -126,11 +135,28 @@ def scan_pdf(abs_path: str, repo_root: str | None = None) -> list[MdChunk]:
             f'page count {page_count} exceeds DOCLING_MAX_PAGES={DOCLING_MAX_PAGES} for {rel_path}'
         )
 
+    # Lazy-import the label enum so module import stays Docling-free.
+    from docling_core.types.doc import DocItemLabel
+
     chunks: list[MdChunk] = []
+    n_toc_dropped = 0
     for i, raw in enumerate(_chunker.chunk(doc)):
         text = raw.text or ''
         if not text.strip():
             continue
+
+        # TOC / document-index filter. Drops chunks whose constituent
+        # doc_items are mostly DOCUMENT_INDEX (Docling's TOC label). At
+        # the default TOC_FILTER_RATIO=1.0, only fully-TOC chunks are
+        # skipped; raise/lower via env var. Indexes pollute retrieval
+        # (no semantic content) and graph extraction (one entity per
+        # heading) without adding signal.
+        items = raw.meta.doc_items or []
+        if items and TOC_FILTER_RATIO > 0:
+            n_toc = sum(1 for it in items if getattr(it, 'label', None) == DocItemLabel.DOCUMENT_INDEX)
+            if n_toc / len(items) >= TOC_FILTER_RATIO:
+                n_toc_dropped += 1
+                continue
 
         first_item = raw.meta.doc_items[0] if raw.meta.doc_items else None
         prov = first_item.prov[0] if first_item and first_item.prov else None
@@ -200,7 +226,7 @@ def scan_pdf(abs_path: str, repo_root: str | None = None) -> list[MdChunk]:
         ))
 
     logger.info(
-        'pdf scan: %s -> %d chunks across %d pages',
-        rel_path, len(chunks), page_count,
+        'pdf scan: %s -> %d chunks across %d pages (toc_dropped=%d, ratio=%.2f)',
+        rel_path, len(chunks), page_count, n_toc_dropped, TOC_FILTER_RATIO,
     )
     return chunks

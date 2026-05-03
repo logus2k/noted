@@ -11,7 +11,6 @@ from pathlib import Path
 
 
 CHROMA_DIR: Path = Path(os.environ.get("CHROMA_DIR", "/data/chroma"))
-MODEL_CACHE: Path = Path(os.environ.get("MODEL_CACHE", "/data/rag_models"))
 DOC_ROOT: Path = Path(os.environ.get("DOC_ROOT", "/docs"))
 
 # Persistent source inventory (lives under DOC_ROOT so it bind-mounts with
@@ -30,32 +29,12 @@ UPLOAD_DIR: Path = Path(os.environ.get(
     str(DOC_ROOT / "data/documents/rag_sources"),
 ))
 
-DEVICE: str = os.environ.get("DEVICE", "cuda")  # "cuda" | "cpu"
-
-EMBED_MODEL: str = os.environ.get("EMBED_MODEL", "BAAI/bge-m3")
-RERANK_MODEL: str = os.environ.get("RERANK_MODEL", "BAAI/bge-reranker-v2-m3")
-
-# GGUF model paths inside the container. The bge-m3 + bge-reranker-v2-m3 GGUFs
-# (Q8_0) are loaded via llama-cpp-python with CUDA, replacing the PyTorch +
-# sentence-transformers path. ~1 GB GPU saved vs fp16 on cuda. Quality is
-# within 0.5% on retrieval benchmarks (near-lossless).
-EMBED_MODEL_PATH: str = os.environ.get(
-    "EMBED_MODEL_PATH",
-    "/data/models/bge-m3-q8/bge-m3-Q8_0.gguf",
-)
-RERANK_MODEL_PATH: str = os.environ.get(
-    "RERANK_MODEL_PATH",
-    "/data/models/bge-reranker-v2-m3-q8/bge-reranker-v2-m3-Q8_0.gguf",
-)
-
-# Model context window. bge-m3 + bge-reranker-v2-m3 are trained at 8192 and
-# the reranker concatenates (query + </s></s> + doc) per pair — under-
-# provisioning here causes llama_decode -1 errors when long chunks combine
-# with the query. 8192 matches the model's native context.
-MODEL_N_CTX: int = int(os.environ.get("MODEL_N_CTX", "8192"))
-
-# Number of layers to offload to GPU. -1 = all layers (full GPU). 0 = CPU only.
-MODEL_N_GPU_LAYERS: int = int(os.environ.get("MODEL_N_GPU_LAYERS", "-1"))
+# Embed + rerank are forwarded to a llama-server router (typically
+# `llama-vision` in the agent_server compose, reachable on noted-network).
+# Model names match the router's preset INI section names.
+LLAMA_SERVER_URL: str = os.environ.get("LLAMA_SERVER_URL", "http://llama-vision:8500")
+EMBED_MODEL_NAME: str = os.environ.get("EMBED_MODEL_NAME", "bge-m3")
+RERANK_MODEL_NAME: str = os.environ.get("RERANK_MODEL_NAME", "bge-reranker")
 
 DENSE_TOP_K: int = int(os.environ.get("DENSE_TOP_K", "20"))
 FINAL_TOP_K: int = int(os.environ.get("FINAL_TOP_K", "5"))
@@ -74,4 +53,3 @@ def ensure_dirs() -> None:
     are owned by the noted side.
     """
     CHROMA_DIR.mkdir(parents=True, exist_ok=True)
-    MODEL_CACHE.mkdir(parents=True, exist_ok=True)
