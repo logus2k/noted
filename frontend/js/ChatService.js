@@ -6,8 +6,8 @@ import { AudioResampler } from './AudioResampler.js';
 // pipe so TTS audio bleeding into the mic can't be transcribed (kills
 // the "Thank you" / "Okay" Whisper hallucination feedback loop).
 // vad-web is a UMD bundle that needs window.ort + window.vad globals,
-// loaded via <script> tags in index.html (see vendor/vad/ + vendor/
-// onnxruntime-web/). MIT + ISC licensed.
+// loaded via <script> tags in index.html (vendor/onnxruntime-web/ +
+// vendor/vad/). MIT + ISC licensed.
 
 const AGENT_URL = 'https://logus2k.com/llm';
 const STT_URL = 'https://logus2k.com/stt';
@@ -662,6 +662,13 @@ export class ChatService {
     async _sendWithContext(text, contextDescriptor, overrides = null) {
         this.chatPanel.setLoading(true);
 
+        // TEMP-DIAG turn-tagged stream logging. Every SSE token, every
+        // parser event, and every TTS dispatch is logged with this turn
+        // ID so the console can be grepped per-turn. Remove once the
+        // streaming-parser bugs are fully chased.
+        const turnId = Math.random().toString(36).slice(2, 8);
+        console.info(`[turn:${turnId}] START user=${JSON.stringify(text.slice(0, 120))}`);
+
         const parser = new ThinkingParser();
         let fullAnswer = '';
         let thinkingContent = '';
@@ -797,7 +804,19 @@ export class ChatService {
                     }
 
                     if (typeof data.token !== 'string') continue;
+                    console.info(`[turn:${turnId}] CHUNK ${JSON.stringify(data.token)}`);
                     const result = parser.processToken(data.token);
+                    if (result.type !== 'pending') {
+                        if (result.type === 'thinking_end') {
+                            console.info(`[turn:${turnId}] EVENT thinking_end thinking_len=${(result.thinking||'').length} answer=${JSON.stringify(result.answer||'')}`);
+                        } else if (result.type === 'thinking_token' || result.type === 'answer_token') {
+                            console.info(`[turn:${turnId}] EVENT ${result.type} ${JSON.stringify(result.token||'')}`);
+                        } else if (result.type === 'voice') {
+                            console.info(`[turn:${turnId}] EVENT voice ${JSON.stringify(result.text||'')}`);
+                        } else {
+                            console.info(`[turn:${turnId}] EVENT ${result.type}`);
+                        }
+                    }
 
                     switch (result.type) {
                         case 'thinking_start':
@@ -837,6 +856,7 @@ export class ChatService {
                             // parallel with the answer body that just started
                             // streaming above.
                             if (!voiceDispatched && this.ttsEnabled && parser.voiceText && !pendingActionSeen) {
+                                console.info(`[turn:${turnId}] TTS dispatch=thinking_end voiceText=${JSON.stringify(parser.voiceText)}`);
                                 this._sendVoiceToTTS(parser.voiceText);
                                 voiceDispatched = true;
                             }
@@ -853,6 +873,7 @@ export class ChatService {
                             // voice BEFORE the answer body, audio starts playing
                             // while the answer is still streaming on screen.
                             if (!voiceDispatched && this.ttsEnabled && parser.voiceText && !pendingActionSeen) {
+                                console.info(`[turn:${turnId}] TTS dispatch=voice_event voiceText=${JSON.stringify(parser.voiceText)}`);
                                 this._sendVoiceToTTS(parser.voiceText);
                                 voiceDispatched = true;
                             }
@@ -865,6 +886,18 @@ export class ChatService {
                             fullAnswer += result.token;
                             this.chatPanel.appendToken(result.token);
                             break;
+                    }
+                    // Defensive backstop: parser CAN set voiceText in code
+                    // paths that don't return a 'voice' event (notably the
+                    // same-chunk voice-LAST case where voiceText is set but
+                    // 'answer_token' is returned for the text BEFORE the
+                    // <voice> opener). Without this, mid-stream dispatch
+                    // would be stranded and only end-of-stream Tier 1
+                    // recovery would fire. Cheap check, runs every event.
+                    if (!voiceDispatched && this.ttsEnabled && parser.voiceText && !pendingActionSeen) {
+                        console.info(`[turn:${turnId}] TTS dispatch=backstop voiceText=${JSON.stringify(parser.voiceText)}`);
+                        this._sendVoiceToTTS(parser.voiceText);
+                        voiceDispatched = true;
                     }
                 }
             }
@@ -897,6 +930,10 @@ export class ChatService {
         this.chatPanel.setThinkingIndicator(false);
         this.chatPanel.finalizeStreamingMessage(thinkingContent, graphProvenance);
 
+        console.info(`[turn:${turnId}] END thinking_len=${thinkingContent.length} answer_len=${fullAnswer.length} voiceText_len=${(parser.voiceText||'').length} voiceDispatched=${voiceDispatched} pendingActionSeen=${pendingActionSeen}`);
+        console.info(`[turn:${turnId}] FULL_ANSWER ${JSON.stringify(fullAnswer)}`);
+        if (parser.voiceText) console.info(`[turn:${turnId}] FULL_VOICE_TEXT ${JSON.stringify(parser.voiceText)}`);
+
         // Voice dispatch (only if the mid-stream path didn't already fire).
         // Voice-first ordering means voiceDispatched is normally true by
         // here; this branch handles the legacy/old-prompt path or a parser
@@ -904,6 +941,7 @@ export class ChatService {
         if (voiceDispatched) {
             // Already speaking — nothing to do.
         } else if (this.ttsEnabled && parser.voiceText) {
+            console.info(`[turn:${turnId}] TTS dispatch=finalize voiceText=${JSON.stringify(parser.voiceText)}`);
             this._sendVoiceToTTS(parser.voiceText);
         } else if (this.ttsEnabled && !pendingActionSeen && fullAnswer) {
             // Defensive fallback: model skipped <voice>. Speak the answer
@@ -913,7 +951,7 @@ export class ChatService {
             // same turn, the frontend parser missed something; investigate
             // the streaming ThinkingParser. Remove once the parser-miss
             // bug is found and fixed.
-            console.info('[ChatService] voice fallback fired - parser.voiceText empty, fullAnswer length=', fullAnswer.length);
+            console.info(`[turn:${turnId}] FALLBACK fired fullAnswer_len=${fullAnswer.length}`);
             this._voiceFallback(fullAnswer, abortController.signal);
         }
 
@@ -925,6 +963,13 @@ export class ChatService {
     _cleanAnswerForVoice(text) {
         if (!text) return '';
         let s = text;
+        // Defense in depth — strip any <think>...</think> / <voice>...</voice>
+        // blocks (and stray opener/closer tags) in case the streaming parser
+        // missed them and they leaked into fullAnswer as literal text. We
+        // do NOT want TTS reading "less than think greater than" out loud.
+        s = s.replace(/<think>[\s\S]*?<\/think>/g, '');
+        s = s.replace(/<voice>[\s\S]*?<\/voice>/g, '');
+        s = s.replace(/<\/?(?:think|voice)>/g, '');
         // Citation tags: [markdown_chunk:hex], [E:type:id], [R:...], bare hex too.
         s = s.replace(/\[(?:markdown_chunk|E|R|C\d+):[^\]]+\]/g, '');
         // Code fences (``` ... ```) - drop the whole block; speaking code is awful.
@@ -946,33 +991,47 @@ export class ChatService {
         return s;
     }
 
-    /** Fired when the model produced an answer but no <voice> block. Speaks
-     *  the cleaned answer if it fits, otherwise asks the backend for a
-     *  one-shot summary. Silent on error (no fallback-of-fallback).
-     *  Accepts the originating turn's AbortSignal so a user interruption
-     *  also cancels the summary call and prevents stale audio. */
-    async _voiceFallback(rawAnswer, signal = null) {
+    /** Fired when the model produced an answer but the streaming parser
+     *  failed to surface the <voice> block. Two-tier recovery:
+     *
+     *  1. Recover voice text from rawAnswer directly. If a parser miss
+     *     leaked <voice>...</voice> into fullAnswer as literal text,
+     *     regex it back out and speak the actual content. Cheap, instant.
+     *  2. If no voice tags found AND the cleaned answer is short enough
+     *     to be speakable, speak it as-is — covers the rare case where
+     *     the model genuinely skipped <voice>.
+     *
+     *  No third tier. The previous "ask Gemma to summarize" path was a
+     *  band-aid for parser bugs; with the parser fixed, it added latency
+     *  and unreliability without value. Removed.
+     *
+     *  Silent on error. Accepts the originating turn's AbortSignal so a
+     *  user interruption also cancels any in-flight TTS dispatch. */
+    _voiceFallback(rawAnswer, signal = null) {
+        if (signal?.aborted) return;
+
+        // Tier 1: recover voice block from the raw stream text.
+        const voiceMatch = rawAnswer && rawAnswer.match(/<voice>([\s\S]*?)<\/voice>/);
+        if (voiceMatch) {
+            const recovered = voiceMatch[1].trim();
+            if (recovered) {
+                console.info(`[ChatService] fallback Tier 1 (regex recovery) fired, voice_len=${recovered.length}`);
+                this._sendVoiceToTTS(recovered);
+                return;
+            }
+        }
+
+        // Tier 2: no voice tags — speak the cleaned answer if short enough.
         const cleaned = this._cleanAnswerForVoice(rawAnswer);
         if (!cleaned) return;
-        if (signal?.aborted) return;
         if (cleaned.length <= VOICE_FALLBACK_MAX_CHARS) {
+            console.info(`[ChatService] fallback Tier 2 (short-answer verbatim) fired, cleaned_len=${cleaned.length}`);
             this._sendVoiceToTTS(cleaned);
             return;
         }
-        try {
-            const resp = await fetch('api/llm/voice_summary', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ answer: cleaned }),
-                signal,
-            });
-            if (!resp.ok || signal?.aborted) return;
-            const data = await resp.json();
-            const summary = (data?.summary || '').trim();
-            if (summary && !signal?.aborted) this._sendVoiceToTTS(summary);
-        } catch {
-            // Stay silent — fallback failure (or abort) is preferable to noise.
-        }
+        // Long answer with no voice block — accept the silence rather than
+        // make a second LLM call. Voice-first prompt makes this rare.
+        console.info(`[ChatService] fallback skipped: no voice tags + cleaned answer too long (${cleaned.length} chars)`);
     }
 
     /** Send extracted <voice> text to TTS for speech output. */
@@ -1031,17 +1090,34 @@ export class ChatService {
             // the user begins speaking. We only act on it during TTS
             // playback (barge-in). Globals (window.vad, window.ort) come
             // from <script> tags in index.html.
+            //
+            // Option names per vad-web 0.0.30 RealTimeVADOptions:
+            //   baseAssetPath     — where to fetch silero_vad_*.onnx +
+            //                        vad.worklet.bundle.min.js
+            //   onnxWASMBasePath  — where vad-web's worklet should look
+            //                        for ORT WASM glue
+            //   model             — 'legacy' (v4) or 'v5'; legacy is
+            //                        smaller (1.8 MB vs 2.3 MB) and
+            //                        well-tested.
+            // ort.env.wasm.numThreads = 1 prevents threaded WASM from
+            // requiring SharedArrayBuffer (which needs COOP/COEP headers).
             try {
                 if (window.vad?.MicVAD && window.ort) {
-                    // Point ONNX runtime at the vendored WASM binary
-                    // (default fetches from same path as the JS, which
-                    // would 404 since the JS is at vendor/onnxruntime-
-                    // web/ but we serve via /static/ alias).
-                    window.ort.env.wasm.wasmPaths = 'static/vendor/onnxruntime-web/';
+                    // ES module dynamic imports require proper specifiers
+                    // (absolute URL or starting with / ./ ../). A bare
+                    // path like "static/vendor/.../foo.mjs" is rejected
+                    // by the browser as a "bare specifier". Build absolute
+                    // URLs from window.location so the .mjs glue and the
+                    // .onnx model resolve unambiguously.
+                    const ortBase = new URL('static/vendor/onnxruntime-web/', window.location.href).href;
+                    const vadBase = new URL('static/vendor/vad/', window.location.href).href;
+                    window.ort.env.wasm.wasmPaths = ortBase;
+                    window.ort.env.wasm.numThreads = 1;
                     this._vad = await window.vad.MicVAD.new({
                         stream: this._mediaStream,
-                        modelURL: 'static/vendor/vad/silero_vad_legacy.onnx',
-                        workletURL: 'static/vendor/vad/vad.worklet.bundle.min.js',
+                        baseAssetPath: vadBase,
+                        onnxWASMBasePath: ortBase,
+                        model: 'legacy',
                         onSpeechStart: () => {
                             if (this._ttsActive) this._bargeIn();
                         },
@@ -1616,6 +1692,11 @@ export class ChatService {
                             this.chatPanel.appendToken(result.token);
                             break;
                     }
+                    // Defensive backstop — see _sendWithContext for rationale.
+                    if (!voiceDispatched && this.ttsEnabled && parser.voiceText) {
+                        this._sendVoiceToTTS(parser.voiceText);
+                        voiceDispatched = true;
+                    }
                 }
             }
             this.chatPanel.finalizeStreamingMessage(thinkingContent);
@@ -1777,18 +1858,73 @@ class ThinkingParser {
      *  the post-opener content in _voiceBuffer. */
     _extractVoiceFromAnswer(answer) {
         if (!answer) return answer;
-        const m = answer.match(/<voice>([\s\S]*?)<\/voice>/);
+        let cleaned = answer;
+
+        // 1. Complete <voice>...</voice> block — extract.
+        const m = cleaned.match(/<voice>([\s\S]*?)<\/voice>/);
         if (m) {
             this.voiceText = (this.voiceText ? this.voiceText + ' ' : '') + m[1].trim();
-            return (answer.slice(0, m.index) + answer.slice(m.index + m[0].length)).trim();
+            cleaned = (cleaned.slice(0, m.index) + cleaned.slice(m.index + m[0].length)).trim();
+            console.info(`[parser] _extract: voice block extracted, voiceText_len=${this.voiceText.length}`);
+        } else {
+            // 2. Complete <voice> opener but no closer in this chunk —
+            //    enter voice mode so the streaming state machine catches
+            //    the </voice> in the next chunk.
+            const voiceOpenIdx = cleaned.indexOf('<voice>');
+            if (voiceOpenIdx >= 0) {
+                this._inVoice = true;
+                this._voiceBuffer = cleaned.slice(voiceOpenIdx + '<voice>'.length);
+                cleaned = cleaned.slice(0, voiceOpenIdx).trim();
+                console.info(`[parser] _extract: <voice> opener (no closer), entered voice mode, voiceBuffer_len=${this._voiceBuffer.length}`);
+            } else {
+                // 3. Partial <voice> opener at end of input (chunk boundary
+                //    cut the tag) — push back into _buffer so the next
+                //    processToken assembles the complete tag.
+                const partialVoice = cleaned.match(/<v(?:o(?:i(?:c(?:e)?)?)?)?$/);
+                if (partialVoice) {
+                    this._buffer = (this._buffer || '') + partialVoice[0];
+                    cleaned = cleaned.slice(0, partialVoice.index).trim();
+                    console.info(`[parser] _extract: partial <voice> opener stashed: ${JSON.stringify(partialVoice[0])}`);
+                }
+            }
         }
-        const openIdx = answer.indexOf('<voice>');
-        if (openIdx >= 0) {
-            this._inVoice = true;
-            this._voiceBuffer = answer.slice(openIdx + '<voice>'.length);
-            return answer.slice(0, openIdx).trim();
+
+        // 4. <tool_call> opener (full or partial) — same pattern. Push
+        //    back into _buffer so the state machine's <tool_call> handler
+        //    catches it and emits a 'tool_call' event with parsed JSON.
+        //    Without this, <tool_call>...</tool_call> leaks into chat as
+        //    text (browsers render <tool_call> as a transparent unknown
+        //    inline element, so the JSON content shows through).
+        const toolIdx = cleaned.indexOf('<tool_call>');
+        if (toolIdx >= 0) {
+            this._buffer = (this._buffer || '') + cleaned.slice(toolIdx);
+            cleaned = cleaned.slice(0, toolIdx).trim();
+            console.info(`[parser] _extract: <tool_call> opener stashed to _buffer (len=${this._buffer.length})`);
+        } else {
+            const partialTool = cleaned.match(/<t(?:o(?:o(?:l(?:_(?:c(?:a(?:l(?:l)?)?)?)?)?)?)?)?$/);
+            if (partialTool) {
+                this._buffer = (this._buffer || '') + partialTool[0];
+                cleaned = cleaned.slice(0, partialTool.index).trim();
+                console.info(`[parser] _extract: partial <tool_call> opener stashed: ${JSON.stringify(partialTool[0])}`);
+            }
         }
-        return answer;
+
+        // 5. Bare `<` at the end of input — a chunk boundary cut a tag at
+        //    its very first character (e.g. "</think><" with the rest of
+        //    the tag arriving in the next chunk). The partial regexes
+        //    above need at least the second character (`<v`, `<t`); a
+        //    bare `<` matches none. Without deferring it, the `<` leaks
+        //    as text AND the subsequent chunk's content (`tool_call>...`)
+        //    arrives without the leading `<`, so the state machine's
+        //    opener check (`buffer.includes('<voice>')` etc.) never
+        //    fires and the entire tag content leaks into chat.
+        if (cleaned.endsWith('<')) {
+            this._buffer = (this._buffer || '') + '<';
+            cleaned = cleaned.slice(0, -1).trim();
+            console.info(`[parser] _extract: bare '<' stashed to _buffer`);
+        }
+
+        return cleaned;
     }
 
     processToken(token) {
@@ -1818,8 +1954,13 @@ class ThinkingParser {
             this._inThinking = false;
             const parts = this._buffer.split('</think>');
             this.thinkingBuffer += parts[0];
-            const answer = this._extractVoiceFromAnswer(parts.slice(1).join('</think>').trimStart());
+            // Reset _buffer BEFORE _extractVoiceFromAnswer so that if it
+            // detects a partial <voice> opener at the end of input and
+            // stashes it back into _buffer, the stash isn't immediately
+            // wiped. The same-chunk path above already resets _buffer
+            // before its _extract call.
             this._buffer = '';
+            const answer = this._extractVoiceFromAnswer(parts.slice(1).join('</think>').trimStart());
             return { type: 'thinking_end', thinking: this.thinkingBuffer, answer };
         }
 

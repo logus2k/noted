@@ -29,10 +29,16 @@ def strip_thinking(content: str) -> str:
 
 
 def clean_history(messages: list[dict]) -> list[dict]:
-    """Strip thinking blocks from assistant messages in conversation history."""
+    """Strip thinking blocks from assistant content in conversation history.
+
+    Structured fields (`tool_calls`, `tool_call_id`, `name`) and non-string
+    content (Anthropic content-block lists) pass through untouched so the
+    asf0 chat template renders prior tool calls/responses in its native
+    pipe-marker format.
+    """
     cleaned = []
     for msg in messages:
-        if msg.get("role") == "assistant" and msg.get("content"):
+        if msg.get("role") == "assistant" and isinstance(msg.get("content"), str):
             cleaned.append({**msg, "content": strip_thinking(msg["content"])})
         else:
             cleaned.append(msg)

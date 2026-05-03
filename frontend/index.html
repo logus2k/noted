@@ -118,10 +118,11 @@
     <script src="static/vendor/notyf.min.js"></script>
     <script src="static/vendor/echarts.min.js"></script>
     <script src="static/vendor/dagre.min.js"></script>
-    <!-- Voice Activity Detection (Silero VAD via ONNX Runtime Web). Loaded
-         as globals (window.ort + window.vad) because @ricky0123/vad-web is
-         a UMD bundle. Used by ChatService for barge-in + STT-during-TTS
-         echo prevention. ort.min.js MUST come before bundle.min.js. -->
+    <!-- Voice Activity Detection (Silero VAD via ONNX Runtime Web).
+         ort.wasm.min.js (UMD) sets window.ort and dynamically imports
+         the .mjs glue + .wasm at runtime — wasmPaths is configured in
+         ChatService.js:startVoice. bundle.min.js (vad-web UMD) needs
+         window.ort to be defined, so this load order matters. -->
     <script src="static/vendor/onnxruntime-web/ort.wasm.min.js"></script>
     <script src="static/vendor/vad/bundle.min.js"></script>
 

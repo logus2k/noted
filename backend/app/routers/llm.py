@@ -1610,17 +1610,46 @@ async def llm_chat(request: ChatRequest):
                     final_answer = full_text
 
                 # ── 6. Store assistant response ──
-                # Read-tool path: serialize the full turn (including tool_call /
-                # tool_result markers) so the next turn replays prior tool work
-                # as text and the model doesn't re-fetch the same data.
+                # Read-tool path: persist each loop_messages entry STRUCTURED
+                # (assistant.tool_calls + role=tool result + ...) so the asf0
+                # chat template renders them in its native pipe-marker format
+                # on subsequent turns. Earlier flat-string serialization with
+                # `<tool_call>...</tool_call>` markers poisoned the template's
+                # `strip_thinking` pass and trained the model to imitate that
+                # text format - native parsing then failed and the loop ate
+                # 6 rounds before the force-final-answer nudge fired.
                 # Non-tool path: strip thinking + tool blocks as before.
                 if used_read_tool_loop:
-                    assistant_text = _serialize_turn_for_memory(
-                        messages, loop_messages, final_answer, _is_anthropic)
+                    skip = len(messages)
+                    for msg in loop_messages[skip:]:
+                        role = msg.get("role")
+                        content = msg.get("content")
+                        # Skip the in-loop forcing nudge ("Please provide your
+                        # answer now...") - it's a transient prompt scaffold,
+                        # not real conversation. Anthropic tool_result wrapper
+                        # user messages have list content and pass through.
+                        if role == "user" and isinstance(content, str):
+                            continue
+                        # Strip <think>/<voice> wrappers from raw assistant
+                        # content before persisting. Tool_calls structure
+                        # passes through untouched.
+                        if role == "assistant" and isinstance(content, str):
+                            msg = {**msg, "content": _strip_thinking_and_tools(content)}
+                        # Skip wholly-empty assistant messages (rare, harmless).
+                        if role == "assistant" and not (msg.get("tool_calls") or msg.get("content")):
+                            continue
+                        await memory.append(memory_key, msg)
+                    # The final user-visible answer is generated AFTER the last
+                    # loop_messages append (either streamed by the no-more-tools
+                    # path or by the force-final-answer synthesis). Persist it
+                    # as a fresh assistant message so history shows the answer.
+                    final_clean = _strip_thinking_and_tools(final_answer) if final_answer else ''
+                    if final_clean:
+                        await memory.append(memory_key, {"role": "assistant", "content": final_clean})
                 else:
                     assistant_text = _strip_thinking_and_tools(final_answer)
-                if assistant_text:
-                    await memory.append(memory_key, "assistant", assistant_text)
+                    if assistant_text:
+                        await memory.append(memory_key, {"role": "assistant", "content": assistant_text})
 
                 # ── 7. Send usage (real counts from Anthropic, estimates otherwise) ──
                 in_tok = actual_input_tokens or input_tokens_est
@@ -1962,26 +1991,6 @@ async def llm_complete(prompt: str, max_tokens: int = 256):
         raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {e}")
 
 
-class VoiceSummaryRequest(BaseModel):
-    answer: str
-
-
-@router.post("/voice_summary")
-async def llm_voice_summary(request: VoiceSummaryRequest):
-    """Summarize an answer body for TTS playback. Frontend calls this when
-    the chat model failed to emit a <voice> block AND the answer is too
-    long to speak verbatim."""
-    text = (request.answer or "").strip()
-    if not text:
-        return {"summary": ""}
-    try:
-        summary = await llm_mgr.voice_summarize(text)
-        return {"summary": summary}
-    except Exception as e:
-        logger.exception("Voice summary failed")
-        raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {e}")
-
-
 _NOTED_SECRET = os.environ.get("NOTED_TERMINAL_SECRET", "")
 
 
@@ -2059,105 +2068,6 @@ def _strip_thinking_and_tools(text: str) -> str:
     text = re.sub(r'<tool_call>[\s\S]*?</tool_call>\s*', '', text)
     text = re.sub(r'<voice>[\s\S]*?</voice>\s*', '', text)
     return text.strip()
-
-
-def _strip_thinking_and_voice(text: str) -> str:
-    """Remove <think> and <voice> blocks. Preserves <tool_call> markers so the
-    serialized turn transcript (see _serialize_turn_for_memory) retains its
-    tool history."""
-    import re
-    # TEMP-DIAG 2026-05-03: see _strip_thinking_and_tools above for context.
-    _matches = re.findall(r'<voice>([\s\S]*?)</voice>', text)
-    for _vb in _matches:
-        logger.info("VOICE_CAPTURED chars=%d content=%r", len(_vb), _vb[:500])
-    if not _matches:
-        _has_open = '<voice>' in text
-        _tail = text[-300:] if len(text) > 300 else text
-        logger.info("VOICE_MISSING has_open=%s text_len=%d tail=%r",
-                    _has_open, len(text), _tail)
-    text = re.sub(r'<think>[\s\S]*?</think>\s*', '', text)
-    text = re.sub(r'<voice>[\s\S]*?</voice>\s*', '', text)
-    return text.strip()
-
-
-def _serialize_turn_for_memory(messages_before: list, loop_messages: list,
-                                final_answer: str, is_anthropic: bool) -> str:
-    """Flatten a read-tool turn into a single assistant-message text transcript
-    so the next turn's replay shows the model its prior tool calls + results
-    as text, eliminating redundant re-fetches.
-
-    Iterates the messages added during this turn (loop_messages after the
-    messages_before prefix), emits <tool_call>{json}</tool_call> and
-    <tool_result id="X">...</tool_result> markers inline with any reasoning
-    text, then appends the cleaned final_answer.
-
-    Handles both Anthropic native-tool format (content blocks) and OpenAI-
-    compatible format (tool_calls array + role=tool).
-    """
-    parts: list[str] = []
-    skip = len(messages_before)
-    new_msgs = loop_messages[skip:] if skip <= len(loop_messages) else []
-
-    for msg in new_msgs:
-        role = msg.get("role")
-        content = msg.get("content")
-
-        if role == "assistant":
-            if is_anthropic and isinstance(content, list):
-                for block in content:
-                    btype = block.get("type")
-                    if btype == "text":
-                        txt = (block.get("text") or "").strip()
-                        if txt:
-                            parts.append(txt)
-                    elif btype == "tool_use":
-                        call_json = json.dumps({
-                            "name": block.get("name"),
-                            "args": block.get("input", {}),
-                        }, ensure_ascii=False)
-                        parts.append(f"<tool_call>{call_json}</tool_call>")
-            else:
-                text = content if isinstance(content, str) else ""
-                text = text.strip()
-                if text:
-                    parts.append(text)
-                for tc in msg.get("tool_calls") or []:
-                    fn = tc.get("function", {}) if isinstance(tc, dict) else {}
-                    raw_args = fn.get("arguments", "{}")
-                    try:
-                        tc_args = json.loads(raw_args) if isinstance(raw_args, str) else raw_args
-                    except Exception:
-                        tc_args = {}
-                    call_json = json.dumps({"name": fn.get("name"), "args": tc_args}, ensure_ascii=False)
-                    parts.append(f"<tool_call>{call_json}</tool_call>")
-
-        elif role == "tool":
-            tc_id = msg.get("tool_call_id", "")
-            result = msg.get("content", "") or ""
-            parts.append(f'<tool_result id="{tc_id}">{result}</tool_result>')
-
-        elif role == "user":
-            # Anthropic tool_result is transported on role=user with list content.
-            # Internal nudges like "Please provide your answer now" are plain strings
-            # and are intentionally skipped here.
-            if is_anthropic and isinstance(content, list):
-                for block in content:
-                    if block.get("type") == "tool_result":
-                        tc_id = block.get("tool_use_id", "")
-                        result = block.get("content", "") or ""
-                        if isinstance(result, list):
-                            # Anthropic tool_result content can be blocks; stringify
-                            result = "".join(
-                                b.get("text", "") for b in result if isinstance(b, dict) and b.get("type") == "text"
-                            ) or json.dumps(result, ensure_ascii=False)
-                        parts.append(f'<tool_result id="{tc_id}">{result}</tool_result>')
-
-    if final_answer:
-        cleaned = _strip_thinking_and_voice(final_answer)
-        if cleaned:
-            parts.append(cleaned)
-
-    return "\n".join(parts).strip()
 
 
 # ── Debug endpoints ──────────────────────────────────────────────
