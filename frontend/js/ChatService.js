@@ -1118,6 +1118,13 @@ export class ChatService {
                         baseAssetPath: vadBase,
                         onnxWASMBasePath: ortBase,
                         model: 'legacy',
+                        // Bumped from vad-web default 0.3 to reduce
+                        // speculative onSpeechStart misfires that cut TTS
+                        // playback when the mic picked up TTS bleed-
+                        // through or mouth/breath noise. Real barge-in
+                        // (user actually starting to speak) easily
+                        // crosses 0.5; transient noise rarely does.
+                        positiveSpeechThreshold: 0.5,
                         onSpeechStart: () => {
                             if (this._ttsActive) this._bargeIn();
                         },
