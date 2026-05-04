@@ -1,7 +1,7 @@
 {
   "domain_id": "ai_papers",
-  "name": "AI Whitepapers",
-  "description": "AI Whitepapers",
+  "name": "Whitepapers",
+  "description": "Whitepapers",
   "created_at": "2026-05-03T16:09:59.772442+00:00",
   "embeddings_model": "bge-m3",
   "pinned": false,
