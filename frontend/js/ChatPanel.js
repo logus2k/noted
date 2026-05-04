@@ -247,6 +247,27 @@ export class ChatPanel {
         });
         inputArea.appendChild(this._sttBtn);
 
+        // "+" attachments / new-content menu. Sits between the mic and
+        // the text input. Opens a dropdown with: Document (KB upload),
+        // Notebook (create in current/selected project), Image (upload
+        // to project assets), Audio (upload to project assets).
+        // Whitelist + size cap enforced server-side via
+        // /api/files/upload-asset (NOTED_MAX_UPLOAD_MB env var).
+        this._attachBtn = document.createElement('button');
+        this._attachBtn.className = 'chat-attach-btn';
+        this._attachBtn.title = 'Attach / new';
+        this._attachBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#202020" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" fill="#fbe5b4"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>';
+        this._attachBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this._toggleAttachMenu();
+        });
+        inputArea.appendChild(this._attachBtn);
+
+        // Dropdown menu — built lazily on first open, anchored above
+        // the + button via fixed positioning so it floats over the
+        // chat layout instead of pushing it.
+        this._attachMenu = null;
+
         // Text input
         this._input = document.createElement('textarea');
         this._input.className = 'chat-input';
@@ -306,6 +327,294 @@ export class ChatPanel {
         this._panel = panel;
     }
 
+    // ── Attach / new menu ─────────────────────────────────────────────
+    // Lazy-built dropdown anchored above the + button. Each option
+    // closes the menu before invoking the action so the action's own
+    // modal can take over without UI overlap.
+
+    _toggleAttachMenu() {
+        if (this._attachMenu && this._attachMenu.style.display !== 'none') {
+            this._closeAttachMenu();
+        } else {
+            this._openAttachMenu();
+        }
+    }
+
+    _openAttachMenu() {
+        if (!this._attachMenu) this._buildAttachMenu();
+        const menu = this._attachMenu;
+        // Position above the + button. Fixed positioning so the menu
+        // floats over surrounding panels rather than shifting layout.
+        const r = this._attachBtn.getBoundingClientRect();
+        document.body.appendChild(menu);
+        menu.style.display = 'block';
+        // Measure after display:block to get real height.
+        const mh = menu.offsetHeight || 0;
+        const mw = menu.offsetWidth || 200;
+        const top = Math.max(8, r.top - mh - 6);
+        const left = Math.max(8, Math.min(r.left, window.innerWidth - mw - 8));
+        menu.style.top = `${top}px`;
+        menu.style.left = `${left}px`;
+        // Click-outside-to-close: register on next tick so this open
+        // click doesn't immediately fire it.
+        setTimeout(() => {
+            this._attachOutsideHandler = (ev) => {
+                if (!menu.contains(ev.target) && ev.target !== this._attachBtn) {
+                    this._closeAttachMenu();
+                }
+            };
+            document.addEventListener('click', this._attachOutsideHandler);
+            this._attachEscHandler = (ev) => {
+                if (ev.key === 'Escape') this._closeAttachMenu();
+            };
+            document.addEventListener('keydown', this._attachEscHandler);
+        }, 0);
+    }
+
+    _closeAttachMenu() {
+        if (this._attachMenu) this._attachMenu.style.display = 'none';
+        if (this._attachOutsideHandler) {
+            document.removeEventListener('click', this._attachOutsideHandler);
+            this._attachOutsideHandler = null;
+        }
+        if (this._attachEscHandler) {
+            document.removeEventListener('keydown', this._attachEscHandler);
+            this._attachEscHandler = null;
+        }
+    }
+
+    _buildAttachMenu() {
+        const menu = document.createElement('div');
+        menu.className = 'chat-attach-menu';
+        // Icon palette matches the Explorer convention: colored fills
+        // for the body shape + a dark stroke for the outline. Each
+        // option's tint hints at the file family (KB-green for File,
+        // tools-blue for Image, music-pink for Audio).
+        const items = [
+            {
+                key: 'file',
+                label: 'File',
+                hint: 'Upload to Knowledge Base (on hold)',
+                iconSvg: '<svg width="16" height="16" viewBox="0 0 24 24" fill="#81c784" stroke="#202020" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8" fill="none"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>',
+                action: () => this._actionUploadDocument(),
+            },
+            {
+                key: 'image',
+                label: 'Image',
+                hint: 'Attach image to your next message',
+                iconSvg: '<svg width="16" height="16" viewBox="0 0 24 24" fill="#64b5f6" stroke="#202020" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5" fill="#fff8e9"/><polyline points="21 15 16 10 5 21" fill="none"/></svg>',
+                action: () => this._actionUploadAsset('image'),
+            },
+            {
+                key: 'audio',
+                label: 'Audio',
+                hint: 'Attach audio (on hold)',
+                iconSvg: '<svg width="16" height="16" viewBox="0 0 24 24" fill="#ba68c8" stroke="#202020" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13" fill="none"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>',
+                action: () => this._actionUploadAsset('audio'),
+            },
+        ];
+        for (const it of items) {
+            const row = document.createElement('button');
+            row.type = 'button';
+            row.className = 'chat-attach-menu-item';
+            row.innerHTML = `
+                <span class="chat-attach-menu-icon">${it.iconSvg}</span>
+                <span class="chat-attach-menu-text">
+                    <span class="chat-attach-menu-label">${it.label}</span>
+                    <span class="chat-attach-menu-hint">${it.hint}</span>
+                </span>`;
+            row.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this._closeAttachMenu();
+                try { it.action(); } catch (err) { console.error('[chat-attach]', it.key, err); }
+            });
+            menu.appendChild(row);
+        }
+        menu.style.display = 'none';
+        this._attachMenu = menu;
+    }
+
+    // ── Attach-menu actions ──────────────────────────────────────────
+    // Each action delegates to existing app surfaces where possible
+    // (KB upload, notebook create) and falls back to file-picker +
+    // /api/files/upload-asset for raw asset types (image, audio).
+
+    _actionUploadDocument() {
+        // Reuse the existing KB-upload modal so users get the same
+        // domain selector + mode + folder picker they get from the
+        // explorer context menu — no duplicate UI to maintain.
+        const app = window.app;
+        const cm = app?._explorerPanel?._contextMenuMod;
+        if (cm?.uploadDocumentToDomain) {
+            cm.uploadDocumentToDomain();
+            return;
+        }
+        this._notifyError('Document upload is not available — Explorer panel not initialised.');
+    }
+
+    async _actionUploadAsset(kind) {
+        // Image: hold-as-pending-attachment pattern. The picked file is
+        // NOT uploaded to a project asset folder; it's encoded in-place
+        // and attached to the next chat message as an OpenAI-style
+        // multimodal content block (image_url with a data: URL). The
+        // chat HTTP path already forwards multimodal content through
+        // noted backend → agent_server → llama-server → gemma-4 (which
+        // has mmproj loaded and reports `vision: true`).
+        //
+        // Audio is on hold per project decisions (see attach-menu hint
+        // text); fall through to a stub for now.
+        if (kind !== 'image') {
+            this._notifyError('Audio attachment is on hold.');
+            return;
+        }
+
+        // Single attachment at a time. Picking a new image while one is
+        // already pending replaces it (with a quick visual confirm).
+        const cfg = await this._getUploadConfig();
+        if (!cfg) {
+            this._notifyError('Could not load upload configuration from the server.');
+            return;
+        }
+        const accept = cfg.image_extensions.join(',');
+        const maxBytes = cfg.max_size_mb * 1024 * 1024;
+
+        // Transient file input — the OS picker is the right UX for
+        // "pick an image to attach". Removed after use.
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = accept;
+        input.style.display = 'none';
+        document.body.appendChild(input);
+        const file = await new Promise((resolve) => {
+            input.addEventListener('change', () => resolve(input.files?.[0] || null), { once: true });
+            input.addEventListener('cancel', () => resolve(null), { once: true });
+            input.click();
+        });
+        document.body.removeChild(input);
+        if (!file) return;
+
+        // Client-side guards mirror the server-side whitelist + size cap
+        // so the user gets immediate feedback rather than waiting for
+        // the round trip to fail. (The send path is HTTP chat, not
+        // upload-asset, so the server doesn't actually validate the
+        // image bytes — these checks are the only enforcement.)
+        if (file.size > maxBytes) {
+            this._notifyError(`"${file.name}" is too large (${(file.size / (1024*1024)).toFixed(1)} MB > ${cfg.max_size_mb} MB cap).`);
+            return;
+        }
+        const ext = file.name.includes('.') ? '.' + file.name.split('.').pop().toLowerCase() : '';
+        const allowed = cfg.image_extensions.map(e => e.toLowerCase());
+        if (!allowed.includes(ext)) {
+            this._notifyError(`"${file.name}": extension ${ext || '(none)'} not allowed. Allowed: ${allowed.join(', ')}`);
+            return;
+        }
+
+        // Read as data URL for both the chip thumbnail AND the eventual
+        // multimodal content block. One read, two uses.
+        let dataUrl;
+        try {
+            dataUrl = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = () => reject(reader.error || new Error('FileReader error'));
+                reader.readAsDataURL(file);
+            });
+        } catch (err) {
+            this._notifyError(`Could not read image: ${err.message || err}`);
+            return;
+        }
+
+        this._pendingAttachment = {
+            kind: 'image',
+            name: file.name,
+            type: file.type || 'image/*',
+            size: file.size,
+            dataUrl,
+        };
+        this._renderAttachmentChip();
+        // Focus the input so the user can immediately type a prompt.
+        try { this._input.focus(); } catch (_e) {}
+    }
+
+    _renderAttachmentChip() {
+        // Strip any existing chip first (replace-on-pick semantics).
+        if (this._attachmentChipEl) {
+            this._attachmentChipEl.remove();
+            this._attachmentChipEl = null;
+        }
+        if (!this._pendingAttachment) return;
+        const chip = document.createElement('div');
+        chip.className = 'chat-attachment-chip';
+
+        const thumb = document.createElement('img');
+        thumb.className = 'chat-attachment-chip-thumb';
+        thumb.src = this._pendingAttachment.dataUrl;
+        thumb.alt = this._pendingAttachment.name;
+        chip.appendChild(thumb);
+
+        const meta = document.createElement('div');
+        meta.className = 'chat-attachment-chip-meta';
+        const nameEl = document.createElement('div');
+        nameEl.className = 'chat-attachment-chip-name';
+        nameEl.textContent = this._pendingAttachment.name;
+        nameEl.title = this._pendingAttachment.name;
+        const sizeEl = document.createElement('div');
+        sizeEl.className = 'chat-attachment-chip-size';
+        const kb = this._pendingAttachment.size / 1024;
+        sizeEl.textContent = kb >= 1024
+            ? `${(kb / 1024).toFixed(1)} MB · image`
+            : `${kb.toFixed(0)} KB · image`;
+        meta.appendChild(nameEl);
+        meta.appendChild(sizeEl);
+        chip.appendChild(meta);
+
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'chat-attachment-chip-remove';
+        removeBtn.title = 'Remove attachment';
+        removeBtn.innerHTML = '&times;';
+        removeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this._clearAttachment();
+        });
+        chip.appendChild(removeBtn);
+
+        // Place the chip immediately above the input area so it reads
+        // as "this is attached to the next message I'll send."
+        const inputArea = this._input?.parentElement;
+        if (inputArea?.parentElement) {
+            inputArea.parentElement.insertBefore(chip, inputArea);
+        }
+        this._attachmentChipEl = chip;
+    }
+
+    _clearAttachment() {
+        this._pendingAttachment = null;
+        if (this._attachmentChipEl) {
+            this._attachmentChipEl.remove();
+            this._attachmentChipEl = null;
+        }
+    }
+
+    async _getUploadConfig() {
+        if (this._uploadConfigCache) return this._uploadConfigCache;
+        try {
+            const r = await fetch('api/files/upload-config');
+            if (!r.ok) return null;
+            this._uploadConfigCache = await r.json();
+            return this._uploadConfigCache;
+        } catch (_e) {
+            return null;
+        }
+    }
+
+    _notifyError(msg) {
+        // Lazy-load to avoid a hard import at the top of this file
+        // (matches the pattern already used by other ChatPanel methods
+        // that use modal/notify imports on demand).
+        import('./Notify.js').then(({ notify }) => notify.error(msg));
+    }
+
     _autoGrow() {
         this._input.style.height = 'auto';
         this._input.style.height = Math.min(this._input.scrollHeight, 120) + 'px';
@@ -357,8 +666,15 @@ export class ChatPanel {
     }
 
     _handleSend() {
-        const text = this._input.value.trim();
-        if (!text) return;
+        const rawText = this._input.value.trim();
+        const att = this._pendingAttachment;
+
+        // Empty text + no attachment = nothing to send.
+        if (!rawText && !att) return;
+
+        // Image-only sends get a default prompt so the model has a clear
+        // task instead of relying on its own image-only fallback.
+        const text = (att && !rawText) ? 'Describe this image.' : rawText;
 
         // Cancel any pending live-trace fire - the real chat flow takes
         // over and will emit the actual graph_provenance event.
@@ -367,12 +683,32 @@ export class ChatPanel {
             this._liveTraceTimer = null;
         }
 
-        this.addMessage('user', text);
+        // Build the message payload. Two shapes:
+        //   - plain text (existing flow):  string
+        //   - multimodal (with image):     OpenAI-style content list
+        //       [{type:"text", text:"..."},
+        //        {type:"image_url", image_url:{url:"data:image/...;base64,..."}}]
+        // agent_server's openai_compat.ChatMessage.content already accepts
+        // Union[str, list[dict]] and the noted backend forwards unchanged.
+        let payload;
+        if (att) {
+            payload = [
+                { type: 'text', text },
+                { type: 'image_url', image_url: { url: att.dataUrl } },
+            ];
+        } else {
+            payload = text;
+        }
+
+        // Render the user bubble with the same shape we're sending so the
+        // history view shows what the model actually saw.
+        this.addMessage('user', payload);
         this._input.value = '';
         this._input.style.height = 'auto';
+        this._clearAttachment();
 
         if (this._onSendCallback) {
-            this._onSendCallback(text);
+            this._onSendCallback(payload);
         }
     }
 
@@ -406,6 +742,46 @@ export class ChatPanel {
     addMessage(role, text, thinkingContent = null, actionLabel = null) {
         const msg = document.createElement('div');
         msg.className = `chat-message chat-message-${role}`;
+
+        // Multimodal user bubbles. When `text` arrives as an OpenAI-style
+        // content list (text + image_url blocks from a chat-input image
+        // attachment), render thumbnails INLINE alongside the text. The
+        // assistant branch never receives this shape — model output is
+        // always plain text from our streaming pipeline.
+        if (role === 'user' && Array.isArray(text)) {
+            const textParts = text.filter(b => b && b.type === 'text').map(b => b.text || '').join('\n').trim();
+            const imageParts = text.filter(b => b && b.type === 'image_url' && b.image_url?.url);
+            if (actionLabel) {
+                const badge = document.createElement('span');
+                badge.className = 'chat-action-badge';
+                badge.textContent = actionLabel;
+                msg.appendChild(badge);
+            }
+            if (imageParts.length) {
+                const stripe = document.createElement('div');
+                stripe.className = 'chat-message-attachments';
+                for (const block of imageParts) {
+                    const img = document.createElement('img');
+                    img.className = 'chat-message-attachment-thumb';
+                    img.src = block.image_url.url;
+                    img.alt = 'attached image';
+                    stripe.appendChild(img);
+                }
+                msg.appendChild(stripe);
+            }
+            if (textParts) {
+                const userDiv = document.createElement('div');
+                userDiv.innerHTML = this._renderMarkdown(textParts);
+                userDiv.querySelectorAll('pre code[class*="language-"]').forEach((block) => {
+                    hljs.highlightElement(block);
+                });
+                this._renderMath(userDiv);
+                msg.appendChild(userDiv);
+            }
+            this._messagesArea.insertBefore(msg, this._typingIndicator);
+            this._messagesArea.scrollTop = this._messagesArea.scrollHeight;
+            return;
+        }
 
         if (role === 'assistant') {
             // Check if this is an error message

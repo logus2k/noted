@@ -10,7 +10,35 @@ import time
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Any, Optional, Union
+
+
+def _message_text(message: Any) -> str:
+    """Extract the text portion of a chat message payload.
+
+    `ChatRequest.message` accepts either a plain string (the common
+    text-only case) or an OpenAI-style content list for multimodal
+    input (text + image_url blocks from the chat-input image
+    attachment). Several routing/heuristic code paths only care about
+    the text — selecting tools, computing previews for logs, the
+    speculative-retrieval gate, etc. This helper flattens to plain
+    text without losing the original shape (which still flows through
+    memory.append + the LLM call unchanged).
+
+    Strings pass through. Lists are joined from their `text`-typed
+    blocks. Anything else stringified defensively.
+    """
+    if isinstance(message, str):
+        return message
+    if isinstance(message, list):
+        parts = []
+        for block in message:
+            if not isinstance(block, dict):
+                continue
+            if block.get("type") == "text":
+                parts.append(block.get("text", "") or "")
+        return " ".join(parts).strip()
+    return str(message or "")
 
 from app.managers.llm_router import LLMRouter
 from app.managers.llm_context import build_context_message, clean_history
@@ -90,7 +118,19 @@ class ContextDescriptor(BaseModel):
     dag_id: Optional[str] = None
 
 class ChatRequest(BaseModel):
-    message: str
+    # Either plain text (text-only chat — the common case) or an
+    # OpenAI-style content list for multimodal input. Each block in the
+    # list is a dict like:
+    #   {"type": "text", "text": "..."}
+    # or
+    #   {"type": "image_url", "image_url": {"url": "data:image/...;base64,..."}}
+    # The list shape is forwarded UNCHANGED to memory.append and the
+    # LLM call (agent_server's openai_compat.ChatMessage.content already
+    # accepts the same Union; llama-server's vision handler renders the
+    # image_url blocks via mmproj). Heuristic / preview / logging paths
+    # use _message_text() to flatten to plain text without losing the
+    # original payload.
+    message: Union[str, list[dict]]
     client_id: str = "default"
     context_descriptor: Optional[ContextDescriptor] = None
     think_enabled: bool = True
@@ -623,9 +663,15 @@ async def llm_chat(request: ChatRequest):
     # TEMP-DIAG 2026-05-02: trace what the user's message looks like at
     # request entry. Investigating "model said 'no specific request' for a
     # turn the user clearly typed". Strip if confirmed unrelated.
-    _msg_preview = (request.message or "")
-    logger.info("CHAT_TURN_USER_MESSAGE turn_id=%s len=%d repr=%r",
-                turn_id, len(_msg_preview), _msg_preview[:200])
+    # Multimodal note: when message is a content list (image attachment),
+    # only the text portion is logged — image_url data: URLs are 200 KB+
+    # base64 blobs that would flood the log file.
+    _msg_preview = _message_text(request.message)
+    _has_attachments = isinstance(request.message, list) and any(
+        isinstance(b, dict) and b.get("type") == "image_url" for b in request.message
+    )
+    logger.info("CHAT_TURN_USER_MESSAGE turn_id=%s len=%d has_attachments=%s repr=%r",
+                turn_id, len(_msg_preview), _has_attachments, _msg_preview[:200])
 
     try:
         # ── 1. Compaction check ──────────────────────────────────
@@ -684,11 +730,16 @@ async def llm_chat(request: ChatRequest):
         # tends to lightly rephrase, so hit rate isn't 100%. Misses fall
         # through to fresh dispatch with the discarded spec task cancelled
         # in the cleanup at the end of this request (around line ~1573).
+        # Speculative retrieval is text-driven (Jaccard match against
+        # the user's verbatim words). For multimodal payloads we use
+        # the text portion only; image_url blocks aren't queryable
+        # against the corpus.
+        _spec_text = _message_text(request.message)
         if (
             request.vector_rag_enabled
             and request.graph_rag_enabled
-            and request.message
-            and len(request.message.strip()) >= 10
+            and _spec_text
+            and len(_spec_text) >= 10
         ):
             # Build the spec query. For follow-up questions ("how does this
             # relate to X", "tell me more"), the model uses prior-turn
@@ -699,7 +750,7 @@ async def llm_chat(request: ChatRequest):
             # message, restoring the topic tokens the model will use.
             # First-turn questions (no prior assistant) fall back to
             # verbatim — no enrichment, no harm.
-            spec_question = request.message.strip()
+            spec_question = _spec_text
             try:
                 _hist = await memory.get_messages_for_llm(memory_key)
                 _last_asst = next(
@@ -742,7 +793,7 @@ async def llm_chat(request: ChatRequest):
             logger.info(
                 "SPECULATIVE_LAUNCH tool=graph_and_vector_search question=%r (enriched=%s)",
                 spec_args["question"][:200],
-                "yes" if spec_question != request.message.strip() else "no",
+                "yes" if spec_question != _spec_text else "no",
             )
 
         ctx_message, active_skills = await build_context_message(ctx_dict, _managers)
@@ -778,17 +829,37 @@ async def llm_chat(request: ChatRequest):
                 if isinstance(content, str) and not content.startswith("<|think|>"):
                     messages[0] = {**first, "content": "<|think|>\n" + content}
 
-        # Estimate input tokens (~4 chars per token)
-        input_chars = sum(len(m.get("content", "")) for m in messages)
+        # Estimate input tokens (~4 chars per token). Multimodal user
+        # messages have list content — sum the text portions only;
+        # image_url base64 payloads are not LLM input tokens (the
+        # vision encoder consumes them out-of-band).
+        def _content_text_chars(c):
+            if isinstance(c, str):
+                return len(c)
+            if isinstance(c, list):
+                return sum(len(b.get("text", "")) for b in c
+                           if isinstance(b, dict) and b.get("type") == "text")
+            return 0
+        input_chars = sum(_content_text_chars(m.get("content", "")) for m in messages)
         input_tokens_est = input_chars // 4
 
         # TEMP-DIAG 2026-05-02: dump the role+last-100-chars of each
         # message about to be sent to the LLM. Shows whether the user's
         # question actually reached the model. Strip if confirmed unrelated.
+        # Multimodal payloads are summarised by content-block kinds so
+        # the log doesn't dump 200 KB image data: URLs.
         for _i, _m in enumerate(messages):
-            _c = _m.get("content", "") or ""
-            logger.info("CHAT_TURN_LLM_MSG turn_id=%s idx=%d role=%s len=%d tail=%r",
-                        turn_id, _i, _m.get("role"), len(_c), _c[-200:])
+            _c = _m.get("content", "")
+            if isinstance(_c, list):
+                _summary = "+".join(b.get("type", "?") for b in _c if isinstance(b, dict))
+                _text = " ".join(b.get("text", "") for b in _c
+                                 if isinstance(b, dict) and b.get("type") == "text")
+                logger.info("CHAT_TURN_LLM_MSG turn_id=%s idx=%d role=%s blocks=[%s] text_len=%d tail=%r",
+                            turn_id, _i, _m.get("role"), _summary, len(_text), _text[-200:])
+            else:
+                _c = _c or ""
+                logger.info("CHAT_TURN_LLM_MSG turn_id=%s idx=%d role=%s len=%d tail=%r",
+                            turn_id, _i, _m.get("role"), len(_c), _c[-200:])
 
         # Early usage emit so the chat-bar bottom counter shows real input +
         # budget BEFORE the answer streams. Output ticks up live on the
@@ -854,7 +925,9 @@ async def llm_chat(request: ChatRequest):
 
         # Dynamic Context Router: filter tools for Anthropic (saves ~2000 tokens/turn),
         # send all tools for local LLM (small models need every tool visible)
-        _native_tools = select_tools(request.message, ctx_dict, _all_tools) if _is_anthropic else _all_tools
+        # Tool selection is keyword-driven against the user's text only;
+        # multimodal image_url blocks add nothing to the keyword match.
+        _native_tools = select_tools(_message_text(request.message), ctx_dict, _all_tools) if _is_anthropic else _all_tools
 
         async def generate():
             nonlocal _native_tools
@@ -1122,7 +1195,7 @@ async def llm_chat(request: ChatRequest):
                     "project_id": ctx_dict.get("project_id", ""),
                     "file_path": ctx_dict.get("file_path", ""),
                     "notebook_path": ctx_dict.get("notebook_path", ""),
-                    "user_message": request.message[:100],
+                    "user_message": _message_text(request.message)[:100],
                 }, client_id=request.client_id)
 
                 def _prepare_text_for_frontend(text: str, intermediate: bool = False) -> str:

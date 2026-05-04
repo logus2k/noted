@@ -53,6 +53,7 @@ services:
     environment:
       - NOTED_TERMINAL_SECRET=${NOTED_TERMINAL_SECRET:-}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - NOTED_MAX_UPLOAD_MB=${NOTED_MAX_UPLOAD_MB:-20}
     volumes:
       - ../data:/app/data
       - ../.noted:/app/.noted

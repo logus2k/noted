@@ -160,7 +160,12 @@ export class ChatService {
     }
 
     _wirePanel() {
-        this.chatPanel.onSend((text) => this.sendMessage(text, { showUserMessage: false }));
+        // ChatPanel hands us either a plain string OR an OpenAI-style
+        // content list (when an image attachment is pending). The shape
+        // is forwarded unchanged through sendMessage → _sendWithContext
+        // → POST /api/llm/chat → noted backend → agent_server (whose
+        // ChatMessage.content already accepts Union[str, list[dict]]).
+        this.chatPanel.onSend((content) => this.sendMessage(content, { showUserMessage: false }));
         this.chatPanel.onSttToggle((active) => {
             if (active) this.startVoice();
             else this.stopVoice();
@@ -613,7 +618,11 @@ export class ChatService {
 
     // --- Text chat ---
 
-    async sendMessage(text, { showUserMessage = true, overrides = null } = {}) {
+    async sendMessage(content, { showUserMessage = true, overrides = null } = {}) {
+        // `content` is either a plain string (text-only chat) or an
+        // OpenAI-style content list (multimodal — text + image_url
+        // blocks from the chat-input image attachment). All downstream
+        // hops accept either shape and forward unchanged.
         // Conversational interruption: if a previous turn is still streaming,
         // abort it before opening the new one. Without this, the two SSE
         // streams race into the chat and tokens from both turns interleave
@@ -635,14 +644,14 @@ export class ChatService {
         this.chatPanel.clearTransientErrors();
         // Show user message in chat (unless already shown by ChatPanel._handleSend)
         if (showUserMessage) {
-            this.chatPanel.addMessage('user', text);
+            this.chatPanel.addMessage('user', content);
         }
         // Once the user actually engages, the welcome no longer makes sense
         // to replay on a late TTS-enable. Mark it consumed.
         this._userMessagesSent++;
         // Always use the HTTP path for consistent usage tracking and memory
         const ctx = this._contextProvider?.() || {};
-        return this._sendWithContext(text, ctx, overrides);
+        return this._sendWithContext(content, ctx, overrides);
     }
 
     async _sendDirect(text) {
@@ -659,7 +668,7 @@ export class ChatService {
         }
     }
 
-    async _sendWithContext(text, contextDescriptor, overrides = null) {
+    async _sendWithContext(content, contextDescriptor, overrides = null) {
         this.chatPanel.setLoading(true);
 
         // TEMP-DIAG turn-tagged stream logging. Every SSE token, every
@@ -667,7 +676,15 @@ export class ChatService {
         // ID so the console can be grepped per-turn. Remove once the
         // streaming-parser bugs are fully chased.
         const turnId = Math.random().toString(36).slice(2, 8);
-        console.info(`[turn:${turnId}] START user=${JSON.stringify(text.slice(0, 120))}`);
+        // Preview is the text portion only — for multimodal content,
+        // join the text blocks and skip the image_url payloads (they're
+        // 200 KB+ data URLs and useless in a console preview).
+        const _previewText = (typeof content === 'string')
+            ? content
+            : (Array.isArray(content)
+                ? content.filter(b => b && b.type === 'text').map(b => b.text || '').join(' ')
+                : String(content || ''));
+        console.info(`[turn:${turnId}] START user=${JSON.stringify(_previewText.slice(0, 120))}`);
 
         const parser = new ThinkingParser();
         let fullAnswer = '';
@@ -702,7 +719,10 @@ export class ChatService {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    message: text,
+                    // Either a plain string OR an OpenAI-style content
+                    // list (text + image_url blocks for multimodal).
+                    // noted backend's ChatRequest.message accepts both.
+                    message: content,
                     client_id: this.clientId,
                     context_descriptor: contextDescriptor,
                     think_enabled: _think,

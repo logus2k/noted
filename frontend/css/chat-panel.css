@@ -703,7 +703,8 @@
 /* Action buttons */
 .chat-stt-btn,
 .chat-send-btn,
-.chat-tts-btn {
+.chat-tts-btn,
+.chat-attach-btn {
     width: 30px;
     height: 30px;
     padding: 0;
@@ -720,8 +721,166 @@
 
 .chat-stt-btn:hover,
 .chat-send-btn:hover,
-.chat-tts-btn:hover {
+.chat-tts-btn:hover,
+.chat-attach-btn:hover {
     background: #c8e6c0;
+}
+
+/* "+" attachments / new menu — dropdown anchored above the button.
+ * Fixed positioning so it floats over the surrounding layout instead
+ * of pushing it. Compact rows with icon + label + secondary hint. */
+.chat-attach-menu {
+    position: fixed;
+    z-index: 10000;
+    min-width: 220px;
+    padding: 4px;
+    background: #ffffff;
+    border: 1px solid #cfd6db;
+    border-radius: 8px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+    font-family: var(--font-sans);
+    color: var(--text-primary);
+}
+
+.chat-attach-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 6px 10px;
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    text-align: left;
+    color: inherit;
+    font: inherit;
+    transition: background 0.12s;
+}
+
+.chat-attach-menu-item:hover {
+    background: #fff8e9;
+}
+
+.chat-attach-menu-icon {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #555;
+}
+
+.chat-attach-menu-text {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.2;
+}
+
+.chat-attach-menu-label {
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.chat-attach-menu-hint {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 1px;
+}
+
+/* Pending image attachment chip — sits ABOVE the input row, makes it
+ * obvious the next send will include an image. Replace-on-pick (only
+ * one attachment at a time).
+ *
+ * Sized to its own content (left-aligned, no full-width stretch) so it
+ * reads as a discrete pill rather than a banner. max-width caps the
+ * filename growth without forcing a fixed width. */
+.chat-attachment-chip {
+    display: inline-flex;
+    align-self: flex-start;
+    width: fit-content;
+    max-width: calc(100% - 16px);
+    align-items: center;
+    gap: 8px;
+    margin: 6px 8px 0;
+    padding: 6px 10px 6px 6px;
+    background: #fff;
+    border: 1px solid #cfd6db;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.chat-attachment-chip-thumb {
+    width: 45px;
+    height: 45px;
+    object-fit: cover;
+    border-radius: 4px;
+    flex-shrink: 0;
+    background: #f0f0f0;
+}
+
+.chat-attachment-chip-meta {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    line-height: 1.25;
+}
+
+.chat-attachment-chip-name {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.chat-attachment-chip-size {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-top: 1px;
+}
+
+.chat-attachment-chip-remove {
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary, #666);
+    font-size: 18px;
+    line-height: 1;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.12s;
+}
+
+.chat-attachment-chip-remove:hover {
+    background: #f0e0e0;
+    color: #c62828;
+}
+
+/* Multimodal user message — thumbnail strip rendered above the text
+ * portion of the bubble so the user can see what the model received. */
+.chat-message-attachments {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 6px;
+}
+
+.chat-message-attachment-thumb {
+    max-width: 330px;
+    max-height: 270px;
+    border-radius: 4px;
+    border: 1px solid #cfd6db;
+    object-fit: contain;
+    background: #f0f0f0;
 }
 
 .chat-stt-btn.active {

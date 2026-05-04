@@ -1407,4 +1407,9 @@ class App {
 
 // --- Bootstrap ---
 const app = new App();
+// Expose globally so leaf components (ChatPanel, popups, etc.) can
+// reach app-level surfaces (current project, panels, modal helpers)
+// without each caller plumbing the instance through callbacks. Matches
+// the ctx.app pattern already used by ExplorerContextMenu.
+window.app = app;
 app.init().catch(err => console.error('App init failed:', err));

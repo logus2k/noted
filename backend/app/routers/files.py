@@ -8,10 +8,161 @@ from typing import Optional
 from app.managers.file_manager import FileManager
 from app.managers import config_manager
 
-MAX_UPLOAD_SIZE = 500 * 1024 * 1024  # 500 MB
+MAX_UPLOAD_SIZE = 500 * 1024 * 1024  # 500 MB — terminal-secret-gated upload (existing endpoint)
+
+# ── Chat-input asset upload config (image / audio / document) ─────────
+# Cap is read from NOTED_MAX_UPLOAD_MB env var (services/.env). Same
+# value is used server-side for enforcement and exposed via
+# GET /api/files/upload-config so the frontend can pre-validate.
+# Whitelists are intentionally narrow: no executables, no scripts, no
+# archives — uploads from the chat input are user-content payloads, not
+# code distribution.
+def _max_upload_mb() -> int:
+    try:
+        return max(1, int(os.environ.get("NOTED_MAX_UPLOAD_MB", "20")))
+    except (TypeError, ValueError):
+        return 20
+
+ALLOWED_IMAGE_EXTS = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.heic', '.heif', '.svg']
+ALLOWED_AUDIO_EXTS = ['.mp3', '.wav', '.m4a', '.ogg', '.flac', '.aac', '.opus', '.webm', '.mp4']
+
+# Mirrors the KB document_converter whitelist (corpus.add_uploaded_file
+# in noted-rag). Kept aligned so a "Document" upload through the + menu
+# is a strict subset of what the KB ingestion accepts.
+ALLOWED_DOCUMENT_EXTS = ['.md', '.pdf', '.docx', '.pptx', '.html', '.htm', '.txt']
+
+# Defense-in-depth: even if the whitelist is bypassed (e.g., file
+# renamed to a permitted extension), refuse anything in the deny set
+# regardless of advertised extension. Catches double-extension tricks
+# like "innocent.pdf.exe".
+BLOCKED_EXTS = {
+    '.exe', '.dll', '.so', '.dylib', '.bat', '.cmd', '.com', '.scr', '.msi',
+    '.ps1', '.psm1', '.vbs', '.vbe', '.js', '.jse', '.wsf', '.wsh',
+    '.sh', '.bash', '.zsh', '.fish', '.app', '.deb', '.rpm', '.dmg',
+    '.jar', '.class', '.war', '.ear',
+    '.py', '.pyc', '.pyo', '.rb', '.pl', '.php', '.phtml', '.cgi',
+    '.lnk', '.url', '.iso', '.img',
+}
 
 router = APIRouter(prefix="/api/files", tags=["files"])
 file_mgr = FileManager()
+
+
+@router.get("/upload-config")
+def get_upload_config():
+    """Configuration for chat-input asset uploads. Frontend reads this
+    once at init to populate file-picker accept lists and to do
+    client-side size validation BEFORE the network round-trip."""
+    return {
+        "max_size_mb": _max_upload_mb(),
+        "image_extensions": ALLOWED_IMAGE_EXTS,
+        "audio_extensions": ALLOWED_AUDIO_EXTS,
+        "document_extensions": ALLOWED_DOCUMENT_EXTS,
+    }
+
+
+def _ext_lower(filename: str) -> str:
+    if '.' not in filename:
+        return ''
+    return '.' + filename.rsplit('.', 1)[-1].lower()
+
+
+def _validate_upload(file: UploadFile, kind: str) -> tuple[str, list[str]]:
+    """Validate kind + filename + extension. Returns (safe_ext, allowed_list).
+    Raises HTTPException on rejection. Does NOT read file bytes."""
+    if kind not in ('image', 'audio', 'document'):
+        raise HTTPException(status_code=400, detail=f"Invalid kind '{kind}' (allowed: image, audio, document)")
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Missing filename")
+    # Reject path-injection attempts in the filename (defense in depth;
+    # _secure_path also normalises but we want to fail fast).
+    if any(c in file.filename for c in ('/', '\\', '\x00')) or '..' in file.filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    ext = _ext_lower(file.filename)
+    if not ext:
+        raise HTTPException(status_code=400, detail="Filename has no extension")
+    if ext in BLOCKED_EXTS:
+        raise HTTPException(status_code=400, detail=f"Extension '{ext}' is not permitted (executable / script / archive)")
+    allowed = {
+        'image': ALLOWED_IMAGE_EXTS,
+        'audio': ALLOWED_AUDIO_EXTS,
+        'document': ALLOWED_DOCUMENT_EXTS,
+    }[kind]
+    if ext not in allowed:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Extension '{ext}' is not allowed for kind '{kind}'. Allowed: {', '.join(allowed)}",
+        )
+    return ext, allowed
+
+
+@router.post("/upload-asset")
+async def upload_asset(
+    file: UploadFile = File(...),
+    kind: str = Form(...),
+    project_id: str = Form(...),
+):
+    """Chat-input asset upload (image / audio / document) into the
+    current project's `assets/<kind>s/` subdirectory.
+
+    Differs from the auth-gated `/upload/{root_type}/{root_name}`:
+      - No terminal-secret header required (chat-input is part of
+        normal user interaction, not a privileged terminal operation).
+      - Hard size cap from NOTED_MAX_UPLOAD_MB env var (default 20 MB)
+        instead of the 500 MB terminal-upload cap.
+      - Extension whitelist enforced per `kind`, plus a deny list of
+        executable / script / archive extensions regardless of kind.
+      - Auto-routes into project assets folder by kind so files stay
+        organised.
+    """
+    _ext_lower(file.filename or '')  # touch to keep the helper used
+    _validate_upload(file, kind)
+
+    # Read with a hard ceiling. We could stream-and-bail, but for a
+    # 20 MB cap a one-shot read is simpler and safe. If the env cap
+    # ever climbs above ~50 MB, switch to streaming.
+    max_bytes = _max_upload_mb() * 1024 * 1024
+    contents = await file.read()
+    if len(contents) > max_bytes:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large ({len(contents) // (1024*1024)} MB > {_max_upload_mb()} MB limit). "
+                   "Adjust NOTED_MAX_UPLOAD_MB in services/.env if you need a higher cap.",
+        )
+
+    # Resolve target inside the project root. _secure_path enforces no
+    # escape (no ../ traversal, no absolute paths).
+    try:
+        root = file_mgr._resolve_root("project", project_id)
+        subdir = {
+            'image': 'assets/images',
+            'audio': 'assets/audio',
+            'document': 'assets/documents',
+        }[kind]
+        rel = os.path.join(subdir, file.filename)
+        filepath = file_mgr._secure_path(root, rel)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    # Disambiguate filename collisions (file.png, file (1).png, ...)
+    if os.path.exists(filepath):
+        base, ext = os.path.splitext(filepath)
+        n = 1
+        while os.path.exists(f"{base} ({n}){ext}"):
+            n += 1
+        filepath = f"{base} ({n}){ext}"
+    with open(filepath, "wb") as f:
+        f.write(contents)
+
+    return {
+        "uploaded": True,
+        "kind": kind,
+        "project_id": project_id,
+        "path": os.path.relpath(filepath, root),
+        "size": len(contents),
+        "filename": os.path.basename(filepath),
+    }
 
 
 # ── Discovery: projects, mounts, git repos ───────────────────────────
