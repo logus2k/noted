@@ -19,7 +19,7 @@ from app.managers.llm_tools import parse_tool_call, parse_all_tool_calls, execut
 from app.managers.llm_debug import get_debug_log
 from app.mcp.tools import is_write_tier
 from app.mcp.tool_formats import to_anthropic_tools, to_openai_tools
-from app.mcp.gemma_tool_parser import parse_gemma_tool_calls, strip_gemma_tokens, strip_gemma_tokens_streaming, translate_gemma_thinking
+from app.mcp.gemma_tool_parser import strip_gemma_tokens, strip_gemma_tokens_streaming, translate_gemma_thinking
 from app.mcp.context_router import select_tools, expand_tools_for_retry
 from app.managers.notebook_manager import NotebookManager
 from app.managers.mlflow_manager import MlflowManager
@@ -918,7 +918,17 @@ async def llm_chat(request: ChatRequest):
                 return delta.get("content")
 
             def _collect_tool_calls_from_stream(chunks: list[dict], full_text: str = "") -> list[dict]:
-                """Extract native tool_call events from collected stream chunks."""
+                """Extract native tool_call events from collected stream chunks.
+
+                Structured-only contract: llama-server's chat-template parser
+                must produce native `delta.tool_calls` for the asf0 Gemma 4
+                template. We deliberately do NOT text-parse `<|tool_call>...`
+                from `full_text` as a fallback — silent text-rescue would
+                mask llama-server-side parse failures (per
+                feedback_no_silent_degradation). If structural parsing
+                breaks, the loop should produce no tool_calls and the
+                resulting empty answer / error surfaces the regression.
+                """
                 if _is_anthropic:
                     return [c["tool_call"] for c in chunks if c.get("tool_call")]
                 # OpenAI format: assemble from accumulated parts
@@ -932,20 +942,14 @@ async def llm_chat(request: ChatRequest):
                         logger.warning("Failed to parse local tool args: %s", args_str[:200])
                         args = {}
                     calls.append({"id": tc["id"], "name": tc["name"], "args": args})
-                # Fallback: parse Gemma 4 native tokens from text if no structured calls found
-                parsed_from_text = False
-                if not calls and full_text and '<|tool_call>' in full_text:
-                    calls = parse_gemma_tool_calls(full_text)
-                    parsed_from_text = True
                 # Duplicate-call diagnostic (Phase 1E debugging): flag any turn
                 # where the same tool name appears more than once so we can
-                # trace it back to structured-stream vs text-parser origin.
+                # trace it back to structured-stream origin.
                 names = [c.get('name') for c in calls]
                 if len(names) != len(set(names)):
                     logger.info(
-                        'tool-call duplicates: names=%s source=%s openai_indices=%s raw_text_tail=%r',
+                        'tool-call duplicates: names=%s openai_indices=%s raw_text_tail=%r',
                         names,
-                        'text-fallback' if parsed_from_text else 'openai-structured',
                         sorted(_openai_tool_calls.keys()),
                         full_text[-600:] if full_text else '',
                     )
