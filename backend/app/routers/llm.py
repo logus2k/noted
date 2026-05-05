@@ -153,13 +153,14 @@ class ToolCallStreamFilter:
 
     # Tool names that should be filtered when seen as raw JSON
     _TOOL_NAMES = {'update_cell', 'insert_cell', 'batch_update_cells', 'find_replace_in_cells',
-                   'update_file', 'create_file',
+                   'update_file', 'create_file', 'append_to_file',
                    'get_experiment_runs', 'get_run_details',
                    'compare_runs', 'get_file_contents', 'get_hydra_config', 'list_dags',
                    'get_dag_status', 'get_task_log', 'get_dvc_data_overview',
                    'get_dvc_file_history', 'query_knowledge_graph', 'get_skill',
                    'list_files', 'search_files', 'get_notebook_cells', 'run_agent',
                    'scroll_to_cell', 'open_file', 'chart',
+                   'create_doc', 'append_to_doc', 'replace_doc', 'read_doc', 'undo_last_change',
                    'get_lint_diagnostics', 'fix_lint_issues'}
 
     def __init__(self):
@@ -1491,6 +1492,149 @@ async def llm_chat(request: ChatRequest):
                                     f"Opened {path} in noted as a {kind} tab "
                                     f"({where}). The user can now see it."
                                 )
+                        elif tool_call["name"] in ("create_doc", "append_to_doc", "replace_doc", "read_doc"):
+                            # Take-Notes capability (NOTES-1): the assistant
+                            # creates/edits an in-memory document buffer.
+                            # Buffer state lives in app.managers.notes_buffer
+                            # (singleton). After every op we emit a `data.doc`
+                            # SSE event with the full new content so the
+                            # frontend document viewer redraws live, and we
+                            # return a short confirmation (or the content for
+                            # read_doc) to the LLM. Mutations push a pre-state
+                            # snapshot to undo_history (NOTES-4).
+                            from app.managers import notes_buffer as _notes
+                            from app.managers import undo_history as _undo
+                            args = tool_call.get("args") or {}
+                            op = tool_call["name"]
+                            buf = None
+                            tool_result = None
+                            if op == "create_doc":
+                                name = (args.get("name") or "").strip() or None
+                                initial = args.get("initial_content") or ""
+                                buf = _notes.create(name=name, initial_content=initial)
+                                tool_result = (
+                                    f"Created document '{buf.name}' (buffer_id={buf.buffer_id}). "
+                                    f"It is open in the middle panel and lives only in memory until "
+                                    f"the user clicks Save. Use this buffer_id for subsequent "
+                                    f"append_to_doc / replace_doc / read_doc calls."
+                                )
+                            elif op == "append_to_doc":
+                                bid = (args.get("buffer_id") or "").strip()
+                                content = args.get("content") or ""
+                                separator = args.get("separator")
+                                if separator is None:
+                                    separator = "\n\n"
+                                if not bid:
+                                    tool_result = "append_to_doc: missing 'buffer_id' argument."
+                                else:
+                                    pre = _notes.get(bid)
+                                    if pre:
+                                        _undo.push(f"buffer:{bid}", {
+                                            "kind": "buffer", "buffer_id": bid,
+                                            "name": pre.name, "content": pre.content,
+                                            "path": pre.path,
+                                        })
+                                    buf = _notes.append(bid, content, separator=separator)
+                                    if not buf:
+                                        tool_result = f"append_to_doc: no buffer with buffer_id={bid}."
+                                    else:
+                                        tool_result = (
+                                            f"Appended {len(content)} chars to '{buf.name}'. "
+                                            f"Document now {len(buf.content)} chars total."
+                                        )
+                            elif op == "replace_doc":
+                                bid = (args.get("buffer_id") or "").strip()
+                                content = args.get("content") or ""
+                                if not bid:
+                                    tool_result = "replace_doc: missing 'buffer_id' argument."
+                                else:
+                                    pre = _notes.get(bid)
+                                    if pre:
+                                        _undo.push(f"buffer:{bid}", {
+                                            "kind": "buffer", "buffer_id": bid,
+                                            "name": pre.name, "content": pre.content,
+                                            "path": pre.path,
+                                        })
+                                    buf = _notes.replace(bid, content)
+                                    if not buf:
+                                        tool_result = f"replace_doc: no buffer with buffer_id={bid}."
+                                    else:
+                                        tool_result = (
+                                            f"Replaced content of '{buf.name}'. "
+                                            f"Document is now {len(buf.content)} chars total."
+                                        )
+                            elif op == "read_doc":
+                                bid = (args.get("buffer_id") or "").strip()
+                                if not bid:
+                                    tool_result = "read_doc: missing 'buffer_id' argument."
+                                else:
+                                    buf = _notes.get(bid)
+                                    if not buf:
+                                        tool_result = f"read_doc: no buffer with buffer_id={bid}."
+                                    else:
+                                        tool_result = (
+                                            f"Document '{buf.name}' ({len(buf.content)} chars):\n\n"
+                                            f"{buf.content}"
+                                        )
+                            if buf is not None:
+                                yield f"data: {json.dumps({'doc': _notes.to_dict(buf)})}\n\n"
+                        elif tool_call["name"] == "undo_last_change":
+                            # NOTES-4 undo. Target is either `buffer:<id>` or
+                            # `file:<project_id>/<path>` (or `file:<path>` —
+                            # legacy form). Pops the most recent snapshot and
+                            # restores it: buffers via notes_buffer.replace,
+                            # files via file_manager.write_file. After
+                            # restoration we emit the corresponding refresh
+                            # event (data.doc / data.file_changed). No
+                            # approval gate — undo is the user's explicit
+                            # ask and restores prior state, not arbitrary
+                            # content.
+                            from app.managers import notes_buffer as _notes
+                            from app.managers import undo_history as _undo
+                            args = tool_call.get("args") or {}
+                            target = (args.get("target") or "").strip()
+                            if not target:
+                                tool_result = "undo_last_change: missing 'target' argument."
+                            else:
+                                snap = _undo.pop(target)
+                                if not snap:
+                                    tool_result = f"undo_last_change: no prior snapshot to undo for {target!r}."
+                                elif snap.get("kind") == "buffer":
+                                    bid = snap.get("buffer_id") or ""
+                                    restored = _notes.replace(bid, snap.get("content", ""))
+                                    if not restored:
+                                        tool_result = f"undo_last_change: buffer {bid} no longer exists."
+                                    else:
+                                        yield f"data: {json.dumps({'doc': _notes.to_dict(restored)})}\n\n"
+                                        tool_result = (
+                                            f"Reverted '{restored.name}' to its prior state "
+                                            f"({len(restored.content)} chars). "
+                                            f"{_undo.depth(target)} earlier snapshot(s) remain."
+                                        )
+                                elif snap.get("kind") == "file":
+                                    project_id = snap.get("project_id") or ""
+                                    path = snap.get("path") or ""
+                                    content = snap.get("content", "") or ""
+                                    if not project_id or not path:
+                                        tool_result = "undo_last_change: snapshot missing project_id or path."
+                                    else:
+                                        try:
+                                            from app.managers.project_registry import get_registry
+                                            from app.managers.file_manager import FileManager as _FM
+                                            registry = get_registry()
+                                            clean_id = registry.clean_id(project_id)
+                                            root_type = "mount" if registry.is_mount(clean_id) else "project"
+                                            _FM().write_file(root_type, clean_id, path, content)
+                                            yield f"data: {json.dumps({'file_changed': {'path': path, 'project_id': clean_id}})}\n\n"
+                                            tool_result = (
+                                                f"Reverted {clean_id}/{path} to its prior state "
+                                                f"({len(content)} chars). "
+                                                f"{_undo.depth(target)} earlier snapshot(s) remain."
+                                            )
+                                        except Exception as _e:
+                                            tool_result = f"undo_last_change: write failed: {type(_e).__name__}: {_e}"
+                                else:
+                                    tool_result = f"undo_last_change: unknown snapshot kind {snap.get('kind')!r}."
                         elif (tool_call["name"] == "research_topic"
                               and (tool_call.get("args") or {}).get("mode", "auto") in ("auto", "local", "global")):
                             # Deep-stream research_topic by hitting noted-graph's
@@ -1933,11 +2077,25 @@ async def llm_confirm(request: ConfirmRequest):
 
     async def _emit_results_prelude():
         """Yield tool_result SSE events so external harnesses / judges see the
-        write tool's real output before the follow-up text starts."""
+        write tool's real output before the follow-up text starts. Also emits
+        `data.file_changed` for any successful update_file / create_file so
+        the frontend can refresh DocumentViewer / FileEditor instances that
+        are currently displaying the touched path (NOTES-3)."""
         _TOOL_RESULT_SSE_MAX = 16000
-        for r in results:
+        for r, act in zip(results, actions):
             preview = r["result"][:_TOOL_RESULT_SSE_MAX] if isinstance(r["result"], str) else str(r["result"])[:_TOOL_RESULT_SSE_MAX]
             yield f"data: {json.dumps({'tool_result': {'name': r['tool'], 'result': preview, 'truncated': isinstance(r['result'], str) and len(r['result']) > _TOOL_RESULT_SSE_MAX}})}\n\n"
+
+            executor = act.get("executor_tool") or act.get("tool", "")
+            result_str = r["result"] if isinstance(r["result"], str) else ""
+            if (executor in ("update_file", "create_file")
+                    and result_str
+                    and "successfully" in result_str.lower()
+                    and not result_str.lower().startswith("error")):
+                file_path = act.get("file_path") or (act.get("args", {}) or {}).get("file_path") or ""
+                project_id = act.get("project_id") or ""
+                if file_path:
+                    yield f"data: {json.dumps({'file_changed': {'path': file_path, 'project_id': project_id}})}\n\n"
 
     if _is_anthropic:
         # Anthropic: feed results as tool_result content blocks

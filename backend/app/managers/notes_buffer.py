@@ -69,5 +69,22 @@ def replace(buffer_id: str, content: str) -> DocBuffer | None:
         return buf
 
 
+def bind_path(buffer_id: str, path: str) -> DocBuffer | None:
+    """Mark a buffer as path-bound after the user saves it (NOTES-2).
+
+    The buffer stays alive in memory; subsequent assistant edits still
+    target the buffer. The path is persisted on the record so the
+    frontend's Save button can skip the Save-As dialog on subsequent
+    saves and the Save endpoint knows where on disk this content
+    belongs.
+    """
+    with _lock:
+        buf = _buffers.get(buffer_id)
+        if not buf:
+            return None
+        buf.path = path or None
+        return buf
+
+
 def to_dict(buf: DocBuffer) -> dict:
     return asdict(buf)

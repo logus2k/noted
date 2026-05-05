@@ -18,6 +18,7 @@ import { DocPanel } from './DocPanel.js';
 import { MediaViewer } from './MediaViewer.js';
 import { isMediaViewable, mediaType } from './file-icons.js';
 import { notify } from './Notify.js';
+import { modalForm, modalAlert } from './modal.js';
 import { domainState } from './domain-state.js';
 import { GitPanel } from './GitPanel.js';
 import { RunManagerPanel } from './RunManagerPanel.js';
@@ -624,6 +625,18 @@ class App {
                 e.stopPropagation();
                 this._showGoToCellModal?.();
             }
+            // Ctrl/Cmd+S: save the active note-taking buffer (NOTES-2).
+            // First save opens Save-As; subsequent saves reuse the bound
+            // path. Only fires when a buffer tab is active so it doesn't
+            // intercept Ctrl+S in unrelated contexts.
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+                const activeKey = this._tabBar?.activeKey;
+                if (activeKey && activeKey.startsWith('doc:__buffer__:')) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this._saveBuffer?.(activeKey);
+                }
+            }
         }, true);
 
         // All sidebar panels closed by default
@@ -825,6 +838,224 @@ class App {
             return this._openFileTab(projId, path);
         } catch (e) {
             console.warn('[app] open_file dispatch failed', e);
+        }
+    }
+
+    /** Handle a doc-buffer SSE event (NOTES-1).
+     *
+     * Payload: {buffer_id, name, content, path}.
+     * - First event for a given buffer_id opens a new document tab
+     *   carrying the buffer's content as inline markdown and switches
+     *   the workspace to it so the user sees the note land.
+     * - Subsequent events for the same buffer_id update the stored
+     *   doc.content and re-render the existing DocumentViewer in place,
+     *   giving the live-preview UX as the assistant writes.
+     * - Tab key prefix `doc:` keeps it inside the existing document-tab
+     *   plumbing (ToC, scroll restore, close handling).
+     */
+    _handleDocBuffer(payload) {
+        if (!payload || !payload.buffer_id) return;
+        const { buffer_id, name, content, path } = payload;
+
+        if (!this._docBufferTabKeys) {
+            this._docBufferTabKeys = new Map();
+        }
+
+        let tabKey = this._docBufferTabKeys.get(buffer_id);
+
+        if (!tabKey) {
+            tabKey = `doc:__buffer__:${buffer_id}`;
+            this._docBufferTabKeys.set(buffer_id, tabKey);
+            const doc = {
+                kind: 'buffer',
+                buffer_id,
+                name: name || `notes-${buffer_id.slice(0, 8)}.md`,
+                content: content || '',
+                path: path || null,
+                category: '__buffer__',
+            };
+            this._documentTabs.set(tabKey, doc);
+            this._tabBar.addTab({
+                key: tabKey,
+                label: doc.name,
+                type: 'document',
+                closable: true,
+                undockable: true,
+            });
+            this._tabBar.activate(tabKey);
+            return;
+        }
+
+        const doc = this._documentTabs.get(tabKey);
+        if (!doc) return;
+        doc.content = content || '';
+        if (typeof name === 'string' && name) doc.name = name;
+        if (typeof path === 'string') doc.path = path;
+
+        const viewer = this._documentViewers.get(tabKey);
+        if (viewer) {
+            viewer.show(doc);
+        }
+    }
+
+    /** Reload any open viewer / editor showing the touched on-disk path.
+     *
+     * Wired to the `data.file_changed` SSE event (NOTES-3) emitted from
+     * /api/llm/confirm after a successful update_file / create_file (or
+     * append_to_file via its update_file rewrite). Two consumers:
+     *  - DocumentViewer instances open on a `doc:` tab whose stored doc
+     *    path matches the touched path → call show(doc) to re-fetch.
+     *  - FileEditor instances open on a `pyfile:` tab whose path matches
+     *    → reload from disk via fileEditor.reloadFromDisk?.() if present,
+     *    or fallback to a manual fetch.
+     */
+    _handleFileChanged(payload) {
+        if (!payload || !payload.path) return;
+        const writtenPath = payload.path;
+        const projectId = payload.project_id || '';
+
+        // Refresh DocumentViewer tabs (skip the in-memory buffer kind —
+        // those mutate via data.doc events instead and have no on-disk
+        // backing yet).
+        if (this._documentTabs && this._documentViewers) {
+            for (const [tabKey, doc] of this._documentTabs) {
+                if (!doc || doc.kind === 'buffer') continue;
+                const docPath = doc.path || doc.location || '';
+                if (!docPath) continue;
+                if (docPath === writtenPath
+                        || docPath.endsWith('/' + writtenPath)
+                        || writtenPath.endsWith('/' + docPath)) {
+                    const viewer = this._documentViewers.get(tabKey);
+                    if (viewer) {
+                        try { viewer.show(doc); } catch (e) { console.warn('[file_changed] viewer reload failed', e); }
+                    }
+                }
+            }
+        }
+
+        // Refresh open code/text file editors (pyfile: tabs) showing the
+        // same path. The optimistic _applyWriteAction path already sets
+        // content for the active editor, but for non-active editors a
+        // fresh fetch keeps them in sync with disk.
+        if (this._fileEditors) {
+            for (const [tabKey, editor] of this._fileEditors) {
+                if (!tabKey.startsWith('pyfile:')) continue;
+                const parts = tabKey.split(':');
+                const tabProject = parts[1] || '';
+                const tabPath = parts.slice(2).join(':');
+                if (projectId && tabProject !== projectId) continue;
+                if (tabPath === writtenPath
+                        || tabPath.endsWith('/' + writtenPath)
+                        || writtenPath.endsWith('/' + tabPath)) {
+                    if (typeof editor.reloadFromDisk === 'function') {
+                        try { editor.reloadFromDisk(); } catch (e) { console.warn('[file_changed] editor reload failed', e); }
+                    }
+                }
+            }
+        }
+    }
+
+    /** Persist a note-taking buffer to disk (NOTES-2 Save flow).
+     *
+     * tabKey is the doc-buffer tab key `doc:__buffer__:<buffer_id>`.
+     *  - First save: opens a Save-As modal to pick project + relative path,
+     *    then POSTs to /api/buffers/<id>/save. On success the buffer is
+     *    marked path-bound on both server and client; subsequent saves
+     *    skip the modal and reuse the bound path.
+     *  - Already-saved buffer: posts directly with the bound path.
+     */
+    async _saveBuffer(tabKey) {
+        const doc = this._documentTabs.get(tabKey);
+        if (!doc || doc.kind !== 'buffer' || !doc.buffer_id) return;
+        const bufferId = doc.buffer_id;
+
+        let projectId = null;
+        let relPath = null;
+
+        if (doc.path) {
+            // Path is "<project_id>/<rel_path>" — split on the first slash.
+            const slash = doc.path.indexOf('/');
+            if (slash > 0) {
+                projectId = doc.path.substring(0, slash);
+                relPath = doc.path.substring(slash + 1);
+            }
+        }
+
+        if (!projectId || !relPath) {
+            // Save-As: ask for project + path. Fetch projects + mounts to
+            // populate the dropdown.
+            let projects = [];
+            try {
+                const resp = await fetch('api/files');
+                if (resp.ok) {
+                    const data = await resp.json();
+                    const ps = (data.projects || []).map(p => ({
+                        label: `project: ${typeof p === 'string' ? p : (p.name || p.id || JSON.stringify(p))}`,
+                        value: typeof p === 'string' ? p : (p.name || p.id || ''),
+                    })).filter(o => o.value);
+                    const ms = (data.mounts || []).map(m => ({
+                        label: `mount: ${m.name}`,
+                        value: m.name,
+                    })).filter(o => o.value);
+                    projects = [...ps, ...ms];
+                }
+            } catch (e) {
+                console.warn('[app] _saveBuffer: failed to list projects', e);
+            }
+            if (projects.length === 0) {
+                modalAlert('No projects or mounts available to save into.', { title: 'Save As' });
+                return;
+            }
+
+            const result = await modalForm([
+                {
+                    key: 'project_id',
+                    label: 'Project / mount',
+                    type: 'select',
+                    options: projects,
+                    defaultValue: projects[0].value,
+                    required: true,
+                },
+                {
+                    key: 'path',
+                    label: 'Path within project (e.g. notes/report.md)',
+                    type: 'text',
+                    defaultValue: doc.name || 'notes.md',
+                    required: true,
+                },
+            ], { title: 'Save As', confirmText: 'Save', width: 480 });
+
+            if (!result) return; // cancelled
+            projectId = (result.project_id || '').trim();
+            relPath = (result.path || '').trim();
+            if (!projectId || !relPath) {
+                modalAlert('Project and path are required.', { title: 'Save As' });
+                return;
+            }
+        }
+
+        try {
+            const resp = await fetch(`api/buffers/${encodeURIComponent(bufferId)}/save`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ project_id: projectId, path: relPath }),
+            });
+            if (!resp.ok) {
+                const text = await resp.text();
+                modalAlert(`Save failed (${resp.status}): ${text}`, { title: 'Save error' });
+                return;
+            }
+            const out = await resp.json();
+            doc.path = out.bound_path || `${projectId}/${relPath}`;
+            // Refresh the top bar so the Save tooltip updates and reflects
+            // the bound path. _tabBar redraws bars on activation; re-activate
+            // to pick up the change.
+            if (this._tabBar.activeKey === tabKey) {
+                this._tabBar.activate(tabKey);
+            }
+            notify(`Saved to ${doc.path}`, { type: 'success', timeout: 3000 });
+        } catch (e) {
+            modalAlert(`Save failed: ${e.message || e}`, { title: 'Save error' });
         }
     }
 
@@ -1185,6 +1416,18 @@ class App {
         const spacer = document.createElement('span');
         spacer.style.flex = '1';
         bar.appendChild(spacer);
+        // Save button — only visible for in-memory note-taking buffers
+        // (NOTES-2). Existing on-disk documents are read-only here.
+        const isBuffer = key.startsWith('doc:__buffer__:');
+        if (isBuffer) {
+            const doc = this._documentTabs.get(key);
+            const saveBtn = document.createElement('button');
+            saveBtn.className = 'info-bar-text-btn';
+            saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk" style="font-size:11px;color:#555555"></i>';
+            saveBtn.title = doc?.path ? `Save (${doc.path})` : 'Save As…';
+            saveBtn.addEventListener('click', () => this._saveBuffer?.(key));
+            bar.appendChild(saveBtn);
+        }
         // Undock button
         const undockBtn = document.createElement('button');
         undockBtn.className = 'info-bar-text-btn';

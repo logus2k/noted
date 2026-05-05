@@ -153,6 +153,13 @@ export function initChat(app) {
         // open_file tool — LLM-driven Explorer-double-click equivalent.
         // Dispatch by kind to the matching tab opener already on `app`.
         app._chatService.onOpenFile((p) => app._handleAssistantOpenFile?.(p));
+        // create_doc / append_to_doc / replace_doc tools (NOTES-1) — open
+        // an in-memory note-taking buffer in the document viewer or update
+        // an existing one with new content.
+        app._chatService.onDoc((p) => app._handleDocBuffer?.(p));
+        // update_file / create_file / append_to_file (NOTES-3) — refresh any
+        // open viewer/editor that is showing the touched path.
+        app._chatService.onFileChanged((p) => app._handleFileChanged?.(p));
         // Double-click on chat thumbnails / file chips / assistant <img>
         // opens the artifact in a floating jsPanel viewer.
         app._chatPanel.onOpenArtifact((p) => app._openChatArtifact?.(p));

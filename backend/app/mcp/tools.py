@@ -444,6 +444,17 @@ _READ_TOOLS: list[types.Tool] = [
         },
     ),
     types.Tool(
+        name="undo_last_change",
+        description="Revert the most recent assistant-driven write to a note buffer or on-disk file. Use when the user asks to undo / revert / take it back. The target string identifies what to undo: `buffer:<buffer_id>` for an in-memory note-taking buffer, or `file:<project_id>/<path>` for an on-disk file edited via update_file or append_to_file. Restores the previous content and refreshes the viewer in the middle panel.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "target": {"type": "string", "description": "Target identifier: 'buffer:<buffer_id>' or 'file:<project_id>/<relative_path>'."},
+            },
+            "required": ["target"],
+        },
+    ),
+    types.Tool(
         name="get_lint_diagnostics",
         description="Get current linter diagnostics (errors, warnings) for the open file",
         inputSchema={
@@ -721,6 +732,20 @@ _WRITE_TOOLS: list[types.Tool] = [
         },
     ),
     types.Tool(
+        name="append_to_file",
+        description=("Append new content to the end of an existing on-disk file. Preferred over update_file for incremental note-taking and report-building flows: it sends only the new content (no need to re-emit the whole file) and is concurrent-safe when the user edits the file between turns. The change still goes through the user approval panel."),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "file_path": {"type": "string", "description": "Relative path to the existing file. REQUIRED when the file is not currently open in FILE CONTEXT."},
+                "content": {"type": "string", "description": "New content to append at the end of the file"},
+                "separator": {"type": "string", "description": "Separator between existing content and the appended block (default '\\n\\n')"},
+                "description": {"type": "string", "description": "Short description of what is being appended"},
+            },
+            "required": ["content", "description"],
+        },
+    ),
+    types.Tool(
         name="fix_lint_issues",
         description="Auto-fix lint issues in the open file by rule code",
         inputSchema={
@@ -753,6 +778,11 @@ ALL_TOOLS: list[types.Tool] = _READ_TOOLS + _WRITE_TOOLS
 _GENERAL_TOOL_NAMES: set[str] = {
     'fetch_url',
     'web_search',
+    'create_doc',
+    'append_to_doc',
+    'replace_doc',
+    'read_doc',
+    'undo_last_change',
     'get_skill',
     'list_projects',
     'list_files',
@@ -760,6 +790,8 @@ _GENERAL_TOOL_NAMES: set[str] = {
     'search_files',
     'search_docs',
     'create_file',
+    'update_file',
+    'append_to_file',
     'graph_and_vector_search',
     'query_knowledge_graph',
     'research_topic',

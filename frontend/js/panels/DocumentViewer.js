@@ -30,6 +30,18 @@ export class DocumentViewer {
         this._currentDoc = doc;
         this._content.innerHTML = '';
 
+        // Buffer document (NOTES-1) — in-memory note-taking buffer, content
+        // arrives as raw markdown directly on the doc object. Live updates
+        // re-call show() with the same buffer_id and the new content; the
+        // _cleanup + innerHTML reset above gives a clean re-render each time.
+        if (doc.kind === 'buffer') {
+            this._content.className = 'document-viewer-content document-viewer-markdown';
+            const html = this._renderMarkdownToHtml(doc.content || '', null);
+            this._content.innerHTML = html;
+            this._postProcessMarkdown();
+            return;
+        }
+
         // Inline content (e.g. skill documents loaded from API JSON)
         if (doc.content) {
             this._content.className = 'document-viewer-content document-viewer-skill';

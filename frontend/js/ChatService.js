@@ -215,6 +215,18 @@ export class ChatService {
         // _openDocumentTab / _openMediaTab based on `kind`.
         this._onOpenFile = null;
 
+        // Doc-buffer SSE callback (NOTES-1). Wire from app.js to drive the
+        // document viewer's buffer rendering. Payload: {buffer_id, name,
+        // content, path}. Same callback fires for create_doc/append_to_doc/
+        // replace_doc - the consumer reconciles by buffer_id.
+        this._onDoc = null;
+
+        // File-changed SSE callback (NOTES-3). Wire from app.js. Payload:
+        // {path, project_id}. Fires after a successful update_file /
+        // create_file / append_to_file disk write so any open viewer for
+        // the touched path can refresh from disk.
+        this._onFileChanged = null;
+
         // Voice state
         this.voiceActive = false;
         this._audioContext = null;
@@ -641,6 +653,8 @@ export class ChatService {
     onWriteAction(cb) { this._onWriteAction = cb; }
     onNavigate(cb) { this._onNavigate = cb; }
     onOpenFile(cb) { this._onOpenFile = cb; }
+    onDoc(cb) { this._onDoc = cb; }
+    onFileChanged(cb) { this._onFileChanged = cb; }
 
 
     async connect() {
@@ -926,6 +940,33 @@ export class ChatService {
                             this.chatPanel?.renderInlineChart?.(data.chart);
                         } catch (e) {
                             console.warn('[ChatService] renderInlineChart threw', e);
+                        }
+                        continue;
+                    }
+
+                    // Doc event - Take-Notes capability (NOTES-1). Payload
+                    // shape: {buffer_id, name, content, path}. Hands off to
+                    // app.js so the document viewer either opens the buffer
+                    // for the first time (create_doc) or re-renders existing
+                    // content live (append_to_doc / replace_doc).
+                    if (data.doc) {
+                        if (this._onDoc) {
+                            try { this._onDoc(data.doc); }
+                            catch (e) { console.warn('[ChatService] onDoc threw', e); }
+                        }
+                        continue;
+                    }
+
+                    // File-changed event - NOTES-3. Emitted from /api/llm/confirm
+                    // after a successful update_file / create_file (and the
+                    // append_to_file path that re-routes through update_file).
+                    // Payload: {path, project_id}. Hands off to app.js to refresh
+                    // any DocumentViewer or FileEditor displaying the touched
+                    // path.
+                    if (data.file_changed) {
+                        if (this._onFileChanged) {
+                            try { this._onFileChanged(data.file_changed); }
+                            catch (e) { console.warn('[ChatService] onFileChanged threw', e); }
                         }
                         continue;
                     }

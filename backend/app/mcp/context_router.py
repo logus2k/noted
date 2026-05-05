@@ -45,13 +45,14 @@ DOMAINS = {
         ],
     },
     "files": {
-        "tools": {"get_file_contents", "list_files", "search_files", "create_file", "update_file"},
+        "tools": {"get_file_contents", "list_files", "search_files", "create_file", "update_file", "append_to_file"},
         "keywords": [
             r"\bfile[s]?\b", r"\bread\b.*\b(file|code|script|module)\b",
             r"\bcreate\b.*\bfile\b", r"\bwrite\b.*\bfile\b", r"\bsearch\b.*\b(file|code|content)\b",
             r"\bgrep\b", r"\bfind\b.*\b(in|across)\b", r"\blist\b.*\bfile\b",
             r"\bsrc/\b", r"\b\.py\b", r"\bimport[s]?\b.*\bfrom\b",
             r"\bmodify\b.*\bfile\b", r"\bedit\b.*\bfile\b",
+            r"\bappend\b.*\b(file|content|notes|report|document)\b",
         ],
     },
     "hydra": {
@@ -93,6 +94,19 @@ DOMAINS = {
             r"\bexplore\b.*\bnotebook\b", r"\bsummarize\b.*\bnotebook\b",
         ],
     },
+    "notes": {
+        "tools": {"create_doc", "append_to_doc", "replace_doc", "read_doc"},
+        "keywords": [
+            r"\bnote[s]?\b", r"\btake.?note", r"\bjot\b",
+            r"\bdraft\b.*\b(report|notes|document|memo|article)\b",
+            r"\bcreate\b.*\b(file|document|notes|report|memo)\b",
+            r"\bnew\b.*\b(file|document|notes)\b",
+            r"\bwrite\b.*\b(report|memo|notes|document|article|summary)\b",
+            r"\bsummari[sz]e\b.*\b(into|to|in)\b.*\b(file|document|notes|memo)\b",
+            r"\b(report|memo|summary)\b.*\b(about|on|for)\b",
+            r"\bappend\b.*\b(to|content)\b",
+        ],
+    },
     "web": {
         "tools": {"fetch_url", "web_search"},
         "keywords": [
@@ -118,6 +132,11 @@ _ALWAYS_INCLUDE = {
     "get_file_contents", "get_notebook_cells", "scroll_to_cell",
     "search_docs", "graph_and_vector_search",
     "research_topic", "query_knowledge_graph",
+    # NOTES tools: pinned because once a buffer is active, follow-up turns
+    # ("now add a section about pricing") may not contain note-keywords
+    # but still need the tools available to keep editing.
+    "create_doc", "append_to_doc", "replace_doc", "read_doc",
+    "undo_last_change",
 }
 
 # Pre-compile keyword patterns per domain

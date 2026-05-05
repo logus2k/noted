@@ -135,10 +135,34 @@ Write (require user confirmation):
     Args: {"new_content": "string (complete file content)", "description": "string", "file_path": "string (optional - required only when the file is not open in the editor)"}
 22. create_file - Create a new file in the project
     Args: {"file_path": "string", "content": "string", "description": "string", "project_id": "string (optional)"}
+22b. append_to_file - Append new content to the end of an existing on-disk file. Smaller payload than update_file (no need to re-emit the whole file) and concurrent-safe with user edits between turns. Goes through the same approval panel as update_file.
+    Args: {"content": "string (text to append)", "description": "string", "separator": "string (optional, default '\\n\\n')", "file_path": "string (optional - required when the file is not open in FILE CONTEXT)"}
 23. get_lint_diagnostics - Get current linter diagnostics (errors, warnings) for the currently open Python file. Returns rule codes, messages, line numbers, and available auto-fixes.
     Args: {} (no args - uses the file from context)
 24. fix_lint_issues - Auto-fix lint issues in the open Python file. ALWAYS use this for lint/linting fixes. NEVER use update_file for lint fixes.
     Args: {"codes": "string (optional, e.g. 'F401' or 'F401,PIE790' to fix specific rules only)"}
+
+Web:
+25. fetch_url - Fetch the text content of a single web URL.
+    Args: {"url": "string", "max_chars": number (optional, default 10000)}
+26. web_search - Search the web (DuckDuckGo) and return the top results as a numbered list of title/url/snippet. Pair with fetch_url to read a chosen result in full.
+    Args: {"query": "string", "top_n": number (optional, default 8)}
+
+Take-Notes (in-memory note-taking buffers; live preview in the middle panel; no approval needed because nothing touches disk until the user clicks Save):
+27. create_doc - Create a new in-memory note-taking document and open it in the middle panel. Returns a buffer_id for subsequent calls. Use when the user asks to take notes, draft a report, or start a new document inline with the conversation.
+    Args: {"name": "string (optional, e.g. meeting-notes.md; defaults to a generated notes-<id>.md)", "initial_content": "string (optional, markdown)"}
+28. append_to_doc - Append new content to an existing buffer. Preferred over replace_doc for incremental note-taking.
+    Args: {"buffer_id": "string (from create_doc)", "content": "string (markdown to append)", "separator": "string (optional, default '\\n\\n')"}
+29. replace_doc - Replace the entire content of a buffer. Call read_doc FIRST to fetch current content (the user may have edited it since the last write).
+    Args: {"buffer_id": "string", "content": "string (full new content)"}
+30. read_doc - Read the current content of a buffer. Use before any non-append edit so changes the user made are not clobbered.
+    Args: {"buffer_id": "string"}
+31. undo_last_change - Revert the most recent assistant-driven write to a buffer or on-disk file. Use when the user asks to undo / revert / take it back.
+    Args: {"target": "string ('buffer:<buffer_id>' for a note buffer, or 'file:<project_id>/<path>' for an on-disk file edited via update_file or append_to_file)"}
+
+When the user asks to "take notes", "draft a report", "summarize this into a file", or otherwise start a NEW note-taking document, prefer create_doc over create_file. The buffer-based path lives in noted's memory until the user clicks Save (a Save-As dialog asks for project + path on first save), giving you fast iteration with no approval prompts. After create_doc, use append_to_doc for each new section as the conversation progresses; the document viewer redraws live in the middle panel.
+
+When the user wants to update or append to an EXISTING on-disk file (one they opened with open_file or referenced by path), use append_to_file for incremental additions and update_file only when restructuring the whole file. Always call get_file_contents (or read_doc for a buffer) before update_file / replace_doc to avoid clobbering edits the user made between turns.
 
 To call a tool, output EXACTLY this format:
 <tool_call>{"name": "tool_name", "args": {"arg1": "value1"}}</tool_call>
@@ -183,6 +207,8 @@ _ALL_TOOL_NAMES = {
     'get_dvc_data_overview', 'get_dvc_file_history', 'query_knowledge_graph',
     'get_skill', 'list_files', 'search_files', 'get_notebook_cells', 'run_agent',
     'scroll_to_cell', 'get_lint_diagnostics', 'fix_lint_issues', 'fetch_url', 'web_search',
+    'append_to_file',
+    'create_doc', 'append_to_doc', 'replace_doc', 'read_doc', 'undo_last_change',
     'list_projects',
 }
 
@@ -269,7 +295,7 @@ def parse_all_tool_calls(text: str) -> list:
 
 
 # Write tools that require user confirmation before execution
-WRITE_TOOLS = {"update_cell", "insert_cell", "batch_update_cells", "find_replace_in_cells", "update_file", "create_file", "fix_lint_issues"}
+WRITE_TOOLS = {"update_cell", "insert_cell", "batch_update_cells", "find_replace_in_cells", "update_file", "create_file", "fix_lint_issues", "append_to_file"}
 
 
 def is_write_tool(tool_call: dict) -> bool:
@@ -346,6 +372,47 @@ async def prepare_write_action(tool_call: dict, managers: dict, ctx: dict) -> di
             action["current_content"] = current
         explicit_path = (args.get("file_path") or "").strip()
         action["file_path"] = explicit_path or ctx.get("file_path", "")
+
+    # For append_to_file, transform into an update_file action server-side:
+    # read current on-disk content, compute merged content with the
+    # separator-joined append, and route through the existing update_file
+    # approval / executor path. The user sees a normal diff (existing vs
+    # existing+appended) and on approval the merged content lands.
+    if name == "append_to_file":
+        explicit_path = (args.get("file_path") or "").strip()
+        target_path = explicit_path or ctx.get("file_path", "")
+        action["file_path"] = target_path
+
+        current = ctx.get("file_content", "")
+        if not current and target_path and project_id:
+            file_mgr_inst = managers.get("files")
+            if file_mgr_inst:
+                try:
+                    from app.managers.project_registry import get_registry as _get_reg
+                    registry = _get_reg()
+                    root_type = "mount" if registry.is_mount(project_id) else "project"
+                    _res = file_mgr_inst.read_file(root_type, project_id, target_path)
+                    if isinstance(_res, dict):
+                        current = _res.get("content", "") or ""
+                    elif isinstance(_res, str):
+                        current = _res
+                except Exception as e:
+                    logger.warning("append_to_file disk read failed: %s", e)
+
+        action["current_content"] = current or ""
+        appended = args.get("content", "") or ""
+        separator = args.get("separator")
+        if separator is None:
+            separator = "\n\n"
+        if current and appended:
+            merged = current + separator + appended
+        else:
+            merged = (current or "") + (appended or "")
+        action["executor_tool"] = "update_file"
+        action["executor_args"] = {
+            "new_content": merged,
+            "description": args.get("description", "") or "Append content",
+        }
 
     # For fix_lint_issues, generate the fixed content server-side using ruff
     if name == "fix_lint_issues":
@@ -2579,6 +2646,30 @@ async def _tool_update_file(action: dict, managers: dict) -> str:
     registry = get_registry()
     clean_id = registry.clean_id(project_id)
     root_type = "mount" if registry.is_mount(clean_id) else "project"
+
+    # NOTES-4: snapshot the pre-write file content so undo_last_change can
+    # revert. Prefer the prepared current_content from prepare_write_action
+    # (it was already read for the diff UI); fall back to disk.
+    try:
+        from app.managers import undo_history
+        prev = action.get("current_content")
+        if prev is None:
+            try:
+                _res = file_mgr.read_file(root_type, clean_id, file_path)
+                if isinstance(_res, dict):
+                    prev = _res.get("content", "") or ""
+                elif isinstance(_res, str):
+                    prev = _res
+                else:
+                    prev = ""
+            except Exception:
+                prev = ""
+        undo_history.push(f"file:{clean_id}/{file_path}", {
+            "kind": "file", "project_id": clean_id, "path": file_path,
+            "content": prev or "",
+        })
+    except Exception as _snap_e:
+        logger.warning("undo snapshot push failed for %s: %s", file_path, _snap_e)
 
     try:
         file_mgr.write_file(root_type, clean_id, file_path, new_content)
