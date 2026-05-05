@@ -677,6 +677,157 @@ class App {
         this._kbMonitor.open(domainId);
     }
 
+    /** Open a chat artifact (image / file content) in a floating
+     * jsPanel viewer. Triggered by double-clicking an image thumbnail
+     * or file chip in the chat (user-uploaded OR assistant-rendered).
+     *
+     * Payload:
+     *   image: { kind:'image', src: <url|dataUrl>, name }
+     *   file:  { kind:'file',  text: <string>, name, charLimit?, truncated? }
+     *
+     * Reserves space in the panel header for a future Save action
+     * (Backlog CHAT-2). Currently single Close button.
+     */
+    _openChatArtifact(payload) {
+        if (!payload) return;
+        const _esc = (s) => String(s == null ? '' : s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        const name = payload.name || (payload.kind === 'image' ? 'image' : 'file');
+        let content = '';
+        let panelOpts = {};
+
+        if (payload.kind === 'image') {
+            // Image viewer: full-bleed <img>, contain-fit, dark
+            // background. The data URL or external URL is set directly
+            // as the src; the browser handles caching.
+            content = `
+                <div style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;background:#1a1a1a;overflow:auto">
+                    <img src="${_esc(payload.src || '')}" alt="${_esc(name)}"
+                         style="max-width:100%;max-height:100%;object-fit:contain;display:block">
+                </div>
+            `;
+            panelOpts = { width: 720, height: 560 };
+        } else if (payload.kind === 'chart') {
+            // ECharts viewer: container div initialised after the panel
+            // mounts (echarts.init needs a sized DOM element). The
+            // option dict is captured in a closure and applied via
+            // setOption. ResizeObserver keeps it responsive.
+            // White background to match the in-bubble chart and let
+            // ECharts' default dark text/axis colors stay readable.
+            const containerId = `_chart_artifact_${Date.now().toString(36)}_${Math.floor(Math.random() * 1e6)}`;
+            content = `<div id="${containerId}" style="width:100%;height:100%;background:#ffffff"></div>`;
+            panelOpts = { width: 880, height: 600 };
+            // Defer init until the jsPanel mounts the content into the DOM.
+            queueMicrotask(() => {
+                const el = document.getElementById(containerId);
+                if (!el || typeof echarts === 'undefined') return;
+                try {
+                    const c = echarts.init(el);
+                    c.setOption(payload.option || {});
+                    const ro = new ResizeObserver(() => { try { c.resize(); } catch {} });
+                    ro.observe(el);
+                } catch (e) {
+                    console.warn('[app] chart artifact render failed', e);
+                }
+            });
+        } else if (payload.kind === 'file') {
+            const trimNote = payload.truncated
+                ? `<div style="padding:6px 12px;background:#3a2e1a;color:#d4a836;font-size:12px;border-bottom:1px solid #444">Trimmed to ${(payload.charLimit || 0).toLocaleString()} chars when sent to model.</div>`
+                : '';
+            const safeText = String(payload.text || '')
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            content = `
+                <div style="display:flex;flex-direction:column;width:100%;height:100%;background:#1e1e1e;color:#ddd">
+                    ${trimNote}
+                    <pre style="margin:0;padding:14px 18px;flex:1;overflow:auto;font-family:var(--mono-font,'JetBrains Mono',monospace);font-size:13px;line-height:1.5;white-space:pre-wrap;word-break:break-word">${safeText}</pre>
+                </div>
+            `;
+            panelOpts = { width: 760, height: 580 };
+        } else {
+            console.warn('[app] _openChatArtifact: unsupported kind', payload.kind);
+            return;
+        }
+
+        // jsPanel quirk: `dragit:true` / `resizeit:true` (booleans)
+        // crash inside jsPanel when it tries to mutate them as
+        // configuration objects (`Cannot create property 'start' on
+        // boolean 'true'`). Passing empty objects gives jsPanel its
+        // defaults without the type clash — drag and resize are then
+        // both enabled and behave like the rest of noted's panels.
+        jsPanel.create({
+            headerTitle: name,
+            contentSize: panelOpts,
+            content,
+            position: 'center',
+            dragit: {},
+            resizeit: {},
+            // Reserve room in the header for the future Save icon
+            // (Backlog CHAT-2) by keeping the standard maximize/close
+            // controls in place.
+            headerControls: 'all',
+            border: '1px solid var(--border-color, #444)',
+            borderRadius: '6px',
+            theme: 'none',
+            boxShadow: 4,
+            onclosed: [() => {
+                document.querySelectorAll('.jsPanel-modal-backdrop').forEach((el) => el.remove());
+                return true;
+            }],
+        });
+    }
+
+    /** Dispatcher for the LLM-driven `open_file` tool. Receives the
+     * payload streamed by ChatService.onOpenFile and routes to the
+     * matching tab opener — same as if the user had double-clicked the
+     * file in the Explorer.
+     *
+     * Payload: { path, kind, project_id?, domain_id? }
+     * `kind` ∈ {'notebook', 'source', 'document', 'media'} (resolved
+     *  server-side from the file extension).
+     */
+    _handleAssistantOpenFile(payload) {
+        if (!payload || !payload.path) {
+            console.warn('[app] open_file: empty payload', payload);
+            return;
+        }
+        const { path, kind, project_id, domain_id } = payload;
+        const projId = project_id || this._currentProject || 'Examples';
+        try {
+            if (kind === 'notebook') {
+                if (typeof this._onNotebookChange === 'function') {
+                    return this._onNotebookChange(projId, path);
+                }
+                return this._openFileTab(projId, path);
+            }
+            if (kind === 'source') {
+                return this._openFileTab(projId, path);
+            }
+            if (kind === 'media') {
+                return this._openMediaTab(projId, path);
+            }
+            if (kind === 'document') {
+                // KB document viewer expects a doc object with category +
+                // name. Without a manifest lookup here we synthesise a
+                // best-effort doc — when a real lookup helper exists this
+                // can be swapped in. For now this opens the doc tab with
+                // the path as the name; the document viewer reads bytes
+                // from the domain's sources/.
+                const doc = {
+                    name: path.split('/').pop(),
+                    path,
+                    category: domain_id || '',
+                    domain_id: domain_id || null,
+                };
+                return this._openDocumentTab(doc);
+            }
+            // Unknown kind — fall back to source viewer.
+            return this._openFileTab(projId, path);
+        } catch (e) {
+            console.warn('[app] open_file dispatch failed', e);
+        }
+    }
+
     /** Open the Domain Manager floating panel - the single canonical surface
      * for Domain CRUD plus per-Domain document and knowledge management.
      * Replaces the legacy KnowledgeBaseManagerPanel. Lazy-imported.

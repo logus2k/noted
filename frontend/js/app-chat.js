@@ -150,6 +150,12 @@ export function initChat(app) {
         });
         app._chatService.onWriteAction((action) => app._applyWriteAction(action));
         app._chatService.onNavigate((cellIndex) => app._editor?.scrollToCell(cellIndex));
+        // open_file tool — LLM-driven Explorer-double-click equivalent.
+        // Dispatch by kind to the matching tab opener already on `app`.
+        app._chatService.onOpenFile((p) => app._handleAssistantOpenFile?.(p));
+        // Double-click on chat thumbnails / file chips / assistant <img>
+        // opens the artifact in a floating jsPanel viewer.
+        app._chatPanel.onOpenArtifact((p) => app._openChatArtifact?.(p));
         // Per-answer KG trace: clicking the trace button on an assistant
         // message opens the GraphPanel in trace mode with the subgraph the
         // model actually used to ground that answer.

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import logging
 import os
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
@@ -28,7 +29,11 @@ from app.analytics.graph_metrics import (
 )
 from app.analytics.sameas import compute_sameas_edges, compute_similar_to_edges
 from app.arcadedb_client import ArcadeDBError
-from app.config import GLOBAL_PROJECT_ID
+from app.config import (
+    ENTITY_EXTRACT_PARALLELISM,
+    GLOBAL_PROJECT_ID,
+    USE_GRAPHBATCH_V2,
+)
 from app.extractors.gemma_community_summarizer import summarize_communities
 from app.extractors.gemma_entity_extractor import GemmaEntityExtractor
 from app.graph_storage import GraphStorage
@@ -108,8 +113,32 @@ class ResearchBuilder:
         # needed. Eventual consistency is fine for progress reporting.
         self.progress: dict = {'phase': 'idle'}
 
+    def _set_sub_phase(self, sub_phase: str, done: int, total: int) -> None:
+        """Promote per-chunk progress from `graph_storage`'s long writing
+        loops up to `self.progress` so the UI can render it. Without this
+        the user sees `phase: writing` for ~12 minutes with no movement;
+        sub-phase fields make each step's progress visible.
+
+        Field shape (consumed by DomainKnowledgeTab):
+          sub_phase: str — short label (e.g. 'writing.mention_edges')
+          sub_done: int  — completed units (chunks of UNWIND batches)
+          sub_total: int — total units in this sub-phase
+          sub_pct: float — convenience for the bar (0..100)
+
+        Cleared (set to None) by the next `_set_phase` transition so
+        stale fields from a prior sub-phase don't carry over."""
+        self.progress['sub_phase'] = sub_phase
+        self.progress['sub_done'] = done
+        self.progress['sub_total'] = total
+        if total and total > 0:
+            self.progress['sub_pct'] = round(100 * done / total, 1)
+
     def _set_phase(self, phase: str, **extra):
         """Update the progress dict. Thread-safe enough (see __init__ note)."""
+        # Clear sub-phase fields when the top-level phase changes — they're
+        # specific to the prior phase and would mislead the UI otherwise.
+        for key in ('sub_phase', 'sub_done', 'sub_total', 'sub_pct'):
+            self.progress.pop(key, None)
         old_phase = self.progress.get('phase')
         self.progress['phase'] = phase
         self.progress.update(extra)
@@ -286,75 +315,94 @@ class ResearchBuilder:
                         extraction_chunks_done=0,
                         entities_accepted=0)
         if n_total:
-            logger.info('Extraction starting: %d chunks to process', n_total)
+            logger.info('Extraction starting: %d chunks to process (parallelism=%d)',
+                        n_total, ENTITY_EXTRACT_PARALLELISM)
 
-        for chunk in chunks:
-            chunk_id = _chunk_id_for(chunk)
-            self.progress['current_doc'] = chunk.doc_path
-            self.progress['current_chunk_in_doc'] = chunk.chunk_index
-            extracted = self._extractor.extract(chunk.text)
-            extracted_count += len(extracted)
-            chunk_text_lower = (chunk.text or '').lower()
-            section_path_lower = (chunk.section_path or '').lower()
-            for item in extracted:
-                key = _canonical_key(item['type'], item['name'])
-                entity_id = f'{item["type"]}:{key}'
-                name_lower = (item['name'] or '').lower()
-                if name_lower:
-                    freq = chunk_text_lower.count(name_lower)
-                    header_bonus = 5 if name_lower in section_path_lower else 0
-                    score = freq + header_bonus
-                else:
-                    score = 0
-                mention_strength.setdefault(entity_id, {})[chunk_id] = max(
-                    score, mention_strength.get(entity_id, {}).get(chunk_id, 0)
-                )
-                existing = extracted_nodes.get(entity_id)
-                if existing is None:
-                    extracted_nodes[entity_id] = Entity(
-                        id=entity_id,
-                        type=item['type'],
-                        label=item['name'],
-                        properties={
-                            'canonical_name': item['name'],
-                            'description': item['description'],
-                            'extraction_confidence': item['confidence'],
-                            'aliases': [],
-                            'mention_count': 1,
-                            'mentioned_in_chunks': [chunk_id],
-                            'source_doc_paths': [chunk.doc_path],
-                        },
+        # Stage 1: parallel LLM extraction. The per-chunk Gemma call is
+        # network-bound (HTTP to agent_server → llama-server). With 4
+        # llama-server slots configured for gemma-4 a serial loop wastes
+        # 75% of throughput. ThreadPoolExecutor here matches GIL semantics
+        # for sync `requests.post` (releases during I/O) without forcing
+        # the whole research_builder onto an asyncio event loop. Order is
+        # preserved by submitting in chunk order and consuming results in
+        # the same order; the aggregation loop below STAYS SERIAL because
+        # it mutates `extracted_nodes` / `mention_strength` which would
+        # need locks otherwise.
+        def _extract_one(chunk):
+            return chunk, self._extractor.extract(chunk.text or '')
+
+        with ThreadPoolExecutor(
+            max_workers=max(1, ENTITY_EXTRACT_PARALLELISM),
+            thread_name_prefix='gemma-extract',
+        ) as pool:
+            extraction_iter = pool.map(_extract_one, chunks)
+
+            for chunk, extracted in extraction_iter:
+                chunk_id = _chunk_id_for(chunk)
+                self.progress['current_doc'] = chunk.doc_path
+                self.progress['current_chunk_in_doc'] = chunk.chunk_index
+                extracted_count += len(extracted)
+                chunk_text_lower = (chunk.text or '').lower()
+                section_path_lower = (chunk.section_path or '').lower()
+                for item in extracted:
+                    key = _canonical_key(item['type'], item['name'])
+                    entity_id = f'{item["type"]}:{key}'
+                    name_lower = (item['name'] or '').lower()
+                    if name_lower:
+                        freq = chunk_text_lower.count(name_lower)
+                        header_bonus = 5 if name_lower in section_path_lower else 0
+                        score = freq + header_bonus
+                    else:
+                        score = 0
+                    mention_strength.setdefault(entity_id, {})[chunk_id] = max(
+                        score, mention_strength.get(entity_id, {}).get(chunk_id, 0)
                     )
-                else:
-                    existing.properties['mention_count'] = (
-                        int(existing.properties.get('mention_count', 1)) + 1
+                    existing = extracted_nodes.get(entity_id)
+                    if existing is None:
+                        extracted_nodes[entity_id] = Entity(
+                            id=entity_id,
+                            type=item['type'],
+                            label=item['name'],
+                            properties={
+                                'canonical_name': item['name'],
+                                'description': item['description'],
+                                'extraction_confidence': item['confidence'],
+                                'aliases': [],
+                                'mention_count': 1,
+                                'mentioned_in_chunks': [chunk_id],
+                                'source_doc_paths': [chunk.doc_path],
+                            },
+                        )
+                    else:
+                        existing.properties['mention_count'] = (
+                            int(existing.properties.get('mention_count', 1)) + 1
+                        )
+                        if item['confidence'] > existing.properties.get('extraction_confidence', 0):
+                            existing.properties['extraction_confidence'] = item['confidence']
+                            if item['description']:
+                                existing.properties['description'] = item['description']
+                        mc = existing.properties.setdefault('mentioned_in_chunks', [])
+                        if chunk_id not in mc and len(mc) < 50:
+                            mc.append(chunk_id)
+                        sp = existing.properties.setdefault('source_doc_paths', [])
+                        if chunk.doc_path not in sp and len(sp) < 20:
+                            sp.append(chunk.doc_path)
+                    mention_rels.append(Relationship(
+                        source=chunk_id,
+                        target=entity_id,
+                        type='mentions',
+                        properties={'confidence': item['confidence']},
+                    ))
+                    accepted_count += 1
+                n_done += 1
+                self.progress['extraction_chunks_done'] = n_done
+                self.progress['entities_accepted'] = accepted_count
+                if n_done % _PROGRESS_EVERY == 0 or n_done == n_total:
+                    pct = (n_done / n_total) * 100 if n_total else 100.0
+                    logger.info(
+                        'Extraction progress: %d/%d chunks (%.1f%%), %d entities accepted so far',
+                        n_done, n_total, pct, accepted_count,
                     )
-                    if item['confidence'] > existing.properties.get('extraction_confidence', 0):
-                        existing.properties['extraction_confidence'] = item['confidence']
-                        if item['description']:
-                            existing.properties['description'] = item['description']
-                    mc = existing.properties.setdefault('mentioned_in_chunks', [])
-                    if chunk_id not in mc and len(mc) < 50:
-                        mc.append(chunk_id)
-                    sp = existing.properties.setdefault('source_doc_paths', [])
-                    if chunk.doc_path not in sp and len(sp) < 20:
-                        sp.append(chunk.doc_path)
-                mention_rels.append(Relationship(
-                    source=chunk_id,
-                    target=entity_id,
-                    type='mentions',
-                    properties={'confidence': item['confidence']},
-                ))
-                accepted_count += 1
-            n_done += 1
-            self.progress['extraction_chunks_done'] = n_done
-            self.progress['entities_accepted'] = accepted_count
-            if n_done % _PROGRESS_EVERY == 0 or n_done == n_total:
-                pct = (n_done / n_total) * 100 if n_total else 100.0
-                logger.info(
-                    'Extraction progress: %d/%d chunks (%.1f%%), %d entities accepted so far',
-                    n_done, n_total, pct, accepted_count,
-                )
 
         # Sort each entity's mentioned_in_chunks by descending strength so
         # the retriever's top-N pick is the strongest evidence first.
@@ -488,11 +536,19 @@ class ResearchBuilder:
                 for e in thematic_entities
             ]
             if ent_ids:
+                t0 = _now()
+                logger.info('caching.entities: cache_upsert %d ids (replace=%s) — start',
+                            len(ent_ids), replace)
                 self._rag.cache_upsert(self.entity_cache_collection, ent_ids, ent_texts, replace=replace)
+                logger.info('caching.entities: end (%.2fs)', _now() - t0)
             if summary_entities:
                 sum_ids = [s.id for s in summary_entities]
                 sum_texts = [s.properties.get('text', '') for s in summary_entities]
+                t0 = _now()
+                logger.info('caching.summaries: cache_upsert %d ids (replace=%s) — start',
+                            len(sum_ids), replace)
                 self._rag.cache_upsert(self.summary_cache_collection, sum_ids, sum_texts, replace=replace)
+                logger.info('caching.summaries: end (%.2fs)', _now() - t0)
             logger.info('Cache push: %d entities, %d summaries (replace=%s)',
                         len(ent_ids), len(summary_entities), replace)
         except RagClientError as e:
@@ -543,6 +599,9 @@ class ResearchBuilder:
                 'section_level': c.section_level,
             } for c in doc_chunks]
             try:
+                t0 = _now()
+                logger.info('rebuild.corpus_push: %s (%d chunks, %s) — start',
+                            doc_path, len(rag_chunks), fmt)
                 result = self._rag.upsert_chunks(
                     source_path=doc_path,
                     tags=[self.kb_id],
@@ -551,6 +610,10 @@ class ResearchBuilder:
                     format=fmt,
                     collection=self.corpus_collection,
                 )
+                logger.info('rebuild.corpus_push: %s end (%.2fs) indexed=%d skipped=%d',
+                            doc_path, _now() - t0,
+                            result.get('indexed', 0),
+                            result.get('skipped_unchanged', 0))
                 n_docs += 1
                 n_indexed += result.get('indexed', 0)
                 n_skipped += result.get('skipped_unchanged', 0)
@@ -611,12 +674,18 @@ class ResearchBuilder:
             self._set_phase('idle')
             raise FileNotFoundError(abs_path)
 
+        # Indeterminate sub-phase for Docling — it's a single op (no
+        # per-page callback) so we surface a label without done/total
+        # so the UI can show "Parsing source document" instead of dead
+        # space during the 30-90s parse.
+        self.progress['sub_phase'] = 'parsing'
         try:
             chunks = scan_pdf(abs_path, repo_root=sources_root)
         except Exception as e:
             self._set_phase('idle')
             logger.exception('add_doc_pdf: scanning %s failed', rel_path)
             raise RuntimeError(f'pdf scan failed: {type(e).__name__}: {e}')
+        self.progress.pop('sub_phase', None)
 
         # Mirror md_scanner._process_file's doc_entity shape so downstream
         # code (storage, retriever, UI) treats PDF docs identically.
@@ -653,6 +722,9 @@ class ResearchBuilder:
             'section_level': c.section_level,
         } for c in chunks]
         try:
+            t0 = _now()
+            logger.info('add_doc_pdf.rag_upsert: ship %d chunks to noted-rag (collection=%s) — start',
+                        len(rag_chunks), self.corpus_collection)
             result = self._rag.upsert_chunks(
                 source_path=rel_path,
                 tags=[self.kb_id],  # P3.2: KB id as the default tag.
@@ -661,6 +733,11 @@ class ResearchBuilder:
                 format=fmt,
                 collection=self.corpus_collection,
             )
+            logger.info('add_doc_pdf.rag_upsert: end (%.2fs) indexed=%d skipped=%d deleted_stale=%d',
+                        _now() - t0,
+                        result.get('indexed', 0),
+                        result.get('skipped_unchanged', 0),
+                        result.get('deleted_stale', 0))
             out['rag'] = {
                 'indexed': result.get('indexed', 0),
                 'skipped_unchanged': result.get('skipped_unchanged', 0),
@@ -724,13 +801,28 @@ class ResearchBuilder:
         self._extractor.drain_below_floor()
         thematic_new = list(extracted_nodes.values())
 
-        # Merge into ArcadeDB.
+        # Merge into ArcadeDB. With USE_GRAPHBATCH_V2 the bulk path uses
+        # ArcadeDB's GraphBatch HTTP endpoint (CREATE-only) + a small UNWIND
+        # UPDATE for property-merge on entities that already exist; ~10×
+        # faster on the mention-edge step. Off by default; legacy path is
+        # the fallback. See documents/kb/kb_import_export.md Phase 2.
+        # `progress_cb` lets storage report per-chunk progress so the UI
+        # can render movement during the otherwise-silent ~12 minute
+        # writing phase (Phase 0b).
         self._set_phase('writing', current_doc=rel_path)
         self._storage.ensure_ready()
-        merge_stats = self._storage.add_doc_merge(
-            doc_entity, chunk_entities, chunked_into_rels,
-            thematic_new, mention_rels,
-        )
+        if USE_GRAPHBATCH_V2:
+            merge_stats = self._storage.add_doc_merge_v2(
+                doc_entity, chunk_entities, chunked_into_rels,
+                thematic_new, mention_rels,
+                progress_cb=self._set_sub_phase,
+            )
+        else:
+            merge_stats = self._storage.add_doc_merge(
+                doc_entity, chunk_entities, chunked_into_rels,
+                thematic_new, mention_rels,
+                progress_cb=self._set_sub_phase,
+            )
 
         # Cache update: upsert (don't replace) so other entities stay.
         if thematic_new:
@@ -878,6 +970,7 @@ class ResearchBuilder:
             summary_rels,
             sameas_rels,
             similar_rels,
+            progress_cb=self._set_sub_phase,
         )
 
         if thematic_entities:

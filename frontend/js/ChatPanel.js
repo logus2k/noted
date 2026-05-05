@@ -58,6 +58,11 @@ export class ChatPanel {
         this._onTtsToggleCallback = null;
         this._onModelChangeCallback = null;
         this._onShowGraphTrace = null;
+        // Open-artifact callback — fired on double-click of any chat
+        // image thumbnail or file chip (user-uploaded OR assistant-
+        // rendered <img> in markdown). Wired by app-chat.js to
+        // app._openChatArtifact which pops a floating viewer panel.
+        this._onOpenArtifact = null;
         // Per-message trace button state. Attached as soon as the
         // graph_provenance SSE event arrives (before thinking/answer
         // streaming) so the user sees "Show graph" alongside "Show
@@ -394,9 +399,9 @@ export class ChatPanel {
             {
                 key: 'file',
                 label: 'File',
-                hint: 'Upload to Knowledge Base (on hold)',
+                hint: 'Attach file content to your next message',
                 iconSvg: '<svg width="16" height="16" viewBox="0 0 24 24" fill="#81c784" stroke="#202020" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8" fill="none"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>',
-                action: () => this._actionUploadDocument(),
+                action: () => this._actionAttachContextFile(),
             },
             {
                 key: 'image',
@@ -439,17 +444,68 @@ export class ChatPanel {
     // (KB upload, notebook create) and falls back to file-picker +
     // /api/files/upload-asset for raw asset types (image, audio).
 
-    _actionUploadDocument() {
-        // Reuse the existing KB-upload modal so users get the same
-        // domain selector + mode + folder picker they get from the
-        // explorer context menu — no duplicate UI to maintain.
-        const app = window.app;
-        const cm = app?._explorerPanel?._contextMenuMod;
-        if (cm?.uploadDocumentToDomain) {
-            cm.uploadDocumentToDomain();
+    async _actionAttachContextFile() {
+        // Pick a file → run it through the chat-context extractor
+        // registry → hold the extracted text as a pending attachment.
+        // The next message Send will inline the text into the wire
+        // payload (NOT to the KB). PDF/DOCX support is added by
+        // registering new strategies in ChatContextExtractors.js.
+        const cfg = await this._getUploadConfig();
+        if (!cfg) {
+            this._notifyError('Could not load upload config.');
             return;
         }
-        this._notifyError('Document upload is not available — Explorer panel not initialised.');
+        // Single-attachment policy: image OR file, never both. Picking a
+        // new attachment replaces whatever was held.
+        if (this._pendingAttachment) this._clearAttachment();
+
+        const { chatContextExtractors } = await import('./ChatContextExtractors.js');
+        const accept = (cfg.chat_context_text_extensions || []).join(',');
+        const input = document.createElement('input');
+        input.type = 'file';
+        if (accept) input.accept = accept;
+        input.style.display = 'none';
+        document.body.appendChild(input);
+        const file = await new Promise((resolve) => {
+            input.addEventListener('change', () => resolve(input.files?.[0] || null), { once: true });
+            input.click();
+        });
+        input.remove();
+        if (!file) return;
+
+        // Pre-read size cap (uses the existing NOTED_MAX_UPLOAD_MB).
+        const maxBytes = (cfg.max_size_mb || 20) * 1024 * 1024;
+        if (file.size > maxBytes) {
+            this._notifyError(`"${file.name}" is too large (${(file.size / (1024*1024)).toFixed(1)} MB > ${cfg.max_size_mb} MB cap).`);
+            return;
+        }
+
+        const extractor = chatContextExtractors.findFor(file, cfg);
+        if (!extractor) {
+            const ext = file.name.includes('.') ? '.' + file.name.split('.').pop().toLowerCase() : '(none)';
+            this._notifyError(`No extractor for ${ext} — supported: ${(cfg.chat_context_text_extensions || []).join(', ')}`);
+            return;
+        }
+
+        let result;
+        try {
+            result = await extractor.extract(file, cfg);
+        } catch (e) {
+            this._notifyError(`Could not read "${file.name}": ${e?.message || e}`);
+            return;
+        }
+
+        this._pendingAttachment = {
+            kind: 'file-context',
+            extractorKind: extractor.kind,
+            name: result.name,
+            text: result.text,
+            charsRead: result.charsRead,
+            charLimit: result.charLimit,
+            truncated: result.truncated,
+            size: file.size,
+        };
+        this._renderAttachmentChip();
     }
 
     async _actionUploadAsset(kind) {
@@ -543,27 +599,48 @@ export class ChatPanel {
             this._attachmentChipEl = null;
         }
         if (!this._pendingAttachment) return;
+        const att = this._pendingAttachment;
+        const isFileContext = att.kind === 'file-context';
         const chip = document.createElement('div');
         chip.className = 'chat-attachment-chip';
 
-        const thumb = document.createElement('img');
-        thumb.className = 'chat-attachment-chip-thumb';
-        thumb.src = this._pendingAttachment.dataUrl;
-        thumb.alt = this._pendingAttachment.name;
-        chip.appendChild(thumb);
+        if (isFileContext) {
+            // File-context chip: paperclip glyph instead of a thumbnail
+            // (no preview makes sense for arbitrary text content).
+            const icon = document.createElement('div');
+            icon.className = 'chat-attachment-chip-thumb';
+            icon.style.display = 'flex';
+            icon.style.alignItems = 'center';
+            icon.style.justifyContent = 'center';
+            icon.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="#81c784" stroke="#202020" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8" fill="none"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>';
+            chip.appendChild(icon);
+        } else {
+            const thumb = document.createElement('img');
+            thumb.className = 'chat-attachment-chip-thumb';
+            thumb.src = att.dataUrl;
+            thumb.alt = att.name;
+            chip.appendChild(thumb);
+        }
 
         const meta = document.createElement('div');
         meta.className = 'chat-attachment-chip-meta';
         const nameEl = document.createElement('div');
         nameEl.className = 'chat-attachment-chip-name';
-        nameEl.textContent = this._pendingAttachment.name;
-        nameEl.title = this._pendingAttachment.name;
+        nameEl.textContent = att.name;
+        nameEl.title = att.name;
         const sizeEl = document.createElement('div');
         sizeEl.className = 'chat-attachment-chip-size';
-        const kb = this._pendingAttachment.size / 1024;
-        sizeEl.textContent = kb >= 1024
-            ? `${(kb / 1024).toFixed(1)} MB · image`
-            : `${kb.toFixed(0)} KB · image`;
+        if (isFileContext) {
+            const chars = att.charsRead.toLocaleString();
+            sizeEl.textContent = att.truncated
+                ? `${chars} chars · trimmed to limit (${att.charLimit.toLocaleString()})`
+                : `${chars} chars · file`;
+        } else {
+            const kb = att.size / 1024;
+            sizeEl.textContent = kb >= 1024
+                ? `${(kb / 1024).toFixed(1)} MB · image`
+                : `${kb.toFixed(0)} KB · image`;
+        }
         meta.appendChild(nameEl);
         meta.appendChild(sizeEl);
         chip.appendChild(meta);
@@ -672,9 +749,13 @@ export class ChatPanel {
         // Empty text + no attachment = nothing to send.
         if (!rawText && !att) return;
 
-        // Image-only sends get a default prompt so the model has a clear
-        // task instead of relying on its own image-only fallback.
-        const text = (att && !rawText) ? 'Describe this image.' : rawText;
+        // Default prompts when the user only attached without typing.
+        let text = rawText;
+        if (att && !rawText) {
+            text = att.kind === 'file-context'
+                ? `Please review the attached file "${att.name}".`
+                : 'Describe this image.';
+        }
 
         // Cancel any pending live-trace fire - the real chat flow takes
         // over and will emit the actual graph_provenance event.
@@ -683,32 +764,63 @@ export class ChatPanel {
             this._liveTraceTimer = null;
         }
 
-        // Build the message payload. Two shapes:
-        //   - plain text (existing flow):  string
-        //   - multimodal (with image):     OpenAI-style content list
-        //       [{type:"text", text:"..."},
-        //        {type:"image_url", image_url:{url:"data:image/...;base64,..."}}]
-        // agent_server's openai_compat.ChatMessage.content already accepts
-        // Union[str, list[dict]] and the noted backend forwards unchanged.
-        let payload;
-        if (att) {
-            payload = [
+        // Build the message payload. Three shapes today:
+        //   - plain text (no attachment):  string
+        //   - image attached: OpenAI-style content list
+        //       [{type:"text",...}, {type:"image_url",...}]
+        //   - file-context attached: content list where the file
+        //     contents are inlined as a separate text block, framed
+        //     with <file name="..."> markers so the model can find
+        //     them. The displayPayload uses a `file_excerpt` block
+        //     instead so addMessage can render a small chip in the
+        //     user bubble (NOT dump 50k chars of file content).
+        // agent_server's openai_compat.ChatMessage.content already
+        // accepts Union[str, list[dict]] and the noted backend
+        // forwards unchanged. Unknown block types in displayPayload
+        // never reach the wire.
+        let wirePayload;
+        let displayPayload;
+        if (att && att.kind === 'file-context') {
+            const fileText = `<file name="${att.name}">\n${att.text}\n</file>`;
+            wirePayload = [
+                { type: 'text', text: fileText },
+                { type: 'text', text },
+            ];
+            displayPayload = [
+                {
+                    type: 'file_excerpt',
+                    name: att.name,
+                    charsRead: att.charsRead,
+                    charLimit: att.charLimit,
+                    truncated: att.truncated,
+                    // Stash the raw text on the display block so the
+                    // bubble's chip can be double-clicked later to open
+                    // the full content in a floating viewer panel. The
+                    // wire payload doesn't include this field; only the
+                    // local UI render branch reads it.
+                    text: att.text,
+                },
+                { type: 'text', text },
+            ];
+        } else if (att) {
+            wirePayload = displayPayload = [
                 { type: 'text', text },
                 { type: 'image_url', image_url: { url: att.dataUrl } },
             ];
         } else {
-            payload = text;
+            wirePayload = displayPayload = text;
         }
 
-        // Render the user bubble with the same shape we're sending so the
-        // history view shows what the model actually saw.
-        this.addMessage('user', payload);
+        // Render the user bubble with the display shape (chip for
+        // file-context). Send the wire shape so the model sees the
+        // file content inline.
+        this.addMessage('user', displayPayload);
         this._input.value = '';
         this._input.style.height = 'auto';
         this._clearAttachment();
 
         if (this._onSendCallback) {
-            this._onSendCallback(payload);
+            this._onSendCallback(wirePayload);
         }
     }
 
@@ -751,6 +863,7 @@ export class ChatPanel {
         if (role === 'user' && Array.isArray(text)) {
             const textParts = text.filter(b => b && b.type === 'text').map(b => b.text || '').join('\n').trim();
             const imageParts = text.filter(b => b && b.type === 'image_url' && b.image_url?.url);
+            const fileParts = text.filter(b => b && b.type === 'file_excerpt');
             if (actionLabel) {
                 const badge = document.createElement('span');
                 badge.className = 'chat-action-badge';
@@ -765,7 +878,55 @@ export class ChatPanel {
                     img.className = 'chat-message-attachment-thumb';
                     img.src = block.image_url.url;
                     img.alt = 'attached image';
+                    img.style.cursor = 'zoom-in';
+                    img.title = 'Double-click to open in a floating viewer';
+                    img.addEventListener('dblclick', (e) => {
+                        e.stopPropagation();
+                        if (this._onOpenArtifact) {
+                            this._onOpenArtifact({
+                                kind: 'image',
+                                src: block.image_url.url,
+                                name: 'attached_image',
+                            });
+                        }
+                    });
                     stripe.appendChild(img);
+                }
+                msg.appendChild(stripe);
+            }
+            if (fileParts.length) {
+                // Render a compact chip for each attached file (the
+                // wire payload carries the actual content; this is just
+                // the visible marker in the bubble so a 50k-char dump
+                // doesn't drown the chat history).
+                const stripe = document.createElement('div');
+                stripe.className = 'chat-message-attachments';
+                for (const block of fileParts) {
+                    const chip = document.createElement('span');
+                    chip.className = 'chat-message-file-chip';
+                    const chars = (block.charsRead || 0).toLocaleString();
+                    const trimNote = block.truncated ? ` · trimmed to ${(block.charLimit || 0).toLocaleString()}` : '';
+                    chip.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="#81c784" stroke="#202020" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:6px"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8" fill="none"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>';
+                    const label = document.createElement('span');
+                    label.textContent = `${block.name || 'file'} · ${chars} chars${trimNote}`;
+                    chip.appendChild(label);
+                    if (typeof block.text === 'string' && block.text.length) {
+                        chip.style.cursor = 'pointer';
+                        chip.title = 'Double-click to open in a floating viewer';
+                        chip.addEventListener('dblclick', (e) => {
+                            e.stopPropagation();
+                            if (this._onOpenArtifact) {
+                                this._onOpenArtifact({
+                                    kind: 'file',
+                                    name: block.name || 'file',
+                                    text: block.text,
+                                    charLimit: block.charLimit,
+                                    truncated: block.truncated,
+                                });
+                            }
+                        });
+                    }
+                    stripe.appendChild(chip);
                 }
                 msg.appendChild(stripe);
             }
@@ -806,6 +967,7 @@ export class ChatPanel {
                 });
                 this._renderMath(answerDiv);
                 this._addCopyButtons(answerDiv);
+                this._wireImageOpenHandlers(answerDiv);
                 // History-restored messages must run the citation transform too;
                 // finalizeStreamingMessage handles fresh streams, this handles
                 // anything reloaded from server-side memory. Without this call
@@ -973,6 +1135,7 @@ export class ChatPanel {
         this._renderMath(this._streamingContent);
         this._addCopyButtons(this._streamingContent);
         this._renderCitations(this._streamingContent);
+        this._wireImageOpenHandlers(this._streamingContent);
         this._streamingContent.classList.remove('chat-streaming-content');
 
         // Stash the raw text on the message element so the action bar's
@@ -1205,6 +1368,100 @@ export class ChatPanel {
      * on an assistant message. Receives the graph_provenance payload. */
     onShowGraphTrace(callback) {
         this._onShowGraphTrace = callback;
+    }
+
+    /** Register a callback invoked when the user double-clicks a chat
+     * image thumbnail or file chip (their own uploads OR assistant
+     * markdown-rendered <img>). Receives a payload with `kind` and
+     * either `src` (image) or `text` (file). */
+    onOpenArtifact(callback) {
+        this._onOpenArtifact = callback;
+    }
+
+    /** Render an ECharts chart inline in the assistant bubble. Called
+     * from ChatService when a `data.chart` SSE event arrives (the
+     * `chart` tool's render pipeline). Payload shape:
+     *   { option: ECharts option dict, title: str, chart_type: str }
+     *
+     * Appends to the in-flight streaming bubble if one exists; falls
+     * back to the most recent assistant bubble otherwise. Each chart
+     * gets a 380px-tall container; double-click opens a larger
+     * floating viewer via the same _openChatArtifact path images use.
+     */
+    renderInlineChart(payload) {
+        if (!payload || !payload.option) return;
+        if (typeof echarts === 'undefined') {
+            console.warn('[ChatPanel] echarts global not loaded — dropping chart');
+            return;
+        }
+        // Find the bubble to append to. Streaming bubble takes priority;
+        // otherwise the last assistant bubble in the messages area.
+        let host = this._streamingMsg
+            || this._messagesArea.querySelector('.chat-message-assistant:last-of-type');
+        if (!host) {
+            // No assistant bubble exists yet — create a minimal one to host the chart.
+            host = document.createElement('div');
+            host.className = 'chat-message chat-message-assistant';
+            this._messagesArea.insertBefore(host, this._typingIndicator);
+        }
+        const wrapper = document.createElement('div');
+        wrapper.className = 'chat-message-chart';
+        // Light background so default ECharts text/axis colors (dark)
+        // contrast properly. Charts in noted intentionally break from
+        // the surrounding dark theme — readability beats consistency.
+        wrapper.style.cssText = 'width:100%;height:380px;margin:8px 0;background:#ffffff;border:1px solid #ccc;border-radius:6px;cursor:zoom-in;overflow:hidden';
+        wrapper.title = 'Double-click to open in a floating viewer';
+        host.appendChild(wrapper);
+        let chart = null;
+        try {
+            chart = echarts.init(wrapper);
+            chart.setOption(payload.option);
+        } catch (e) {
+            console.warn('[ChatPanel] echarts.setOption failed', e);
+            wrapper.textContent = `Chart render failed: ${e?.message || e}`;
+            return;
+        }
+        // Double-click → open in floating viewer with the same option.
+        wrapper.addEventListener('dblclick', (e) => {
+            e.stopPropagation();
+            if (this._onOpenArtifact) {
+                this._onOpenArtifact({
+                    kind: 'chart',
+                    name: payload.title || payload.chart_type || 'chart',
+                    option: payload.option,
+                });
+            }
+        });
+        // Resize-on-window-resize so the chart adapts to panel changes.
+        const ro = new ResizeObserver(() => { try { chart.resize(); } catch {} });
+        ro.observe(wrapper);
+        this._messagesArea.scrollTop = this._messagesArea.scrollHeight;
+    }
+
+    /** Attach double-click "open in floating viewer" handlers to every
+     * <img> in the given container. Used for assistant bubbles where
+     * markdown rendering produces <img> tags from external URLs or
+     * data URLs that the user might want to enlarge or save. */
+    _wireImageOpenHandlers(container) {
+        if (!container) return;
+        container.querySelectorAll('img').forEach((img) => {
+            // Skip images we've already wired (defensive when the same
+            // bubble gets re-rendered, e.g. citation pass).
+            if (img.dataset.dblWired === '1') return;
+            img.dataset.dblWired = '1';
+            img.style.cursor = img.style.cursor || 'zoom-in';
+            img.title = img.title || 'Double-click to open in a floating viewer';
+            img.addEventListener('dblclick', (e) => {
+                e.stopPropagation();
+                if (this._onOpenArtifact) {
+                    this._onOpenArtifact({
+                        kind: 'image',
+                        src: img.src,
+                        name: img.alt || 'image',
+                    });
+                }
+            });
+        });
     }
 
     setThinkingIndicator(visible) {

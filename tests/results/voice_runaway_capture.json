@@ -1,0 +1,52 @@
+{
+  "transcript": [
+    {
+      "user": "Explica-me em detalhe a regulamentação GDPR e os seus princípios fundamentais.",
+      "elapsed_s": 12.8,
+      "text_len": 3446,
+      "is_long_synthesis": true,
+      "text_first_200": "Show thinking\nO Regulamento Geral de Proteção de Dados (GDPR)\n\nO GDPR, formalmente o Regulamento (UE) 2016/679, estabelece as regras para a proteção de pessoas singulares no que diz respeito ao tratam",
+      "text_last_200": "ocessamento de dados pessoais 7, e estabelece que as restrições específicas podem ser impostas por lei da União ou de um Estado-Membro para salvaguardar a segurança pública ou interesses económicos 7."
+    },
+    {
+      "user": "Explícame en detalle qué es la inteligencia artificial generativa y sus aplicaciones principales.",
+      "elapsed_s": 9.8,
+      "text_len": 3304,
+      "is_long_synthesis": true,
+      "text_first_200": "Show thinking\nInteligencia Artificial Generativa: Concepto Detallado\n\nLa inteligencia artificial generativa se refiere a una clase de modelos de IA diseñados para producir contenido nuevo y realista (",
+      "text_last_200": "generación de voces sintéticas o efectos de sonido realistas.\nVideojuegos: Creación procedural de entornos, texturas y personajes en tiempo real, lo que permite mundos de juego más vastos y dinámicos."
+    },
+    {
+      "user": "Explain in detail what the Transformer architecture is and how attention mechanisms power it.",
+      "elapsed_s": 11.5,
+      "text_len": 3684,
+      "is_long_synthesis": true,
+      "text_first_200": "Show thinking\nArquitectura Transformer: El Modelo Revolucionario\n\nEl Transformer es una arquitectura de red neuronal, introducida en 2017, que marcó un cambio radical en el procesamiento del lenguaje ",
+      "text_last_200": " entender el contexto interno de una secuencia y la atención cruzada para alinear las secuencias de entrada y salida, permitiendo que los modelos de lenguaje sean increíblemente potentes y eficientes."
+    },
+    {
+      "user": "Explique-moi en détail ce qu'est l'apprentissage automatique et ses applications principales.",
+      "elapsed_s": 12.6,
+      "text_len": 3953,
+      "is_long_synthesis": true,
+      "text_first_200": "Show thinking\n\ncomplexes à partir de grands ensembles de données. Au lieu de suivre des règles codées manuellement, ces systèmes développent une hypothèse (une fonction) qui mappe les caractéristiques",
+      "text_last_200": "connaissance faciale, véhicules autonomes, inspection de qualité industrielle.\nRecommandation: Systèmes de recommandation de contenu (Netflix, Amazon) basés sur le comportement passé de l'utilisateur."
+    },
+    {
+      "user": "Spiegami in dettaglio cosa sono le reti neurali e come funzionano.",
+      "elapsed_s": 14.4,
+      "text_len": 4209,
+      "is_long_synthesis": true,
+      "text_first_200": "Show thinking\nQu'est-ce qu'un Réseau Neuronal (Neural Network)?\n\nUn réseau neuronal est une architecture de calcul inspirée par le fonctionnement du cerveau biologique. Il est fondamentalement un modè",
+      "text_last_200": "pprentissage qui utilise des couches de neurones et des fonctions d'activation pour transformer des données brutes en prédictions, en optimisant ses poids par rétropropagation et descente de gradient."
+    },
+    {
+      "user": "Explica-me em detalhe como criar um agente de IA, incluindo padrões de design e melhores práticas.",
+      "elapsed_s": 14.5,
+      "text_len": 4372,
+      "is_long_synthesis": true,
+      "text_first_200": "Show thinking\nLe Cadre de Conception des Agents IA\n\nUn agent IA est un système computationnel autonome qui est capable de percevoir son environnement, de prendre des décisions éclairées et d'exécuter ",
+      "text_last_200": "ne approche alternative.\n\nEn appliquant ces principes, vous passez d'un simple \"modèle réactif\" à un \"système intelligent et autonome\" capable de raisonner, de planifier et d'agir de manière fiable 1."
+    }
+  ]
+}

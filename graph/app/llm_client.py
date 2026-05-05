@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import time
 from typing import Any
 
 import requests
@@ -15,6 +17,30 @@ import requests
 from app.config import LLM_BASE_URL, LLM_MODEL_ID, LLM_TIMEOUT
 
 logger = logging.getLogger(__name__)
+
+
+_FAILURE_DUMP_DIR = '/tmp/summarizer_failures'
+
+
+def _dump_chat_json_failure(raw_text: str, reason: str) -> str:
+    """Persist the full raw model response when chat_json parsing fails.
+
+    The default LLMError message only carries a 200-char snippet; for
+    diagnosing structural issues (think-tag leakage, LaTeX backslash
+    escapes, truncation) we need the WHOLE text. Returns the dump path
+    so it can be referenced in the raised error."""
+    try:
+        os.makedirs(_FAILURE_DUMP_DIR, exist_ok=True)
+        ts = time.strftime('%Y%m%dT%H%M%S') + f'_{int(time.time() * 1000) % 1000:03d}'
+        path = f'{_FAILURE_DUMP_DIR}/{ts}_{reason}.txt'
+        with open(path, 'w', encoding='utf-8') as f:
+            f.write(raw_text)
+        logger.warning('chat_json failure (%s) — full response dumped to %s (%d chars)',
+                       reason, path, len(raw_text))
+        return path
+    except OSError as e:
+        logger.warning('chat_json failure (%s) — dump skipped: %s', reason, e)
+        return ''
 
 
 class LLMError(RuntimeError):
@@ -161,6 +187,18 @@ class LLMClient:
             'temperature': temperature,
             'max_tokens': max_tokens,
             'response_format': {'type': 'json_object'},
+            # Disable thinking for structured-output calls. With the global
+            # `reasoning = on` in llama-router-models.ini, Gemma 4 emits a
+            # `<think>...</think>` block that agent_server's _ThinkingSplice
+            # folds into the response content. _extract_json then finds the
+            # first `{` inside the think block (often part of an example the
+            # model wrote in its reasoning) and fails to balance, dumping
+            # the response to /tmp/summarizer_failures/. Forwarding
+            # chat_template_kwargs through to llama-server suppresses the
+            # think channel for THIS payload only — entity extractor +
+            # community summarizer get clean JSON, other consumers (chat
+            # stream) keep their reasoning channel.
+            'chat_template_kwargs': {'enable_thinking': False},
         }
         try:
             r = requests.post(
@@ -186,6 +224,7 @@ class LLMClient:
 
 def _extract_json(text: str) -> dict:
     """Try direct parse, then fall back to first balanced {...} span."""
+    raw = text
     text = text.strip()
     try:
         return json.loads(text)
@@ -193,7 +232,8 @@ def _extract_json(text: str) -> dict:
         pass
     start = text.find('{')
     if start < 0:
-        raise LLMError(f'No JSON object in response: {text[:200]}')
+        dump = _dump_chat_json_failure(raw, 'no_object')
+        raise LLMError(f'No JSON object in response (dump={dump}): {text[:200]}')
     depth = 0
     in_str = False
     esc = False
@@ -218,5 +258,7 @@ def _extract_json(text: str) -> dict:
                 try:
                     return json.loads(text[start:i + 1])
                 except json.JSONDecodeError as e:
-                    raise LLMError(f'Malformed JSON span: {e}') from e
-    raise LLMError(f'Unbalanced JSON in response: {text[:200]}')
+                    dump = _dump_chat_json_failure(raw, 'malformed_span')
+                    raise LLMError(f'Malformed JSON span (dump={dump}): {e}') from e
+    dump = _dump_chat_json_failure(raw, 'unbalanced')
+    raise LLMError(f'Unbalanced JSON in response (dump={dump}): {text[:200]}')

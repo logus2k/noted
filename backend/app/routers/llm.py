@@ -7,6 +7,8 @@ import logging
 import os
 import re
 import time
+
+import httpx
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
@@ -157,7 +159,8 @@ class ToolCallStreamFilter:
                    'get_dag_status', 'get_task_log', 'get_dvc_data_overview',
                    'get_dvc_file_history', 'query_knowledge_graph', 'get_skill',
                    'list_files', 'search_files', 'get_notebook_cells', 'run_agent',
-                   'scroll_to_cell', 'get_lint_diagnostics', 'fix_lint_issues'}
+                   'scroll_to_cell', 'open_file', 'chart',
+                   'get_lint_diagnostics', 'fix_lint_issues'}
 
     def __init__(self):
         self._buffer = ''
@@ -1377,6 +1380,117 @@ async def llm_chat(request: ChatRequest):
                             cell_index_0 = cell_index_1 - 1 if cell_index_1 > 0 else 0
                             yield f"data: {json.dumps({'navigate': {'cell_index': cell_index_0}})}\n\n"
                             tool_result = f"Cell {cell_index_1} is now visible."
+                        elif tool_call["name"] == "chart":
+                            # Two-stage: (1) call chart_designer to get a
+                            # ChartIntent JSON from the natural-language
+                            # description; (2) hand that intent to the
+                            # deterministic builder in app/charts.py to
+                            # produce an ECharts option dict; (3) emit
+                            # SSE event for the frontend to render.
+                            from app import charts as _charts
+                            from app.managers.llm_manager import LLM_BASE_URL as _LLM_BASE_URL
+                            args = tool_call.get("args") or {}
+                            description = (args.get("description") or "").strip()
+                            project_id = (args.get("project_id") or "").strip() or None
+                            if not description:
+                                tool_result = "chart: missing 'description' argument."
+                            else:
+                                # Stage 1: chart_designer call.
+                                user_msg = description
+                                if project_id:
+                                    user_msg = f"(default project_id: {project_id})\n{description}"
+                                designer_payload = {
+                                    "model": "chart_designer",
+                                    "messages": [{"role": "user", "content": user_msg}],
+                                    "stream": False,
+                                    "max_tokens": 4096,
+                                    "chat_template_kwargs": {"enable_thinking": False},
+                                }
+                                try:
+                                    async with httpx.AsyncClient(timeout=60) as _c:
+                                        _r = await _c.post(
+                                            f"{_LLM_BASE_URL}/v1/chat/completions",
+                                            json=designer_payload,
+                                        )
+                                    if _r.status_code != 200:
+                                        tool_result = (
+                                            f"chart: chart_designer call failed "
+                                            f"(HTTP {_r.status_code}): {_r.text[:200]}"
+                                        )
+                                    else:
+                                        _data = _r.json()
+                                        _content = (_data.get("choices") or [{}])[0].get("message", {}).get("content", "").strip()
+                                        try:
+                                            intent = json.loads(_content)
+                                        except Exception as _e:
+                                            tool_result = (
+                                                f"chart: chart_designer returned non-JSON "
+                                                f"({type(_e).__name__}: {_e}). Raw: {_content[:200]}"
+                                            )
+                                            intent = None
+                                        if intent is not None:
+                                            # Stage 2: build option.
+                                            projects_root = os.environ.get("PROJECTS_DIR", "/app/data/projects")
+                                            result = _charts.build_chart_option(intent, projects_root)
+                                            if result["ok"]:
+                                                # Stage 3: emit chart event.
+                                                chart_payload = {
+                                                    "option": result["option"],
+                                                    "title": result.get("title", ""),
+                                                    "chart_type": result.get("chart_type", ""),
+                                                }
+                                                yield f"data: {json.dumps({'chart': chart_payload})}\n\n"
+                                                tool_result = (
+                                                    f"Rendered a {result['chart_type']} chart titled "
+                                                    f"'{result.get('title', '')}' in the chat. "
+                                                    f"The user can now see it."
+                                                )
+                                            else:
+                                                tool_result = (
+                                                    f"chart: render failed — {result.get('error', 'unknown error')}. "
+                                                    f"Intent was: {json.dumps(intent)[:200]}"
+                                                )
+                                except httpx.RequestError as _e:
+                                    tool_result = f"chart: agent_server unreachable: {_e}"
+                        elif tool_call["name"] == "open_file":
+                            # UI-action tool: tells the frontend to open the
+                            # named file in the appropriate tab (notebook /
+                            # source / document / media) — same action as
+                            # double-clicking in the Explorer. No backend
+                            # work; the SSE event hands off to the frontend
+                            # and we synthesise a confirmation string for
+                            # the LLM's chat memory.
+                            args = tool_call.get("args") or {}
+                            path = (args.get("path") or "").strip()
+                            if not path:
+                                tool_result = "open_file: missing 'path' argument."
+                            else:
+                                ext = path.rsplit(".", 1)[-1].lower() if "." in path else ""
+                                if ext == "ipynb":
+                                    kind = "notebook"
+                                elif ext in {"pdf", "docx", "pptx", "html", "htm", "md", "markdown"}:
+                                    kind = "document"
+                                elif ext in {"png", "jpg", "jpeg", "gif", "webp", "bmp", "svg",
+                                             "mp3", "wav", "m4a", "ogg", "flac", "mp4", "webm"}:
+                                    kind = "media"
+                                else:
+                                    kind = "source"
+                                payload = {
+                                    "path": path,
+                                    "kind": kind,
+                                    "project_id": (args.get("project_id") or "").strip() or None,
+                                    "domain_id": (args.get("domain_id") or "").strip() or None,
+                                }
+                                yield f"data: {json.dumps({'open_file': payload})}\n\n"
+                                where = (
+                                    f"project '{payload['project_id']}'" if payload['project_id']
+                                    else f"domain '{payload['domain_id']}'" if payload['domain_id']
+                                    else "the active workspace"
+                                )
+                                tool_result = (
+                                    f"Opened {path} in noted as a {kind} tab "
+                                    f"({where}). The user can now see it."
+                                )
                         elif (tool_call["name"] == "research_topic"
                               and (tool_call.get("args") or {}).get("mode", "auto") in ("auto", "local", "global")):
                             # Deep-stream research_topic by hitting noted-graph's

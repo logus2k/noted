@@ -24,6 +24,109 @@ const AGENT_NAME = 'noted';
 // that. Configurable here. See _voiceFallback() below.
 const VOICE_FALLBACK_MAX_CHARS = 150;
 
+// ───────────────────────────────────────────────────────────────────────
+// TTS voice auto-switch (Kokoro multilingual)
+// ───────────────────────────────────────────────────────────────────────
+// Kokoro server has all 9 language KPipelines pre-loaded at startup
+// (American/British English, Japanese, Mandarin, Spanish, French, Hindi,
+// Italian, Brazilian Portuguese). What was missing was upstream voice
+// switching — we sent the same default `af_heart` regardless of what
+// language Gemma actually responded in.
+//
+// Pattern: detect the language of each `<voice>` block as it arrives,
+// look up the preferred voice for that language, fire `tts_configure_client`
+// to the TTS server if it differs from the currently selected voice. The
+// language pipeline is then routed correctly when the chunk goes out.
+//
+// Kokoro language codes:
+//   a = American English   b = British English   j = Japanese
+//   z = Mandarin Chinese   e = Spanish           f = French
+//   h = Hindi              i = Italian           p = Brazilian Portuguese
+//
+// Voice selections below: female-default (Diana persona consistency),
+// highest grade Kokoro provides per language. Edit + rebuild noted to
+// change. (Future: promote to a config file under noted/data/ if you
+// want hot-reload.)
+const TTS_LANGUAGE_VOICE_MAP = {
+    'a': 'af_heart',     // American English  — Grade A
+    'b': 'bf_emma',      // British English   — Grade B-
+    'j': 'jf_alpha',     // Japanese          — Grade C+
+    'z': 'zf_xiaoxiao',  // Mandarin Chinese  — all Grade D, female
+    'e': 'ef_dora',      // Spanish           — only female option
+    'f': 'ff_siwis',     // French            — Grade B-, only voice available
+    'h': 'hf_alpha',     // Hindi             — Grade C
+    'i': 'if_sara',      // Italian           — Grade C
+    'p': 'pf_dora',      // Brazilian Portuguese — only female option
+};
+const TTS_DEFAULT_VOICE = TTS_LANGUAGE_VOICE_MAP['a'];
+
+// Lightweight language detector for the 9 Kokoro languages. Two stages:
+//   1. Unicode script majority → resolves CJK / Hiragana-Katakana /
+//      Devanagari / Hangul cleanly.
+//   2. Latin-only fallback uses distinctive characters first (ñ ã õ ç),
+//      then a small stop-word lexicon to disambiguate the four Latin
+//      target languages we care about (en/es/pt/fr/it).
+// Returns a Kokoro language code ('a' = American English default for
+// Latin-without-strong-signal). Never throws.
+function detectKokoroLanguage(text) {
+    if (!text || typeof text !== 'string') return 'a';
+    const t = text.trim();
+    if (t.length < 3) return 'a';
+
+    // ── Stage 1: Unicode script majority ──
+    let cjk = 0, hiragana = 0, katakana = 0, hangul = 0, devanagari = 0, latin = 0;
+    for (const ch of t) {
+        const cp = ch.codePointAt(0);
+        if ((cp >= 0x4E00 && cp <= 0x9FFF) ||  // CJK Unified
+            (cp >= 0x3400 && cp <= 0x4DBF)) {  // CJK Ext A
+            cjk++;
+        } else if (cp >= 0x3040 && cp <= 0x309F) {
+            hiragana++;
+        } else if (cp >= 0x30A0 && cp <= 0x30FF) {
+            katakana++;
+        } else if (cp >= 0xAC00 && cp <= 0xD7AF) {
+            hangul++;
+        } else if (cp >= 0x0900 && cp <= 0x097F) {
+            devanagari++;
+        } else if ((cp >= 0x0041 && cp <= 0x007A) ||         // basic Latin A-Za-z
+                   (cp >= 0x00C0 && cp <= 0x024F)) {         // Latin-1 + Latin Ext A/B
+            latin++;
+        }
+    }
+    if (hiragana + katakana > 0) return 'j';     // any kana → Japanese
+    if (hangul > 0) return 'a';                  // Korean isn't supported by Kokoro
+    if (devanagari > 0) return 'h';              // Hindi
+    if (cjk > 0 && hiragana + katakana === 0) return 'z'; // Chinese (CJK without kana)
+
+    // ── Stage 2: Latin disambiguation ──
+    // Distinctive characters first (cheap and decisive).
+    if (/[ñ¿¡]/i.test(t)) return 'e';   // Spanish-only chars
+    if (/[ãõ]/i.test(t)) return 'p';    // Portuguese-only chars (incl Brazilian)
+    // ç + é/è without ã/õ → French (Portuguese also uses ç but with ã/õ caught above)
+    if (/ç/i.test(t) && /[éèê]/i.test(t)) return 'f';
+
+    // Stop-word scoring for Latin disambiguation. Each language gets a
+    // tiny set of high-frequency words that rarely appear in the others.
+    // Score = number of matched tokens. Highest score wins; ties go to
+    // English (the platform default).
+    const words = t.toLowerCase().match(/\b[a-zà-ÿ']+\b/g) || [];
+    if (!words.length) return 'a';
+    const wordSet = new Set(words);
+    const score = (lex) => lex.reduce((acc, w) => acc + (wordSet.has(w) ? 1 : 0), 0);
+    const scores = {
+        a: score(['the', 'and', 'is', 'of', 'to', 'in', 'for', 'with', 'this', 'that', 'are', 'you', 'have', 'not', 'but']),
+        e: score(['el', 'la', 'los', 'las', 'es', 'en', 'para', 'con', 'que', 'por', 'una', 'del', 'pero', 'muy', 'esto']),
+        p: score(['o', 'os', 'as', 'um', 'uma', 'para', 'com', 'que', 'do', 'da', 'dos', 'das', 'mas', 'ser', 'isso']),
+        f: score(['le', 'la', 'les', 'des', 'et', 'est', 'pour', 'avec', 'que', 'dans', 'sur', 'pas', 'ce', 'son', 'ne']),
+        i: score(['il', 'la', 'gli', 'le', 'di', 'per', 'con', 'che', 'del', 'della', 'una', 'sono', 'ma', 'questo', 'non']),
+    };
+    let bestLang = 'a', bestScore = scores.a;
+    for (const lang of ['e', 'p', 'f', 'i']) {
+        if (scores[lang] > bestScore) { bestLang = lang; bestScore = scores[lang]; }
+    }
+    return bestLang;
+}
+
 // Random welcome messages shown when chat opens with no prior history.
 // Static (no LLM call) to avoid a race with the user's first message:
 // a dynamic welcome streams tokens into ChatPanel's single _streamingMsg
@@ -105,6 +208,13 @@ export class ChatService {
         // Navigate callback - called when LLM requests scroll_to_cell
         this._onNavigate = null;
 
+        // Open-file callback - called when LLM requests open_file
+        // (notebook / source / document / media). Payload shape:
+        //   {path, kind, project_id?, domain_id?}
+        // Wire from app.js to dispatch to _openNotebookTab / _openFileTab /
+        // _openDocumentTab / _openMediaTab based on `kind`.
+        this._onOpenFile = null;
+
         // Voice state
         this.voiceActive = false;
         this._audioContext = null;
@@ -117,6 +227,12 @@ export class ChatService {
         this._ttsSocket = null;
         this._ttsAudioContext = null;
         this._ttsPlayQueue = Promise.resolve();
+        // Currently-active Kokoro voice for THIS browser session. Used
+        // by the language auto-switch path: when a `<voice>` block is
+        // detected to be in a different Kokoro language than this voice
+        // belongs to, _sendVoiceToTTS fires `tts_configure_client` to
+        // swap voices BEFORE the chunk goes out.
+        this._currentTtsVoice = TTS_DEFAULT_VOICE;
         this.ttsEnabled = false;
 
         // The static greeting shown at chat-open (when there's no prior
@@ -524,6 +640,7 @@ export class ChatService {
     }
     onWriteAction(cb) { this._onWriteAction = cb; }
     onNavigate(cb) { this._onNavigate = cb; }
+    onOpenFile(cb) { this._onOpenFile = cb; }
 
 
     async connect() {
@@ -785,6 +902,31 @@ export class ChatService {
                     // Navigate event - scroll notebook to cell
                     if (data.navigate) {
                         if (this._onNavigate) this._onNavigate(data.navigate.cell_index);
+                        continue;
+                    }
+
+                    // Open-file event - LLM requested open_file tool. Hands
+                    // off to app.js which dispatches to the appropriate tab
+                    // opener based on payload.kind.
+                    if (data.open_file) {
+                        if (this._onOpenFile) {
+                            try { this._onOpenFile(data.open_file); }
+                            catch (e) { console.warn('[ChatService] onOpenFile threw', e); }
+                        }
+                        continue;
+                    }
+
+                    // Chart event - LLM-requested ECharts render. Payload
+                    // shape: {option, title, chart_type}. The chat panel
+                    // appends a chart canvas to the currently-streaming
+                    // assistant bubble (or the most recent one) via its
+                    // renderInlineChart() helper.
+                    if (data.chart) {
+                        try {
+                            this.chatPanel?.renderInlineChart?.(data.chart);
+                        } catch (e) {
+                            console.warn('[ChatService] renderInlineChart threw', e);
+                        }
                         continue;
                     }
 
@@ -1054,7 +1196,14 @@ export class ChatService {
         console.info(`[ChatService] fallback skipped: no voice tags + cleaned answer too long (${cleaned.length} chars)`);
     }
 
-    /** Send extracted <voice> text to TTS for speech output. */
+    /** Send extracted <voice> text to TTS for speech output.
+     *
+     *  Auto-switches the Kokoro voice when the detected language of
+     *  `text` differs from the current voice's language. Detection
+     *  uses Unicode-script majority + a small Latin stop-word lexicon
+     *  (see detectKokoroLanguage). The configure event is emitted to
+     *  the TTS server BEFORE the text chunk so the right pipeline is
+     *  resolved when the chunk gets queued for synthesis. */
     _sendVoiceToTTS(text) {
         if (!this._ttsSocket?.connected || !text) return;
         // New TTS request — re-open the audio chunk pipeline that
@@ -1062,6 +1211,29 @@ export class ChatService {
         // barge-in would be silent.
         this._ttsBargedIn = false;
         try {
+            // Language auto-switch. Detect the language of THIS voice
+            // block, look up the preferred voice for it, and emit a
+            // configure event if it doesn't match the current voice.
+            const detected = detectKokoroLanguage(text);
+            const targetVoice = TTS_LANGUAGE_VOICE_MAP[detected] || TTS_DEFAULT_VOICE;
+            if (targetVoice && targetVoice !== this._currentTtsVoice) {
+                console.info(
+                    `[ChatService] TTS language switch: ${this._currentTtsVoice} → ${targetVoice} ` +
+                    `(detected lang='${detected}')`
+                );
+                // tts_configure_client routes through audio_client_mapping
+                // (populated by register_audio_client at TTS connect time)
+                // so the right session is updated. Server validates the
+                // voice name + has the pipeline pre-loaded — failure here
+                // is silent on the wire (server logs the warning) and
+                // worst-case the chunk plays in the previous voice.
+                this._ttsSocket.emit('tts_configure_client', {
+                    client_id: this.clientId,
+                    voice: targetVoice,
+                });
+                this._currentTtsVoice = targetVoice;
+            }
+
             this._ttsSocket.emit('tts_text_chunk', {
                 chunk: text,
                 target_client_id: this.clientId,

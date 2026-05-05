@@ -8,6 +8,9 @@ app.config.
 from __future__ import annotations
 
 import logging
+import os
+import random
+import time
 from typing import Any
 
 import requests
@@ -25,6 +28,29 @@ logger = logging.getLogger(__name__)
 
 class ArcadeDBError(RuntimeError):
     """Any failure talking to ArcadeDB."""
+
+
+# Retry policy for transient page-level optimistic-lock collisions. ArcadeDB
+# uses LSM page versioning for write isolation; when two writers touch the
+# same bucket page concurrently the slower one gets:
+#   HTTP 503 ConcurrentModificationException
+#   "Concurrent modification on page PageId(...) (current v.X <> database v.Y)
+#    Please retry the operation"
+# Hot edge buckets (e.g. Entity_*_in_edges.* during a heavy mention-edge
+# write) are the typical trigger. A bounded retry with jittered backoff is
+# safe because the failed batch did not commit; the next attempt sees the
+# new page version and proceeds.
+_RETRYABLE_EXCEPTIONS = ('ConcurrentModificationException',)
+_MAX_RETRIES = int(os.environ.get('ARCADEDB_MAX_RETRIES', '5'))
+_RETRY_BACKOFF_BASE = float(os.environ.get('ARCADEDB_RETRY_BACKOFF_BASE', '0.25'))
+
+
+def _is_retryable_arcadedb_error(status_code: int, body: str) -> bool:
+    """Match ArcadeDB's documented retryable failures by exception class
+    in the response body. Other 5xx are surfaced unchanged."""
+    if status_code != 503:
+        return False
+    return any(exc in body for exc in _RETRYABLE_EXCEPTIONS)
 
 
 class ArcadeDBClient:
@@ -142,20 +168,55 @@ class ArcadeDBClient:
         payload: dict[str, Any] = {'language': 'cypher', 'command': cypher}
         if params:
             payload['params'] = params
-        try:
-            r = self._session.post(url, json=payload, auth=self._auth, timeout=self._timeout)
-        except requests.RequestException as e:
-            raise ArcadeDBError(f'ArcadeDB request failed: {e}') from e
-        if not r.ok:
-            body = r.text[:500]
+        return self._post_with_retry(url, payload, kind=kind, expect_result=True)
+
+    def _post_with_retry(
+        self,
+        url: str,
+        payload: dict[str, Any],
+        *,
+        kind: str,
+        expect_result: bool,
+    ) -> list[dict]:
+        """POST + retry on transient ArcadeDB ConcurrentModificationException.
+
+        Retries _MAX_RETRIES times with jittered exponential backoff. Network
+        errors and non-retryable HTTP errors raise immediately. The failed
+        batch did not commit (ArcadeDB's optimistic locking aborts cleanly
+        on conflict), so retry is safe."""
+        last_body = ''
+        for attempt in range(_MAX_RETRIES + 1):
+            try:
+                r = self._session.post(url, json=payload, auth=self._auth, timeout=self._timeout)
+            except requests.RequestException as e:
+                raise ArcadeDBError(f'ArcadeDB request failed: {e}') from e
+            if r.ok:
+                if not expect_result:
+                    return r.json().get('result', [])
+                data = r.json()
+                result = data.get('result')
+                if result is None:
+                    raise ArcadeDBError(f'ArcadeDB response missing result: {data}')
+                return result
+            last_body = r.text[:500]
+            if attempt < _MAX_RETRIES and _is_retryable_arcadedb_error(r.status_code, last_body):
+                # Jittered exponential backoff: 0.25, 0.5, 1.0, 2.0, 4.0 ish.
+                # Jitter prevents synchronized retries from colliding again
+                # if multiple worker threads got the same conflict.
+                backoff = _RETRY_BACKOFF_BASE * (2 ** attempt) * (0.5 + random.random())
+                logger.warning(
+                    'ArcadeDB %s HTTP %d (retryable, attempt %d/%d, backoff %.2fs): %s',
+                    kind, r.status_code, attempt + 1, _MAX_RETRIES, backoff, last_body[:200],
+                )
+                time.sleep(backoff)
+                continue
             raise ArcadeDBError(
-                f'ArcadeDB {kind} HTTP {r.status_code}: {body}'
+                f'ArcadeDB {kind} HTTP {r.status_code}: {last_body}'
             )
-        data = r.json()
-        result = data.get('result')
-        if result is None:
-            raise ArcadeDBError(f'ArcadeDB response missing result: {data}')
-        return result
+        # Exhausted retries — last response was retryable but never succeeded.
+        raise ArcadeDBError(
+            f'ArcadeDB {kind} exhausted {_MAX_RETRIES} retries on retryable error: {last_body}'
+        )
 
     # ── Schema bootstrap ─────────────────────────────────────────────
     def ensure_schema(self) -> None:
@@ -195,6 +256,64 @@ class ArcadeDBClient:
         """Run an ArcadeDB SQL statement (not Cypher). Used when Cypher
         lacks a feature (e.g. list comprehension / array REMOVE)."""
         return self._send_sql(sql, params)
+
+    def graphbatch_post(
+        self,
+        ndjson_lines: list[str],
+        *,
+        light_edges: bool = False,
+    ) -> dict[str, Any]:
+        """POST a GraphBatch payload to /api/v1/batch/<db>.
+
+        Each line in `ndjson_lines` is an already-serialized JSON dict
+        (vertex or edge per the ArcadeDB GraphBatch HTTP schema).
+        Vertices: `{"@type":"vertex","@class":"Entity","@id":"...", ...props}`.
+        Edges:    `{"@type":"edge","@class":"RELATES","@from":"...","@to":"...", ...props}`.
+
+        `@from`/`@to` may be either:
+          - a `@id` declared earlier in THIS batch (vertex must precede the edge), or
+          - an existing-vertex RID string like `"#1:967834"` (caller is
+            responsible for fetching the RID via a prior SELECT).
+
+        The endpoint is CREATE-only — duplicate `@id` raises
+        DuplicatedKeyException (HTTP 503). Vertex MERGE must be handled
+        by the caller (pre-fetch + partition new vs existing).
+
+        Returns the server response: `{verticesCreated, edgesCreated,
+        elapsedMs, idMapping: {<@id>: <RID>, ...}}`.
+        """
+        url = f'{self._base}/api/v1/batch/{self._db}?lightEdges={"true" if light_edges else "false"}'
+        body = ('\n'.join(ndjson_lines)).encode('utf-8')
+        headers = {'Content-Type': 'application/x-ndjson'}
+        # GraphBatch is the hot path; retry on the same transient errors
+        # the regular command path retries on (ConcurrentModificationException
+        # is theoretically possible if another writer hits the same edge
+        # bucket page concurrently with our batch).
+        last_body = ''
+        for attempt in range(_MAX_RETRIES + 1):
+            try:
+                r = self._session.post(
+                    url, data=body, headers=headers, auth=self._auth, timeout=self._timeout,
+                )
+            except requests.RequestException as e:
+                raise ArcadeDBError(f'GraphBatch request failed: {e}') from e
+            if r.ok:
+                return r.json()
+            last_body = r.text[:500]
+            if attempt < _MAX_RETRIES and _is_retryable_arcadedb_error(r.status_code, last_body):
+                backoff = _RETRY_BACKOFF_BASE * (2 ** attempt) * (0.5 + random.random())
+                logger.warning(
+                    'GraphBatch HTTP %d (retryable, attempt %d/%d, backoff %.2fs): %s',
+                    r.status_code, attempt + 1, _MAX_RETRIES, backoff, last_body[:200],
+                )
+                time.sleep(backoff)
+                continue
+            raise ArcadeDBError(
+                f'GraphBatch HTTP {r.status_code}: {last_body}'
+            )
+        raise ArcadeDBError(
+            f'GraphBatch exhausted {_MAX_RETRIES} retries on retryable error: {last_body}'
+        )
 
     def _send_sql(self, sql: str, params: dict[str, Any] | None = None) -> list[dict]:
         """Run an ArcadeDB SQL statement (not Cypher)."""

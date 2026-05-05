@@ -23,6 +23,41 @@ def _max_upload_mb() -> int:
     except (TypeError, ValueError):
         return 20
 
+
+def _chat_context_max_chars() -> int:
+    """Cap on per-attachment text length when a file is attached to the
+    chat as in-context (NOT to the KB). Read by the frontend extractor
+    registry to truncate before sending; also enforceable server-side
+    later if a wire-level guard becomes useful."""
+    try:
+        return max(1000, int(os.environ.get("NOTED_CHAT_CONTEXT_MAX_CHARS", "50000")))
+    except (TypeError, ValueError):
+        return 50000
+
+
+# Extensions the chat-context "Attach file" path treats as plain text.
+# Distinct from KB's ALLOWED_DOCUMENT_EXTS — context-attach reads bytes
+# client-side as text via FileReader and never persists, so the threat
+# model is "could this file be parsed as text" not "could this be
+# executed". Code files are deliberately included; the BLOCKED_EXTS
+# server-side guard does not apply because nothing is uploaded.
+ALLOWED_CONTEXT_TEXT_EXTS = [
+    # Plain text + markdown
+    '.txt', '.md', '.markdown', '.rst',
+    # Data formats
+    '.json', '.csv', '.tsv', '.xml', '.yaml', '.yml', '.toml', '.ini',
+    '.cfg', '.conf', '.env', '.log', '.properties',
+    # Web / styling
+    '.html', '.htm', '.css', '.scss', '.sass', '.less',
+    # Code (read as text only — never executed by frontend)
+    '.py', '.js', '.mjs', '.ts', '.tsx', '.jsx', '.vue', '.svelte',
+    '.go', '.rs', '.c', '.h', '.cpp', '.hpp', '.cc', '.cs',
+    '.java', '.kt', '.kts', '.swift', '.rb', '.php', '.lua',
+    '.sh', '.bash', '.zsh', '.fish', '.ps1',
+    '.sql', '.r', '.m', '.dart', '.scala', '.clj', '.cljs',
+    '.ex', '.exs', '.erl', '.pl', '.f', '.f90',
+]
+
 ALLOWED_IMAGE_EXTS = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.heic', '.heif', '.svg']
 ALLOWED_AUDIO_EXTS = ['.mp3', '.wav', '.m4a', '.ogg', '.flac', '.aac', '.opus', '.webm', '.mp4']
 
@@ -58,6 +93,8 @@ def get_upload_config():
         "image_extensions": ALLOWED_IMAGE_EXTS,
         "audio_extensions": ALLOWED_AUDIO_EXTS,
         "document_extensions": ALLOWED_DOCUMENT_EXTS,
+        "chat_context_text_extensions": ALLOWED_CONTEXT_TEXT_EXTS,
+        "chat_context_max_chars": _chat_context_max_chars(),
     }
 
 

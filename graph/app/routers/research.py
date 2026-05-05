@@ -170,6 +170,37 @@ def doc_add(domain_id: str, req: DocPathRequest):
     return {'status': 'queued', 'queue_depth': depth, 'path': req.path}
 
 
+class PreflightRequest(BaseModel):
+    path: str | None = Field(
+        default=None,
+        description=('Doc path relative to sources/. Omit for system-health '
+                     'mode (skip Docling, manifest, disk-space file checks).'),
+    )
+
+
+@router.post('/{domain_id}/preflight')
+def preflight(domain_id: str, req: PreflightRequest = PreflightRequest()):
+    """Run the preflight scan for a per-doc add OR as a system-health
+    diagnostic (when path is omitted).
+
+    Doc-targeted mode (path supplied): cheap (~5-15s) battery — Docling
+    probe, Gemma JSON smoke, ArcadeDB write probe, schema sanity,
+    embedding probe, manifest collision, disk-space estimate. Catches
+    problems BEFORE committing to the long ingestion.
+
+    System-health mode (path omitted): runs only the non-file checks
+    (~3-5s). Surfaces in the KB Manager as "Run Diagnostics".
+
+    Returns a structured report. `ok=true` means safe to proceed;
+    `ok=false` means at least one blocking error was hit. See
+    documents/kb/kb_import_export.md Phase 0a."""
+    from app.preflight import run_preflight_for_doc
+    kb = _get_domain(domain_id)
+    _require_knowledge(kb)
+    report = run_preflight_for_doc(domain_id, req.path)
+    return report.to_dict()
+
+
 @router.post('/{domain_id}/doc/remove')
 def doc_remove(domain_id: str, req: DocPathRequest):
     """Incremental remove of a single doc from the KB's graph (and its

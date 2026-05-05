@@ -8,6 +8,7 @@ a confidence score; entries below the configured floor are dropped.
 from __future__ import annotations
 
 import logging
+import threading
 from typing import Any
 
 from app.config import ENTITY_CONFIDENCE_FLOOR
@@ -56,7 +57,12 @@ class GemmaEntityExtractor:
         self._llm = client or LLMClient()
         self._floor = confidence_floor
         # Below-floor entities are logged, not stored (per Q D decision).
+        # Lock guards concurrent appends from parallel chunk extraction
+        # (ThreadPoolExecutor in research_builder._extract_from_chunks).
+        # Without it, concurrent .append on a list is *probably* atomic
+        # under CPython's GIL but explicit locking is safer and free.
         self._below_floor_log: list[dict] = []
+        self._below_floor_lock = threading.Lock()
 
     def extract(self, chunk_text: str) -> list[dict[str, Any]]:
         """Return a list of accepted entity dicts for this chunk.
@@ -72,7 +78,20 @@ class GemmaEntityExtractor:
                 system_prompt=_SYSTEM_PROMPT,
                 user_prompt=_format_user_prompt(chunk_text),
                 temperature=0.1,
-                max_tokens=2048,
+                # Bumped from 2048 — dense reference-list chunks (e.g.
+                # bibliography pages with 30+ named editors/authors)
+                # exceeded 2048 token JSON output and got truncated
+                # mid-entity, dropping every entity from those chunks.
+                # gemma-4 has c=131072 with kv-unified default-on, so
+                # any single request can consume the full pool minus
+                # its input prompt (~600-800 tokens). 65532 is a
+                # generous upper bound; realistic chunk JSON output is
+                # 1-5k tokens and the model stops at EOS naturally, so
+                # there's no cost when the cap isn't hit. Risk is
+                # bounded by EOS emission — if Gemma loops past EOS
+                # we'd waste budget, but that hasn't been observed for
+                # entity extraction.
+                max_tokens=65532,
             )
         except LLMError as e:
             logger.warning('Entity extraction LLM call failed: %s', e)
@@ -97,14 +116,18 @@ class GemmaEntityExtractor:
             return []
 
         accepted: list[dict[str, Any]] = []
+        below: list[dict[str, Any]] = []
         for item in raw:
             clean = _normalize_entity(item)
             if clean is None:
                 continue
             if clean['confidence'] < self._floor:
-                self._below_floor_log.append(clean)
+                below.append(clean)
                 continue
             accepted.append(clean)
+        if below:
+            with self._below_floor_lock:
+                self._below_floor_log.extend(below)
         return accepted
 
     def drain_below_floor(self) -> list[dict]:

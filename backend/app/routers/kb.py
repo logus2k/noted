@@ -627,6 +627,33 @@ async def delete_document(
     return out
 
 
+@router.post("/{domain_id}/preflight")
+async def preflight(
+    domain_id: str,
+    path: str = Query(
+        "",
+        description=("Source-relative path of the doc to validate. "
+                     "Empty = system-health mode (skip Docling + manifest + disk checks)."),
+    ),
+):
+    """Run the preflight scan for a per-doc add OR a system-health diagnostic
+    (when `path` is empty — KB Manager 'Run Diagnostics' button uses this).
+    See documents/kb/kb_import_export.md Phase 0a."""
+    async with httpx.AsyncClient(timeout=320) as client:
+        try:
+            r = await client.post(
+                f"{NOTED_BASE}/api/graph/research/{domain_id}/preflight",
+                json={"path": path} if path else {},
+            )
+            if r.status_code == 404:
+                raise HTTPException(status_code=404, detail=f"unknown Domain: {domain_id!r}")
+            return r.json() if r.status_code == 200 else {
+                "status": "error", "code": r.status_code, "detail": r.text[:300],
+            }
+        except httpx.RequestError as e:
+            raise HTTPException(status_code=502, detail=f"noted-graph unreachable: {e}")
+
+
 @router.post("/{domain_id}/recluster")
 async def recluster(domain_id: str):
     """Re-run analytics + community summaries over the Domain's CURRENT

@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import Iterable
 
@@ -99,25 +100,41 @@ class GraphStorage:
         entities = list(entities)
         relationships = list(relationships)
 
+        phase_t0 = time.perf_counter()
+        logger.info('writing.replace_project_graph: start (entities=%d, relationships=%d, project=%s)',
+                    len(entities), len(relationships), project_id)
+
         # 1. Remove this project's id from every entity that lists it.
         #    ArcadeDB Cypher does not support list comprehension syntax yet,
         #    so we use ArcadeDB SQL for the two-step cleanup.
+        t0 = time.perf_counter()
+        logger.info('writing.replace_project_graph.step1a: SQL strip project_ids — start')
         self._c.command_sql(
             "UPDATE Entity REMOVE project_ids = :pid WHERE project_ids CONTAINS :pid",
             {'pid': project_id},
         )
+        logger.info('writing.replace_project_graph.step1a: end (%.2fs)', time.perf_counter() - t0)
+
         # Delete entities whose project_ids list is now empty. DETACH DELETE
         # via Cypher drops incident edges in one shot.
+        t0 = time.perf_counter()
+        logger.info('writing.replace_project_graph.step1b: DETACH DELETE empty entities — start')
         self._c.command(
             'MATCH (n:Entity) WHERE size(n.project_ids) = 0 DETACH DELETE n',
         )
+        logger.info('writing.replace_project_graph.step1b: end (%.2fs)', time.perf_counter() - t0)
 
         # 2. Bulk-upsert entities, chunked. Hot retrieval properties
         #    (community_id, rank) are promoted from the properties dict
         #    to top-level Entity columns so they can be indexed and queried
         #    without doing a substring match on the JSON blob.
+        t0 = time.perf_counter()
+        n_chunks_2 = (len(entities) + _CHUNK_VERTICES - 1) // _CHUNK_VERTICES
+        logger.info('writing.replace_project_graph.step2: insert %d entities in %d chunks — start',
+                    len(entities), n_chunks_2)
         n_entities = 0
-        for chunk in _chunks(entities, _CHUNK_VERTICES):
+        for ci, chunk in enumerate(_chunks(entities, _CHUNK_VERTICES), 1):
+            ct0 = time.perf_counter()
             rows = []
             for e in chunk:
                 # Pop hot fields from properties so they aren't duplicated
@@ -152,11 +169,19 @@ class GraphStorage:
                 {'rows': rows, 'pid': project_id},
             )
             n_entities += len(chunk)
+            logger.info('writing.replace_project_graph.step2: chunk %d/%d (%d rows) %.2fs',
+                        ci, n_chunks_2, len(chunk), time.perf_counter() - ct0)
+        logger.info('writing.replace_project_graph.step2: end (%.2fs)', time.perf_counter() - t0)
 
         # 3. Bulk-upsert relationships. Endpoints must already exist (they
         #    were just written). MERGE on the edge pattern avoids duplicates.
+        t0 = time.perf_counter()
+        n_chunks_3 = (len(relationships) + _CHUNK_EDGES - 1) // _CHUNK_EDGES
+        logger.info('writing.replace_project_graph.step3: insert %d edges in %d chunks — start',
+                    len(relationships), n_chunks_3)
         n_rels = 0
-        for chunk in _chunks(relationships, _CHUNK_EDGES):
+        for ci, chunk in enumerate(_chunks(relationships, _CHUNK_EDGES), 1):
+            ct0 = time.perf_counter()
             rows = [
                 {
                     'source': r.source,
@@ -179,10 +204,13 @@ class GraphStorage:
                 {'rows': rows},
             )
             n_rels += len(chunk)
+            logger.info('writing.replace_project_graph.step3: chunk %d/%d (%d rows) %.2fs',
+                        ci, n_chunks_3, len(chunk), time.perf_counter() - ct0)
+        logger.info('writing.replace_project_graph.step3: end (%.2fs)', time.perf_counter() - t0)
 
         logger.info(
-            'ArcadeDB replace_project_graph: project=%s wrote %d entities, %d rels',
-            project_id, n_entities, n_rels,
+            'writing.replace_project_graph: complete (%.2fs total) — project=%s wrote %d entities, %d rels',
+            time.perf_counter() - phase_t0, project_id, n_entities, n_rels,
         )
         return {'entities': n_entities, 'relationships': n_rels}
 
@@ -194,6 +222,7 @@ class GraphStorage:
         chunked_into_rels: list[Relationship],
         thematic_new: list[Entity],
         mention_rels: list[Relationship],
+        progress_cb=None,
     ) -> dict[str, int]:
         """Merge a single doc + its chunks + extracted entities into the
         existing graph, idempotent on re-add (doc + chunks are dropped first
@@ -205,9 +234,29 @@ class GraphStorage:
           - mentioned_in_chunks: union (capped 50, new ones first)
           - source_doc_paths: union (capped 20, new path first)
           - aliases: union
+
+        `progress_cb` is an optional callable `(sub_phase: str, done: int,
+        total: int) -> None`. When supplied, every batched UNWIND loop
+        reports its progress so the caller (research_builder) can promote
+        sub-phase fields up to `self.progress` and the KB Monitor can
+        render movement during the otherwise-silent ~12 minute writing
+        phase. Called freely from the same thread as the writes — no
+        synchronization required by the callback.
         """
         self.ensure_ready()
         project_id = self.project_id
+
+        def _report(sub_phase, done, total):
+            if progress_cb:
+                try:
+                    progress_cb(sub_phase, done, total)
+                except Exception:
+                    # Progress reporting must NEVER break ingestion.
+                    pass
+
+        phase_t0 = time.perf_counter()
+        logger.info('writing.add_doc_merge: start (doc=%s, chunks=%d, thematic_new=%d, mention_rels=%d)',
+                    doc_entity.id, len(chunk_entities), len(thematic_new), len(mention_rels))
 
         # 1. Drop existing doc + its chunks for this path. Each chunk is
         #    DETACH DELETE'd so its incident mentions edges go too.
@@ -215,6 +264,8 @@ class GraphStorage:
         #    filtering markdown_chunk + CONTAINS-matching the path, because
         #    ArcadeDB's type index gets stale references after DETACH DELETE
         #    that surface as "Record not found" on subsequent queries.
+        t0 = time.perf_counter()
+        logger.info('writing.add_doc_merge.step1a: query existing chunks for doc — start')
         existing_chunk_rows = self._c.query(
             '''MATCH (d:Entity {id: $doc_id})-[r:RELATES]->(c:Entity)
                WHERE r.type = "chunked_into"
@@ -222,22 +273,38 @@ class GraphStorage:
             {'doc_id': doc_entity.id},
         )
         existing_chunk_ids = [r.get('id') for r in existing_chunk_rows if r.get('id')]
+        logger.info('writing.add_doc_merge.step1a: end %.2fs (%d existing chunks)',
+                    time.perf_counter() - t0, len(existing_chunk_ids))
+
         if existing_chunk_ids:
+            t0 = time.perf_counter()
+            logger.info('writing.add_doc_merge.step1b: DETACH DELETE %d existing chunks — start',
+                        len(existing_chunk_ids))
             self._c.command(
                 'MATCH (c:Entity) WHERE c.id IN $ids DETACH DELETE c',
                 {'ids': existing_chunk_ids},
             )
+            logger.info('writing.add_doc_merge.step1b: end (%.2fs)', time.perf_counter() - t0)
+
         # Drop the doc node itself if present (re-add will recreate it).
+        t0 = time.perf_counter()
+        logger.info('writing.add_doc_merge.step1c: DETACH DELETE doc node — start')
         self._c.command(
             'MATCH (d:Entity {id: $doc_id}) DETACH DELETE d',
             {'doc_id': doc_entity.id},
         )
+        logger.info('writing.add_doc_merge.step1c: end (%.2fs)', time.perf_counter() - t0)
 
         # 2. Insert the new doc + chunks + chunked_into edges using the
         #    same UNWIND pattern as replace_project_graph (CREATE since we
         #    just deleted these ids).
         md_entities = [doc_entity] + list(chunk_entities)
-        for chunk in _chunks(md_entities, _CHUNK_VERTICES):
+        t0 = time.perf_counter()
+        n_chunks_2 = (len(md_entities) + _CHUNK_VERTICES - 1) // _CHUNK_VERTICES
+        logger.info('writing.add_doc_merge.step2: insert %d md entities (doc+chunks) in %d chunks — start',
+                    len(md_entities), n_chunks_2)
+        for ci, chunk in enumerate(_chunks(md_entities, _CHUNK_VERTICES), 1):
+            ct0 = time.perf_counter()
             rows = []
             for e in chunk:
                 props = dict(e.properties)
@@ -268,7 +335,17 @@ class GraphStorage:
                        END''',
                 {'rows': rows, 'pid': project_id},
             )
-        for chunk in _chunks(list(chunked_into_rels), _CHUNK_EDGES):
+            _report('writing.chunks_insert', ci, n_chunks_2)
+            logger.info('writing.add_doc_merge.step2: chunk %d/%d (%d rows) %.2fs',
+                        ci, n_chunks_2, len(chunk), time.perf_counter() - ct0)
+        logger.info('writing.add_doc_merge.step2: end (%.2fs)', time.perf_counter() - t0)
+
+        t0 = time.perf_counter()
+        n_chunks_2b = (len(chunked_into_rels) + _CHUNK_EDGES - 1) // _CHUNK_EDGES
+        logger.info('writing.add_doc_merge.step2b: insert %d chunked_into edges in %d chunks — start',
+                    len(chunked_into_rels), n_chunks_2b)
+        for ci, chunk in enumerate(_chunks(list(chunked_into_rels), _CHUNK_EDGES), 1):
+            ct0 = time.perf_counter()
             rows = [
                 {'source': r.source, 'target': r.target, 'type': r.type,
                  'properties_json': _safe_json(r.properties)}
@@ -282,11 +359,18 @@ class GraphStorage:
                    SET e.type = row.type, e.properties_json = row.properties_json''',
                 {'rows': rows},
             )
+            _report('writing.chunked_into_edges', ci, n_chunks_2b)
+            logger.info('writing.add_doc_merge.step2b: chunk %d/%d (%d rows) %.2fs',
+                        ci, n_chunks_2b, len(chunk), time.perf_counter() - ct0)
+        logger.info('writing.add_doc_merge.step2b: end (%.2fs)', time.perf_counter() - t0)
 
         # 3. Thematic entity merge: load existing, merge in Python, write
         #    back. Avoids fragile Cypher list ops.
         new_by_id = {e.id: e for e in thematic_new}
         if new_by_id:
+            t0 = time.perf_counter()
+            logger.info('writing.add_doc_merge.step3a: load %d existing thematic entities — start',
+                        len(new_by_id))
             existing_rows = self._c.query(
                 '''MATCH (n:Entity)
                    WHERE $pid IN n.project_ids AND n.id IN $ids
@@ -303,6 +387,8 @@ class GraphStorage:
                     'rank': row.get('rank'),
                     'tags': _load_json_or_list(row.get('tags')),
                 }
+            logger.info('writing.add_doc_merge.step3a: end %.2fs (%d existing matched)',
+                        time.perf_counter() - t0, len(existing_by_id))
 
             merged_rows = []
             for ent_id, new_ent in new_by_id.items():
@@ -383,7 +469,12 @@ class GraphStorage:
                     'tags_json': _safe_json(new_ent.tags or old.get('tags') or []),
                 })
 
-            for chunk in _chunks(merged_rows, _CHUNK_VERTICES):
+            t0 = time.perf_counter()
+            n_chunks_3b = (len(merged_rows) + _CHUNK_VERTICES - 1) // _CHUNK_VERTICES
+            logger.info('writing.add_doc_merge.step3b: write %d merged thematic entities in %d chunks — start',
+                        len(merged_rows), n_chunks_3b)
+            for ci, chunk in enumerate(_chunks(merged_rows, _CHUNK_VERTICES), 1):
+                ct0 = time.perf_counter()
                 self._c.command(
                     '''UNWIND $rows AS row
                        MERGE (n:Entity {id: row.id})
@@ -400,11 +491,20 @@ class GraphStorage:
                            END''',
                     {'rows': chunk, 'pid': project_id},
                 )
+                _report('writing.thematic_merge', ci, n_chunks_3b)
+                logger.info('writing.add_doc_merge.step3b: chunk %d/%d (%d rows) %.2fs',
+                            ci, n_chunks_3b, len(chunk), time.perf_counter() - ct0)
+            logger.info('writing.add_doc_merge.step3b: end (%.2fs)', time.perf_counter() - t0)
 
         # 4. CREATE mentions edges. Chunk endpoints are brand new (we just
         #    inserted them above) so duplicates aren't possible.
         n_mentions = 0
-        for chunk in _chunks(list(mention_rels), _CHUNK_EDGES):
+        t0 = time.perf_counter()
+        n_chunks_4 = (len(mention_rels) + _CHUNK_EDGES - 1) // _CHUNK_EDGES
+        logger.info('writing.add_doc_merge.step4: insert %d mentions edges in %d chunks — start',
+                    len(mention_rels), n_chunks_4)
+        for ci, chunk in enumerate(_chunks(list(mention_rels), _CHUNK_EDGES), 1):
+            ct0 = time.perf_counter()
             rows = [
                 {'source': r.source, 'target': r.target, 'type': r.type,
                  'properties_json': _safe_json(r.properties)}
@@ -419,6 +519,262 @@ class GraphStorage:
                 {'rows': rows},
             )
             n_mentions += len(rows)
+            _report('writing.mention_edges', ci, n_chunks_4)
+            logger.info('writing.add_doc_merge.step4: chunk %d/%d (%d rows) %.2fs',
+                        ci, n_chunks_4, len(chunk), time.perf_counter() - ct0)
+        logger.info('writing.add_doc_merge.step4: end (%.2fs)', time.perf_counter() - t0)
+        logger.info('writing.add_doc_merge: complete (%.2fs total) — %d entities, %d mentions, %d chunks',
+                    time.perf_counter() - phase_t0, len(new_by_id), n_mentions, len(chunk_entities))
+
+        return {
+            'entities_upserted': len(new_by_id),
+            'mentions_written': n_mentions,
+            'chunks_written': len(chunk_entities),
+            'chunks_replaced': len(existing_chunk_ids),
+        }
+
+    # ── GraphBatch v2 path (Phase 2 of kb_import_export.md) ─────────────
+    def add_doc_merge_v2(
+        self,
+        doc_entity: Entity,
+        chunk_entities: list[Entity],
+        chunked_into_rels: list[Relationship],
+        thematic_new: list[Entity],
+        mention_rels: list[Relationship],
+        progress_cb=None,
+    ) -> dict[str, int]:
+        """Same contract as `add_doc_merge` but the bulk vertex+edge insert
+        goes through ArcadeDB's GraphBatch HTTP endpoint
+        (`POST /api/v1/batch/<db>`). For a typical 700-chunk PDF this drops
+        the ~12-15 min mention-edge step to ~30s.
+
+        Hybrid strategy because GraphBatch is CREATE-only:
+          - Chunks (always brand new — DETACH DELETE happens first) and the
+            doc node go in via GraphBatch.
+          - Thematic entities are split: NEW ones (not yet in the graph)
+            via GraphBatch; EXISTING ones get a small UNWIND UPDATE batch
+            (Cypher) that merges their property dicts in place.
+          - Edges (chunked_into + mentions) go in via GraphBatch with
+            `@from`/`@to` resolved by `@id` for new vertices in the same
+            batch and by RID string for pre-existing ones (probed working
+            in v26.3.2).
+        """
+        self.ensure_ready()
+        project_id = self.project_id
+
+        phase_t0 = time.perf_counter()
+        logger.info('writing.add_doc_merge_v2: start (doc=%s, chunks=%d, thematic_new=%d, mention_rels=%d)',
+                    doc_entity.id, len(chunk_entities), len(thematic_new), len(mention_rels))
+
+        # ── Step 1: drop existing chunks + doc node (same as legacy path).
+        #            Cypher is fine here — these are small DETACH DELETE ops
+        #            that compile to LSM page erases. The slow MATCH-heavy
+        #            work is in steps 2-4 which GraphBatch replaces.
+        t0 = time.perf_counter()
+        existing_chunk_rows = self._c.query(
+            '''MATCH (d:Entity {id: $doc_id})-[r:RELATES]->(c:Entity)
+               WHERE r.type = "chunked_into"
+               RETURN c.id AS id''',
+            {'doc_id': doc_entity.id},
+        )
+        existing_chunk_ids = [r.get('id') for r in existing_chunk_rows if r.get('id')]
+        if existing_chunk_ids:
+            self._c.command(
+                'MATCH (c:Entity) WHERE c.id IN $ids DETACH DELETE c',
+                {'ids': existing_chunk_ids},
+            )
+        self._c.command(
+            'MATCH (d:Entity {id: $doc_id}) DETACH DELETE d',
+            {'doc_id': doc_entity.id},
+        )
+        logger.info('writing.add_doc_merge_v2.step1: dropped %d existing chunks + doc node (%.2fs)',
+                    len(existing_chunk_ids), time.perf_counter() - t0)
+
+        # ── Step 2: pre-fetch RIDs for thematic entities that already
+        #            exist. One bulk query against the unique `Entity[id]`
+        #            index. Returns `{id → "#1:967834"}` for entities
+        #            present in the graph; absent ones are new.
+        t0 = time.perf_counter()
+        new_by_id: dict[str, Entity] = {e.id: e for e in thematic_new}
+        existing_rid_map: dict[str, str] = {}
+        existing_props_by_id: dict[str, dict] = {}
+        if new_by_id:
+            existing_rows = self._c.query(
+                '''MATCH (n:Entity)
+                   WHERE $pid IN n.project_ids AND n.id IN $ids
+                   RETURN n.id AS id, n.@rid AS rid,
+                          n.properties_json AS props, n.tags_json AS tags,
+                          n.community_id AS community_id, n.rank AS rank,
+                          n.label AS label, n.type AS type''',
+                {'pid': project_id, 'ids': list(new_by_id.keys())},
+            )
+            for row in existing_rows:
+                eid = row.get('id')
+                rid = row.get('rid')
+                if eid and rid:
+                    existing_rid_map[eid] = rid
+                    existing_props_by_id[eid] = {
+                        'props': _load_json_or_dict(row.get('props')),
+                        'tags': _load_json_or_list(row.get('tags')),
+                        'community_id': row.get('community_id'),
+                        'rank': row.get('rank'),
+                        'label': row.get('label'),
+                        'type': row.get('type'),
+                    }
+        logger.info('writing.add_doc_merge_v2.step2: pre-fetched %d existing RIDs (%.2fs)',
+                    len(existing_rid_map), time.perf_counter() - t0)
+
+        # ── Step 3: build NDJSON for GraphBatch — doc_node + all new
+        #            chunks + truly-new thematic entities + all edges.
+        t0 = time.perf_counter()
+        ndjson_lines: list[str] = []
+
+        def _vertex_line(e: Entity) -> str:
+            props = dict(e.properties)
+            cid = props.pop('community_id', None)
+            rank = props.pop('rank', None)
+            row: dict = {
+                '@type': 'vertex',
+                '@class': 'Entity',
+                '@id': e.id,
+                'id': e.id,
+                'type': e.type,
+                'label': e.label,
+                'properties_json': _safe_json(props),
+                'tags_json': _safe_json(e.tags or []),
+                'project_ids': [project_id],
+            }
+            if cid is not None:
+                row['community_id'] = cid
+            if rank is not None:
+                row['rank'] = rank
+            return json.dumps(row, ensure_ascii=False)
+
+        ndjson_lines.append(_vertex_line(doc_entity))
+        for ce in chunk_entities:
+            ndjson_lines.append(_vertex_line(ce))
+        for e in thematic_new:
+            if e.id in existing_rid_map:
+                continue  # handled by the property-merge UPDATE pass below
+            ndjson_lines.append(_vertex_line(e))
+
+        def _resolve_endpoint(node_id: str) -> str:
+            """Edge endpoint — RID string for pre-existing thematic
+            entity, otherwise the @id (in-batch reference)."""
+            return existing_rid_map.get(node_id, node_id)
+
+        for r in chunked_into_rels:
+            ndjson_lines.append(json.dumps({
+                '@type': 'edge',
+                '@class': 'RELATES',
+                '@from': _resolve_endpoint(r.source),
+                '@to': _resolve_endpoint(r.target),
+                'type': r.type,
+                'properties_json': _safe_json(r.properties),
+            }, ensure_ascii=False))
+        for r in mention_rels:
+            ndjson_lines.append(json.dumps({
+                '@type': 'edge',
+                '@class': 'RELATES',
+                '@from': _resolve_endpoint(r.source),
+                '@to': _resolve_endpoint(r.target),
+                'type': r.type,
+                'properties_json': _safe_json(r.properties),
+            }, ensure_ascii=False))
+        logger.info('writing.add_doc_merge_v2.step3: built %d NDJSON lines (%.2fs)',
+                    len(ndjson_lines), time.perf_counter() - t0)
+
+        # ── Step 4: single GraphBatch POST. Single op so we surface
+        #             0/1 then 1/1 around it; the UI shows it as the
+        #             write hitting the wire.
+        if progress_cb:
+            try: progress_cb('writing.graphbatch_post', 0, 1)
+            except Exception: pass
+        t0 = time.perf_counter()
+        result = self._c.graphbatch_post(ndjson_lines, light_edges=False)
+        if progress_cb:
+            try: progress_cb('writing.graphbatch_post', 1, 1)
+            except Exception: pass
+        logger.info('writing.add_doc_merge_v2.step4: GraphBatch POST verticesCreated=%s edgesCreated=%s server_elapsed=%sms (%.2fs wall)',
+                    result.get('verticesCreated'), result.get('edgesCreated'),
+                    result.get('elapsedMs'), time.perf_counter() - t0)
+
+        # ── Step 5: property-merge UPDATE for thematic entities that
+        #            already existed. Same merge semantics as legacy
+        #            add_doc_merge step 3 (description / aliases /
+        #            mentioned_in_chunks / source_doc_paths / mention_count).
+        t0 = time.perf_counter()
+        merged_rows: list[dict] = []
+        for ent_id, new_ent in new_by_id.items():
+            old = existing_props_by_id.get(ent_id)
+            if old is None:
+                continue  # truly new — already inserted via GraphBatch
+            old_props = old['props']
+            new_props = dict(new_ent.properties)
+            old_conf = float(old_props.get('extraction_confidence') or 0)
+            new_conf = float(new_props.get('extraction_confidence') or 0)
+            if new_conf > old_conf and new_props.get('description'):
+                old_props['description'] = new_props['description']
+                old_props['extraction_confidence'] = new_conf
+            old_aliases = old_props.get('aliases') or []
+            for a in (new_props.get('aliases') or []):
+                if a and a not in old_aliases:
+                    old_aliases.append(a)
+            old_props['aliases'] = old_aliases
+            old_mc = old_props.get('mentioned_in_chunks') or []
+            new_mc = new_props.get('mentioned_in_chunks') or []
+            merged_mc: list[str] = []
+            seen: set[str] = set()
+            for cid in list(new_mc) + list(old_mc):
+                if cid and cid not in seen:
+                    merged_mc.append(cid)
+                    seen.add(cid)
+                    if len(merged_mc) >= 50:
+                        break
+            old_props['mentioned_in_chunks'] = merged_mc
+            old_props['mention_count'] = len(merged_mc)
+            old_sp = old_props.get('source_doc_paths') or []
+            new_sp = new_props.get('source_doc_paths') or []
+            merged_sp: list[str] = []
+            seen_sp: set[str] = set()
+            for p in list(new_sp) + list(old_sp):
+                if p and p not in seen_sp:
+                    merged_sp.append(p)
+                    seen_sp.add(p)
+                    if len(merged_sp) >= 20:
+                        break
+            old_props['source_doc_paths'] = merged_sp
+            old_props.pop('community_id', None)
+            old_props.pop('rank', None)
+            merged_rows.append({
+                'id': ent_id,
+                'properties_json': _safe_json(old_props),
+                'tags_json': _safe_json(new_ent.tags or old.get('tags') or []),
+                'label': new_ent.label,
+            })
+
+        if merged_rows:
+            n_chunks_5 = (len(merged_rows) + _CHUNK_VERTICES - 1) // _CHUNK_VERTICES
+            for ci, chunk in enumerate(_chunks(merged_rows, _CHUNK_VERTICES), 1):
+                self._c.command(
+                    '''UNWIND $rows AS row
+                       MATCH (n:Entity {id: row.id})
+                       SET n.properties_json = row.properties_json,
+                           n.tags_json = row.tags_json,
+                           n.label = row.label''',
+                    {'rows': chunk},
+                )
+                if progress_cb:
+                    try: progress_cb('writing.thematic_merge', ci, n_chunks_5)
+                    except Exception: pass
+        logger.info('writing.add_doc_merge_v2.step5: property-merged %d existing entities (%.2fs)',
+                    len(merged_rows), time.perf_counter() - t0)
+
+        n_mentions = len(mention_rels)
+        n_truly_new = len(new_by_id) - len(existing_rid_map)
+        logger.info('writing.add_doc_merge_v2: complete (%.2fs total) — %d new entities, %d merged, %d mentions, %d chunks',
+                    time.perf_counter() - phase_t0,
+                    n_truly_new, len(merged_rows), n_mentions, len(chunk_entities))
 
         return {
             'entities_upserted': len(new_by_id),
@@ -654,6 +1010,7 @@ class GraphStorage:
         summary_rels: list[Relationship],
         sameas_rels: list[Relationship],
         similar_rels: list[Relationship],
+        progress_cb=None,
     ) -> dict[str, int]:
         """Atomically refresh the analytics layer.
 
@@ -661,14 +1018,38 @@ class GraphStorage:
         member_of / summarizes / sameAs / similar_to edges via DETACH DELETE
         on the endpoints), then writes new ones. Updates rank + community_id
         + properties_json on existing thematic entities (where the analytics
-        pass mutated them in place)."""
+        pass mutated them in place).
+
+        `progress_cb(sub_phase, done, total)` is called from each chunked
+        UNWIND loop so the orchestrator (research_builder.recluster) can
+        promote sub-phase fields up to `self.progress`. Without it, the
+        UI shows `phase: writing` for ~80 minutes with no movement during
+        the analytics-edge insert loop."""
         self.ensure_ready()
         project_id = self.project_id
+
+        def _report(sub_phase, done, total):
+            if progress_cb:
+                try:
+                    progress_cb(sub_phase, done, total)
+                except Exception:
+                    pass
+
+        # Per-step timing so a writing-phase hang shows the exact culprit
+        # in the noted-graph logs (instead of a 30+ min silence after the
+        # `summarizing -> writing` line). Each `step start` MUST be paired
+        # with a `step end`; if start appears without end, that's the hang.
+        phase_t0 = time.perf_counter()
+        logger.info('writing.replace_analytics_layer: start (thematic=%d, communities=%d, summaries=%d, member_of=%d, summary_rels=%d, sameas=%d, similar=%d)',
+                    len(thematic_entities), len(community_entities), len(summary_entities),
+                    len(member_of_rels), len(summary_rels), len(sameas_rels), len(similar_rels))
 
         # 1. Drop old communities + community_summary nodes (DETACH DELETE
         #    removes member_of / summarizes edges automatically). sameAs +
         #    similar_to edges connect thematic entities directly so we drop
         #    those by edge type.
+        t0 = time.perf_counter()
+        logger.info('writing.step1a: drop old community/community_summary nodes — start')
         self._c.command(
             '''MATCH (n:Entity)
                WHERE $pid IN n.project_ids
@@ -676,6 +1057,10 @@ class GraphStorage:
                DETACH DELETE n''',
             {'pid': project_id},
         )
+        logger.info('writing.step1a: end (%.2fs)', time.perf_counter() - t0)
+
+        t0 = time.perf_counter()
+        logger.info('writing.step1b: drop old sameAs/similar_to edges — start')
         self._c.command(
             '''MATCH (a:Entity)-[r:RELATES]->(b:Entity)
                WHERE $pid IN a.project_ids
@@ -684,6 +1069,7 @@ class GraphStorage:
                DELETE r''',
             {'pid': project_id},
         )
+        logger.info('writing.step1b: end (%.2fs)', time.perf_counter() - t0)
 
         # 2. Update thematic entities with refreshed rank + community_id.
         rows = []
@@ -697,7 +1083,11 @@ class GraphStorage:
                 'rank': rank,
                 'properties_json': _safe_json(props),
             })
-        for chunk in _chunks(rows, _CHUNK_VERTICES):
+        t0 = time.perf_counter()
+        n_chunks_2 = (len(rows) + _CHUNK_VERTICES - 1) // _CHUNK_VERTICES
+        logger.info('writing.step2: update %d thematic entities in %d chunks — start', len(rows), n_chunks_2)
+        for ci, chunk in enumerate(_chunks(rows, _CHUNK_VERTICES), 1):
+            ct0 = time.perf_counter()
             self._c.command(
                 '''UNWIND $rows AS row
                    MATCH (n:Entity {id: row.id})
@@ -706,10 +1096,19 @@ class GraphStorage:
                        n.properties_json = row.properties_json''',
                 {'rows': chunk},
             )
+            _report('writing.thematic_update', ci, n_chunks_2)
+            logger.info('writing.step2: chunk %d/%d (%d rows) %.2fs',
+                        ci, n_chunks_2, len(chunk), time.perf_counter() - ct0)
+        logger.info('writing.step2: end (%.2fs)', time.perf_counter() - t0)
 
         # 3. Insert new community + community_summary nodes.
         new_nodes = list(community_entities) + list(summary_entities)
-        for chunk in _chunks(new_nodes, _CHUNK_VERTICES):
+        t0 = time.perf_counter()
+        n_chunks_3 = (len(new_nodes) + _CHUNK_VERTICES - 1) // _CHUNK_VERTICES
+        logger.info('writing.step3: insert %d community/summary nodes in %d chunks — start',
+                    len(new_nodes), n_chunks_3)
+        for ci, chunk in enumerate(_chunks(new_nodes, _CHUNK_VERTICES), 1):
+            ct0 = time.perf_counter()
             node_rows = []
             for e in chunk:
                 props = dict(e.properties)
@@ -740,6 +1139,10 @@ class GraphStorage:
                        END''',
                 {'rows': node_rows, 'pid': project_id},
             )
+            _report('writing.community_nodes', ci, n_chunks_3)
+            logger.info('writing.step3: chunk %d/%d (%d rows) %.2fs',
+                        ci, n_chunks_3, len(chunk), time.perf_counter() - ct0)
+        logger.info('writing.step3: end (%.2fs)', time.perf_counter() - t0)
 
         # 4. Insert new edges (member_of, summarizes, sameAs, similar_to).
         all_new_edges = (
@@ -747,7 +1150,12 @@ class GraphStorage:
             + list(sameas_rels) + list(similar_rels)
         )
         n_edges = 0
-        for chunk in _chunks(all_new_edges, _CHUNK_EDGES):
+        t0 = time.perf_counter()
+        n_chunks_4 = (len(all_new_edges) + _CHUNK_EDGES - 1) // _CHUNK_EDGES
+        logger.info('writing.step4: insert %d analytics edges in %d chunks — start',
+                    len(all_new_edges), n_chunks_4)
+        for ci, chunk in enumerate(_chunks(all_new_edges, _CHUNK_EDGES), 1):
+            ct0 = time.perf_counter()
             edge_rows = [
                 {'source': r.source, 'target': r.target, 'type': r.type,
                  'properties_json': _safe_json(r.properties)}
@@ -762,6 +1170,12 @@ class GraphStorage:
                 {'rows': edge_rows},
             )
             n_edges += len(edge_rows)
+            _report('writing.analytics_edges', ci, n_chunks_4)
+            logger.info('writing.step4: chunk %d/%d (%d rows) %.2fs',
+                        ci, n_chunks_4, len(chunk), time.perf_counter() - ct0)
+        logger.info('writing.step4: end (%.2fs)', time.perf_counter() - t0)
+        logger.info('writing.replace_analytics_layer: complete (%.2fs total)',
+                    time.perf_counter() - phase_t0)
 
         return {
             'thematic_updated': len(thematic_entities),

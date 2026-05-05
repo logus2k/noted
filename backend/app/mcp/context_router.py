@@ -94,12 +94,14 @@ DOMAINS = {
         ],
     },
     "web": {
-        "tools": {"fetch_url"},
+        "tools": {"fetch_url", "web_search"},
         "keywords": [
             r"\burl\b", r"\bhttp[s]?://", r"\bfetch\b.*\b(url|page|site|link)\b",
             r"\bread\b.*\b(url|page|site|link|article|doc)\b",
-            r"\bweb\b.*\b(page|site|content)\b", r"\blink\b",
+            r"\bweb\b.*\b(page|site|content|search)\b", r"\blink\b",
             r"\bdocumentation\b", r"\bapi\b.*\b(doc|reference)\b",
+            r"\bsearch\b.*\b(web|internet|online|google|duckduckgo)\b",
+            r"\b(google|duckduckgo|bing)\b", r"\blook\b.*\b(up|online)\b",
         ],
     },
 }

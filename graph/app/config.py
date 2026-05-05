@@ -46,6 +46,17 @@ EXTRACT_CHUNK_MIN_TOKENS = int(os.environ.get('EXTRACT_CHUNK_MIN_TOKENS', '200')
 EXTRACT_CHUNK_MAX_TOKENS = int(os.environ.get('EXTRACT_CHUNK_MAX_TOKENS', '800'))
 # Q D: extraction confidence floor
 ENTITY_CONFIDENCE_FLOOR = float(os.environ.get('ENTITY_CONFIDENCE_FLOOR', '0.6'))
+# Concurrent chunk-extraction workers. Should match (or slightly exceed)
+# the llama-server slot count for gemma-4 (currently 4). Raising past the
+# slot count just queues at the server side; lower than that wastes slots.
+ENTITY_EXTRACT_PARALLELISM = int(os.environ.get('ENTITY_EXTRACT_PARALLELISM', '4'))
+
+# Feature flag: route per-doc graph writes (`add_doc_merge`) through the
+# GraphBatch HTTP endpoint (`POST /api/v1/batch/<db>?lightEdges=false`)
+# introduced in ArcadeDB v26.3.2. The legacy UNWIND+MATCH+CREATE path
+# stays in place and is the default until this flag is flipped on.
+# See documents/kb/kb_import_export.md Phase 2 for the design.
+USE_GRAPHBATCH_V2 = os.environ.get('USE_GRAPHBATCH_V2', 'false').lower() == 'true'
 # Q B: Leiden target community size
 COMMUNITY_TARGET_SIZE = int(os.environ.get('COMMUNITY_TARGET_SIZE', '50'))
 # Retrieval tuning (see graph_rag_notes.md §5.3)

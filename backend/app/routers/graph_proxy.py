@@ -20,6 +20,14 @@ _LONG_OP_TIMEOUTS = (
     ('/recluster',  3600),   # 1h cap (typical recluster minutes)
     ('/doc/add',    1800),   # 30m cap (typical 1-5 min per doc)
     ('/doc/remove', 600),    # 10m cap (no extraction, just storage)
+    ('/preflight',  300),    # 5m cap. Docling first-page probe runs the
+                             # full PDF parse (no page-range knob today)
+                             # which can take 30-90s on large PDFs; +
+                             # Gemma JSON smoke (~2s) + ArcadeDB write
+                             # probe (<1s) + RAG embed (~2s) + schema
+                             # check (<1s) + manifest read (instant).
+                             # 5m gives generous headroom for a slow
+                             # Docling cold-start.
 )
 
 

@@ -182,7 +182,7 @@ _ALL_TOOL_NAMES = {
     'get_hydra_config', 'list_dags', 'get_dag_status', 'get_task_log',
     'get_dvc_data_overview', 'get_dvc_file_history', 'query_knowledge_graph',
     'get_skill', 'list_files', 'search_files', 'get_notebook_cells', 'run_agent',
-    'scroll_to_cell', 'get_lint_diagnostics', 'fix_lint_issues', 'fetch_url',
+    'scroll_to_cell', 'get_lint_diagnostics', 'fix_lint_issues', 'fetch_url', 'web_search',
     'list_projects',
 }
 
@@ -853,6 +853,8 @@ async def execute_tool(tool_call: dict, managers: dict, ctx: dict = None) -> str
             return await _tool_run_agent(args, managers, ctx)
         elif name == "fetch_url":
             return await _tool_fetch_url(args)
+        elif name == "web_search":
+            return await _tool_web_search(args)
         elif name == "search_docs":
             return await _tool_search_docs(args, managers)
         elif name == "research_topic":
@@ -1935,6 +1937,14 @@ async def _tool_fetch_url(args: dict) -> str:
     url = args.get("url", "").strip()
     max_chars = int(args.get("max_chars", 10000))
     return await fetch_url(url, max_chars)
+
+
+async def _tool_web_search(args: dict) -> str:
+    """Run a web search via the persistent stealth browser (DDG HTML)."""
+    from app.managers.web_fetch_manager import web_search
+    query = args.get("query", "").strip()
+    top_n = int(args.get("top_n", 8))
+    return await web_search(query, top_n)
 
 
 async def _tool_run_agent(args: dict, managers: dict, ctx: dict | None = None) -> str:

@@ -274,6 +274,81 @@ _READ_TOOLS: list[types.Tool] = [
         },
     ),
     types.Tool(
+        name="chart",
+        description=(
+            "Render a chart in the chat using ECharts. Use when the user asks "
+            "to plot, graph, visualise, show as a chart, draw a bar/pie/scatter/"
+            "heatmap/line/area/histogram/box plot. Pass a short natural-language "
+            "description that includes (a) the kind of chart, (b) what to plot, "
+            "(c) the data source — values stated in chat, OR a CSV/Parquet/JSON "
+            "file in a noted project (give the project_id and path). The backend "
+            "delegates to the chart_designer LLM role to choose the right shape "
+            "and column bindings, then renders it directly into the chat. Do NOT "
+            "fabricate data values; let chart_designer reference the file path."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string",
+                    "description": (
+                        "Natural-language description of the chart, including the "
+                        "data source. Example: 'Bar chart of mean run duration by "
+                        "experiment from data/runs.csv in project Examples'."
+                    ),
+                },
+                "project_id": {
+                    "type": "string",
+                    "description": (
+                        "Optional default project for file-based data sources. When "
+                        "set, chart_designer can refer to files by relative path."
+                    ),
+                },
+            },
+            "required": ["description"],
+        },
+    ),
+    types.Tool(
+        name="open_file",
+        description=(
+            "Open a notebook (.ipynb) or any file in the noted editor as a "
+            "new tab — the SAME action as the user double-clicking it in "
+            "the Explorer. The file becomes visible to the user; this tool "
+            "does NOT return file content to you (use get_file_contents / "
+            "get_notebook_cells for that). Use when the user asks to "
+            "'open', 'show me', 'let me see', 'navigate to', or 'pull up' "
+            "a specific file or notebook by path. The right viewer is "
+            "picked automatically based on the file extension (notebook / "
+            "source / document / media)."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": (
+                        "File path. For project files: relative to the project "
+                        "root (e.g. 'src/train.py'). For KB documents: relative "
+                        "to the domain's sources directory (e.g. 'optimization.pdf')."
+                    ),
+                },
+                "project_id": {
+                    "type": "string",
+                    "description": (
+                        "Project id when opening a project file. Omit for KB documents."
+                    ),
+                },
+                "domain_id": {
+                    "type": "string",
+                    "description": (
+                        "Domain id when opening a KB document. Omit for project files."
+                    ),
+                },
+            },
+            "required": ["path"],
+        },
+    ),
+    types.Tool(
         name="get_skill",
         description="Load detailed instructions for a specific topic. IMPORTANT: Check the ACTIVE SKILLS section of the current workspace context first - if the skill you need is already listed there, its content is already in your context and you MUST NOT call this tool for it (redundant fetch wastes tokens). Call this ONLY for skills that are NOT already active.",
         inputSchema={
@@ -307,6 +382,65 @@ _READ_TOOLS: list[types.Tool] = [
                 "max_chars": {"type": "integer", "description": "Maximum characters to return (default 10000)"},
             },
             "required": ["url"],
+        },
+    ),
+    types.Tool(
+        name="web_search",
+        description="Search the web for the given query and return the top results as a numbered list of title/url/snippet. Use this when the user asks for current information, looks up something the assistant doesn't already know, or explicitly asks to search the web. Pair with fetch_url to read a chosen result in full.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "The search query"},
+                "top_n": {"type": "integer", "description": "How many results to return (default 8, max 25)"},
+            },
+            "required": ["query"],
+        },
+    ),
+    types.Tool(
+        name="create_doc",
+        description="Create a new in-memory note-taking document and open it in the middle panel. Use when the user asks to take notes, draft a report, or create a new file inline with the conversation. The document lives in memory and is NOT saved to disk until the user clicks Save (which triggers a Save-As dialog). Returns a buffer_id that subsequent append_to_doc / replace_doc / read_doc calls reference.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "name": {"type": "string", "description": "Suggested filename including extension, e.g. 'meeting-notes.md'. Defaults to a generated 'notes-<id>.md' if omitted."},
+                "initial_content": {"type": "string", "description": "Optional initial content (markdown). Leave empty for a blank document."},
+            },
+        },
+    ),
+    types.Tool(
+        name="append_to_doc",
+        description="Append new content to an existing in-memory note-taking buffer. Preferred over replace_doc for note-taking flows: append-only is concurrent-safe with user edits and uses fewer tokens. The viewer in the middle panel updates live.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "buffer_id": {"type": "string", "description": "buffer_id returned by create_doc"},
+                "content": {"type": "string", "description": "Content to append (markdown)"},
+                "separator": {"type": "string", "description": "Separator inserted between existing content and the new content (default '\\n\\n')"},
+            },
+            "required": ["buffer_id", "content"],
+        },
+    ),
+    types.Tool(
+        name="replace_doc",
+        description="Replace the entire content of an in-memory note-taking buffer. Use only when restructuring or rewriting in full; for incremental note-taking, use append_to_doc. ALWAYS call read_doc first to fetch the current content (the user may have edited it since the last write).",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "buffer_id": {"type": "string", "description": "buffer_id returned by create_doc"},
+                "content": {"type": "string", "description": "Full new content (markdown)"},
+            },
+            "required": ["buffer_id", "content"],
+        },
+    ),
+    types.Tool(
+        name="read_doc",
+        description="Read the current content of an in-memory note-taking buffer. Use before any non-append edit so the assistant sees any user edits made since the last write.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "buffer_id": {"type": "string", "description": "buffer_id returned by create_doc"},
+            },
+            "required": ["buffer_id"],
         },
     ),
     types.Tool(
@@ -618,6 +752,7 @@ ALL_TOOLS: list[types.Tool] = _READ_TOOLS + _WRITE_TOOLS
 # only the universal `general` set.
 _GENERAL_TOOL_NAMES: set[str] = {
     'fetch_url',
+    'web_search',
     'get_skill',
     'list_projects',
     'list_files',
