@@ -674,6 +674,24 @@ export class ChatService {
         });
         this.agentClient.socket.on('reconnect', () => {
             this._emitStatus('connected');
+            // Browser ↔ agent_server reconnect assigns a new sid, but
+            // agent_server's CLIENT_INDEX still maps clientId to the OLD
+            // sid. Without re-issuing JoinSTT, UserTranscript events
+            // emit into the dead sid silently and voice input goes
+            // mute even though stt_server, agent_server's stt-link,
+            // and the browser audio path are all healthy. Re-emit
+            // sttSubscribe to refresh the binding when voice is active.
+            if (this.voiceActive) {
+                this.agentClient.sttSubscribe({
+                    sttUrl: STT_URL,
+                    clientId: this.clientId,
+                    agent: AGENT_NAME,
+                    threadId: this.threadId,
+                    transcriptOnly: true,
+                }).catch((err) => {
+                    console.warn('[ChatService] reconnect sttSubscribe failed:', err);
+                });
+            }
         });
 
         // STT transcripts arrive via agent_server's UserTranscript event

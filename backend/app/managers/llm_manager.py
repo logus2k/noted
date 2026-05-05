@@ -39,10 +39,15 @@ class LLMManager:
 
     async def chat_stream(self, messages: list[dict], temperature: float = 0.5,
                           max_tokens: int = 2048,
-                          tools: list[dict] | None = None):
+                          tools: list[dict] | None = None,
+                          extra_body: dict | None = None):
         """POST /v1/chat/completions with stream=True.
 
-        Yields parsed SSE chunk dicts as they arrive.
+        Yields parsed SSE chunk dicts as they arrive. `extra_body` is merged
+        into the request payload after the standard fields, letting callers
+        pass through Gemma-specific extras like
+        `{"chat_template_kwargs": {"enable_thinking": False}}` without
+        widening the signature for every new template flag.
         """
         session = await self._get_session()
         payload = {
@@ -72,6 +77,8 @@ class LLMManager:
             # Multi-tool-call in a single response is supported per Gemma 4's
             # documented design; noted's backend batches multi-write-call
             # turns into one approval.
+        if extra_body:
+            payload.update(extra_body)
         async with session.post(
             f"{self.base_url}/v1/chat/completions",
             json=payload,

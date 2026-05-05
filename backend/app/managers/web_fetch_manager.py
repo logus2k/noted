@@ -66,10 +66,19 @@ class StealthBrowser:
         logger.info("Camoufox browser ready")
 
     def _shutdown_browser(self):
-        """Stop the current browser session."""
+        """Stop the current browser session.
+
+        Camoufox is a context manager (uses __enter__ / __exit__) — there is
+        no public `.stop()` method. Calling .stop() raised AttributeError
+        previously, leaving the underlying Playwright sync loop alive in
+        the process; the next session-refresh `start()` then failed with
+        "you are using Playwright Sync API inside the asyncio loop" because
+        Playwright detected the orphan loop. Using __exit__ gives Camoufox
+        the standard cleanup path.
+        """
         if self._browser_manager:
             try:
-                self._browser_manager.stop()
+                self._browser_manager.__exit__(None, None, None)
             except Exception as e:
                 logger.warning("Error stopping Camoufox: %s", e)
             self._browser_manager = None

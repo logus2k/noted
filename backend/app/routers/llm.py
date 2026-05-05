@@ -89,8 +89,13 @@ _managers = {
     "graphrag": graphrag_mgr,
 }
 
-# Maximum tool call rounds to prevent infinite loops
-MAX_TOOL_ROUNDS = 6
+# Maximum tool call rounds to prevent infinite loops, runaway costs, and
+# context-window overflow. Bumped from 6 (2026-05-05) to accommodate
+# multi-step agentic workflows like "fetch_url + append_to_doc per URL"
+# across 5+ URLs. At 12 a typical "summarise these 5 sites into a report"
+# request completes in one turn (10 rounds: 5 fetch + 5 append) with
+# headroom; pathological loops still hit the cap before becoming costly.
+MAX_TOOL_ROUNDS = 12
 
 # Pending write actions awaiting user confirmation
 # Key: action_id (str) -> {"action": dict, "messages": list, "memory_key": str, "request": ChatRequest}
@@ -1927,14 +1932,37 @@ async def llm_chat(request: ChatRequest):
                         logger.info("Tool loop exhausted, forcing final answer")
                         loop_messages.append({
                             "role": "user",
-                            "content": "Please provide your answer now based on all the tool results above. Do not call any more tools."
+                            "content": (
+                                "You have used the maximum number of tool rounds for this turn. "
+                                "Briefly summarise what you accomplished with the tool calls above "
+                                "and tell the user how to continue (e.g. ask them to confirm before "
+                                "you fetch more URLs / process more items). Do not call any more "
+                                "tools and do not deliberate further; produce the user-facing answer "
+                                "directly."
+                            )
                         })
+                        # Disable thinking for the forced-final call when on
+                        # local Gemma. With thinking enabled the model often
+                        # spends its entire output budget reasoning about the
+                        # next tool it wanted to call, emits </think>, and
+                        # stops with no answer body — the "suspended at end
+                        # of thinking" symptom. enable_thinking=False routes
+                        # the model straight to the user-facing summary.
+                        # Anthropic models have no equivalent flag here; we
+                        # rely on the strengthened prompt instead.
+                        forced_extra = None
+                        try:
+                            if not llm_mgr._is_anthropic(llm_mgr._active_model):
+                                forced_extra = {"chat_template_kwargs": {"enable_thinking": False}}
+                        except Exception:
+                            forced_extra = None
                         forced_text = ''
                         async for chunk in llm_mgr.chat_stream(
                             loop_messages,
                             temperature=request.temperature,
                             max_tokens=request.max_tokens,
                             tools=None,
+                            extra_body=forced_extra,
                         ):
                             content = _absorb_chunk(chunk)
                             if content:

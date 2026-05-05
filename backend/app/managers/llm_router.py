@@ -50,9 +50,13 @@ class LLMRouter:
 
     async def chat_stream(self, messages: list[dict], temperature: float = 0.5,
                           max_tokens: int = 2048, system: str | None = None,
-                          tools: list[dict] | None = None):
+                          tools: list[dict] | None = None,
+                          extra_body: dict | None = None):
         manager = self._active_manager()
         if isinstance(manager, AnthropicLLMManager):
+            # Anthropic doesn't accept Gemma's chat_template_kwargs; drop
+            # the field on this branch. If we ever need Anthropic-specific
+            # extras (e.g. thinking config), wire them through here.
             async for chunk in manager.chat_stream(
                 messages, temperature=temperature, max_tokens=max_tokens,
                 model=self._active_model, system=system, tools=tools,
@@ -61,7 +65,7 @@ class LLMRouter:
         else:
             async for chunk in manager.chat_stream(
                 messages, temperature=temperature, max_tokens=max_tokens,
-                tools=tools,
+                tools=tools, extra_body=extra_body,
             ):
                 yield chunk
 
