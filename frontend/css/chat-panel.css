@@ -883,29 +883,74 @@
     background: #f0f0f0;
 }
 
+/* Mic + Speaker shared OFF look: light-grey pill background, mid-grey
+ * icon. FontAwesome glyphs (fa-microphone-slash / fa-volume-off) carry
+ * the muted shape on their own; the pill is the second visual channel
+ * so OFF reads at a peripheral glance. */
+.chat-stt-btn,
+.chat-tts-btn {
+    background-color: #ffe6bd;
+    color: #808080;
+    font-size: 16px;
+}
+
+/* Hover overrides for the two toggle buttons so we don't flash the
+ * shared green hover over a red/green active pill. Slight darken on
+ * the cream-peach OFF pill. */
+.chat-stt-btn:hover { background-color: #f5d7a5; }
+.chat-tts-btn:hover { background-color: #f5d7a5; }
+
+/* Two-tone icon stack used by the ON state of the mic and speaker
+ * buttons. Lays a "filled" SVG (pastel fill) under a "regular" SVG
+ * (dark outline) so the result mirrors the Send arrow's outline-on-
+ * fill structure. Wrapper sizing matches the previous single-icon
+ * footprint (18x18). */
+.chat-icon-stack {
+    position: relative;
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+    line-height: 0;
+}
+.chat-icon-stack > svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 18px;
+    height: 18px;
+}
+
+/* Mic ON: pastel red pill, two-tone icon (pastel red fill + dark
+ * outline — matches the Send arrow's stroke-on-polygon style). */
 .chat-stt-btn.active {
-    background-color: rgba(211, 47, 47, 0.18);
+    background-color: #ffcdd2;
+}
+.chat-stt-btn.active .chat-icon-fill { color: #ee9999; }
+.chat-stt-btn.active .chat-icon-outline { color: #202020; }
+.chat-stt-btn.active:hover { background-color: #ffb3b3; }
+
+/* Mic ON + listening (VAD detected speech): pulse the pill. Cycle
+ * between the resting pastel red and a slightly more saturated red,
+ * with a soft expanding ring — matches the "I'm hearing you" visual
+ * language from phone / video-call apps. */
+.chat-stt-btn.listening {
+    animation: chat-mic-listening-pulse 1s ease-in-out infinite;
 }
 
-.chat-stt-btn.active svg {
-    stroke: #d32f2f;
+@keyframes chat-mic-listening-pulse {
+    0%   { background-color: #ffcdd2; box-shadow: 0 0 0 0 rgba(229, 115, 115, 0.45); }
+    50%  { background-color: #f8bbd0; box-shadow: 0 0 0 4px rgba(229, 115, 115, 0.00); }
+    100% { background-color: #ffcdd2; box-shadow: 0 0 0 0 rgba(229, 115, 115, 0.00); }
 }
 
-.chat-stt-btn.active svg rect {
-    fill: #ef5350;
-}
-
+/* Speaker ON: pastel green pill, two-tone icon (pastel green fill +
+ * dark outline — same structure as Send and Mic-ON). */
 .chat-tts-btn.active {
-    background-color: rgba(33, 150, 243, 0.15);
+    background-color: #c8e6c9;
 }
-
-.chat-tts-btn.active svg {
-    stroke: #1565c0;
-}
-
-.chat-tts-btn.active svg polygon {
-    fill: #64b5f6;
-}
+.chat-tts-btn.active .chat-icon-fill { color: #9bd49b; }
+.chat-tts-btn.active .chat-icon-outline { color: #202020; }
+.chat-tts-btn.active:hover { background-color: #a5d6a7; }
 
 /* Citation badges. Rendered by ChatPanel._renderCitations after the
  * markdown pass; replace `[markdown_chunk:<hex>]` tags with a small

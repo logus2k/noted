@@ -1378,6 +1378,15 @@ export class ChatService {
                         positiveSpeechThreshold: 0.5,
                         onSpeechStart: () => {
                             if (this._ttsActive) this._bargeIn();
+                            // Pulse the mic icon while speech is detected
+                            // so the user has explicit "I hear you" feedback.
+                            try { this.chatPanel?.setMicListening?.(true); } catch {}
+                        },
+                        onSpeechEnd: () => {
+                            try { this.chatPanel?.setMicListening?.(false); } catch {}
+                        },
+                        onVADMisfire: () => {
+                            try { this.chatPanel?.setMicListening?.(false); } catch {}
                         },
                     });
                     this._vad.start();

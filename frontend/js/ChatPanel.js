@@ -234,30 +234,13 @@ export class ChatPanel {
         const inputArea = document.createElement('div');
         inputArea.className = 'chat-input-area';
 
-        // STT button
-        this._sttBtn = document.createElement('button');
-        this._sttBtn.className = 'chat-stt-btn';
-        this._sttBtn.title = 'Voice input';
-        // Two icon variants: OFF shows the mic with a small X to the upper
-        // right (mirrors the speaker's off-state pattern so the user can
-        // tell the active/inactive state at a glance). ON drops the X.
-        this._sttIconOn = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#202020" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="1" width="6" height="12" rx="3" fill="#f4b4b4"/><path d="M12 1a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" y1="18" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>';
-        this._sttIconOff = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#202020" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="1" width="6" height="12" rx="3" fill="#dddddd"/><path d="M12 1a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" y1="18" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/><line x1="22" y1="2" x2="16" y2="8"/><line x1="16" y1="2" x2="22" y2="8"/></svg>';
-        this._sttBtn.innerHTML = this._sttIconOff;
-        this._sttBtn.addEventListener('click', () => {
-            this._sttActive = !this._sttActive;
-            this._sttBtn.classList.toggle('active', this._sttActive);
-            this._sttBtn.innerHTML = this._sttActive ? this._sttIconOn : this._sttIconOff;
-            if (this._onSttToggleCallback) this._onSttToggleCallback(this._sttActive);
-        });
-        inputArea.appendChild(this._sttBtn);
-
-        // "+" attachments / new-content menu. Sits between the mic and
-        // the text input. Opens a dropdown with: Document (KB upload),
-        // Notebook (create in current/selected project), Image (upload
-        // to project assets), Audio (upload to project assets).
-        // Whitelist + size cap enforced server-side via
-        // /api/files/upload-asset (NOTED_MAX_UPLOAD_MB env var).
+        // "+" attachments / new-content menu. Anchors the left edge of the
+        // input area. Opens a dropdown with: Document (KB upload), Notebook
+        // (create in current/selected project), Image (upload to project
+        // assets), Audio (upload to project assets). Whitelist + size cap
+        // enforced server-side via /api/files/upload-asset
+        // (NOTED_MAX_UPLOAD_MB env var). The mic and speaker buttons sit on
+        // the right of the text input, alongside Send.
         this._attachBtn = document.createElement('button');
         this._attachBtn.className = 'chat-attach-btn';
         this._attachBtn.title = 'Attach / new';
@@ -299,13 +282,56 @@ export class ChatPanel {
         sendBtn.addEventListener('click', () => this._handleSend());
         inputArea.appendChild(sendBtn);
 
-        // TTS button
+        // STT (mic) button — placed between Send and TTS on the right side
+        // of the input. Icons are inline SVG (Carbon-style) from
+        // frontend/images/. fill="currentColor" lets CSS drive the colour.
+        //
+        //   OFF: mic-off-32-filled — bold solid silhouette in mid-grey.
+        //   ON:  STACK of two SVGs to get Send-style two-tone treatment —
+        //          1) mic-32-filled (pastel red fill, bottom layer)
+        //          2) mic-32-regular (dark outline, top layer)
+        //        The regular path traces the outline + lower stem; layered
+        //        over the filled body it produces an outline-on-fill look
+        //        equivalent to the Send arrow's stroke-on-polygon style.
+        //   ON + listening (VAD speech-start): .listening pulses the pill.
+        this._sttBtn = document.createElement('button');
+        this._sttBtn.className = 'chat-stt-btn';
+        this._sttBtn.title = 'Voice input';
+        this._sttIconOn = '<span class="chat-icon-stack">'
+            + '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" class="chat-icon-fill"><path fill="currentColor" d="M16 2a6 6 0 0 0-6 6v8a6 6 0 0 0 12 0V8a6 6 0 0 0-6-6M7 15a1 1 0 0 1 1 1a8 8 0 1 0 16 0a1 1 0 1 1 2 0c0 5.186-3.947 9.45-9.001 9.95L17 26v3a1 1 0 1 1-2 0v-3l.001-.05C9.947 25.45 6 21.187 6 16a1 1 0 0 1 1-1"/></svg>'
+            + '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" class="chat-icon-outline"><path fill="currentColor" d="M16 2a6 6 0 0 0-6 6v8a6 6 0 0 0 12 0V8a6 6 0 0 0-6-6m4 14a4 4 0 0 1-8 0V8a4 4 0 0 1 8 0zM7 15a1 1 0 0 1 1 1a8 8 0 1 0 16 0a1 1 0 1 1 2 0c0 5.186-3.947 9.45-9.001 9.95L17 26v3a1 1 0 1 1-2 0v-3l.001-.05C9.947 25.45 6 21.187 6 16a1 1 0 0 1 1-1"/></svg>'
+            + '</span>';
+        this._sttIconOff = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 32 32" fill="currentColor"><path d="M10 11.415V16a6 6 0 0 0 9.477 4.89l1.429 1.43A8 8 0 0 1 8 16a1 1 0 1 0-2 0c0 5.186 3.948 9.45 9.002 9.95L15 26v3a1 1 0 1 0 2 0v-3.05a9.95 9.95 0 0 0 5.329-2.207l5.964 5.964a1 1 0 0 0 1.414-1.414l-26-26a1 1 0 0 0-1.414 1.414zm13.143 8.193l1.473 1.472A9.95 9.95 0 0 0 26 16a1 1 0 1 0-2 0a8 8 0 0 1-.857 3.608M10.159 6.624l11.467 11.467A6 6 0 0 0 22 16V8a6 6 0 0 0-11.84-1.376"/></svg>';
+        this._sttBtn.innerHTML = this._sttIconOff;
+        // Insert a half-icon gap between Send and Mic so users don't
+        // fat-finger Mic when reaching for Send.
+        this._sttBtn.style.marginLeft = '15px';
+        this._sttBtn.addEventListener('click', () => {
+            this._sttActive = !this._sttActive;
+            this._sttBtn.classList.toggle('active', this._sttActive);
+            this._sttBtn.innerHTML = this._sttActive ? this._sttIconOn : this._sttIconOff;
+            // Drop any leftover listening pulse when the user toggles off.
+            if (!this._sttActive) this._sttBtn.classList.remove('listening');
+            if (this._onSttToggleCallback) this._onSttToggleCallback(this._sttActive);
+        });
+        inputArea.appendChild(this._sttBtn);
+
+        // TTS (speaker) button — same two-tone stack pattern as the mic.
+        //   OFF: speaker-mute-32-filled — solid silhouette with the X.
+        //   ON:  STACK of two SVGs:
+        //          1) speaker-2-32-filled (pastel green fill, bottom)
+        //          2) speaker-2-32-regular (dark outline, top)
         this._ttsBtn = document.createElement('button');
         this._ttsBtn.className = 'chat-tts-btn';
         this._ttsBtn.title = 'Text to speech';
-        this._ttsIconOff = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#202020" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19" fill="#b4d4f4"/><line x1="22" y1="9" x2="16" y2="15"/><line x1="16" y1="9" x2="22" y2="15"/></svg>';
-        this._ttsIconOn = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#202020" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19" fill="#b4d4f4"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>';
+        this._ttsIconOff = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 32 32" fill="currentColor"><path d="M18 5.604c0-1.114-1.346-1.672-2.134-.884l-4.694 4.694A2 2 0 0 1 9.757 10H6a4 4 0 0 0-4 4v4a4 4 0 0 0 4 4h3.757a2 2 0 0 1 1.415.586l4.694 4.694c.788.788 2.134.23 2.134-.884zm3.293 6.689a1 1 0 0 1 1.414 0L25 14.586l2.293-2.293a1 1 0 0 1 1.414 1.414L26.414 16l2.293 2.293a1 1 0 0 1-1.414 1.414L25 17.414l-2.293 2.293a1 1 0 0 1-1.414-1.414L23.586 16l-2.293-2.293a1 1 0 0 1 0-1.414"/></svg>';
+        this._ttsIconOn = '<span class="chat-icon-stack">'
+            + '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" class="chat-icon-fill"><path fill="currentColor" d="M18 5.433c0-1.398-1.742-2.036-2.645-.97l-4.086 4.83A2 2 0 0 1 9.743 10H6a4 4 0 0 0-4 4v4a4 4 0 0 0 4 4h3.743a2 2 0 0 1 1.526.708l4.086 4.829c.902 1.066 2.645.428 2.645-.97zm3.433 3.743a1 1 0 0 1 1.391.258c1.465 2.13 2.238 4.324 2.238 6.566s-.773 4.436-2.238 6.567a1 1 0 1 1-1.648-1.133c1.285-1.87 1.887-3.676 1.887-5.434s-.602-3.564-1.887-5.433a1 1 0 0 1 .258-1.39m4.257-3.9a1 1 0 0 0-1.38 1.448c2.387 2.273 3.628 5.739 3.628 9.276s-1.241 7.003-3.628 9.276a1 1 0 0 0 1.38 1.448c2.863-2.727 4.247-6.761 4.247-10.724S28.554 8.003 25.69 5.276"/></svg>'
+            + '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" class="chat-icon-outline"><path fill="currentColor" d="M18 5.604c0-1.114-1.346-1.671-2.134-.884l-4.694 4.695A2 2 0 0 1 9.757 10H6a4 4 0 0 0-4 4v4a4 4 0 0 0 4 4h3.757a2 2 0 0 1 1.415.585l4.694 4.695c.788.787 2.134.23 2.134-.884zm-5.414 5.225L16 7.415v17.171l-3.414-3.414A4 4 0 0 0 9.757 20H6a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h3.757a4 4 0 0 0 2.829-1.171m10.238-1.395a1 1 0 1 0-1.648 1.133c1.285 1.87 1.887 3.676 1.887 5.433c0 1.758-.602 3.565-1.887 5.434a1 1 0 1 0 1.648 1.133c1.465-2.13 2.238-4.324 2.238-6.567c0-2.242-.773-4.435-2.238-6.566m2.866-4.158a1 1 0 0 0-1.38 1.449c2.387 2.273 3.628 5.738 3.628 9.275s-1.241 7.003-3.628 9.276a1 1 0 1 0 1.38 1.449c2.863-2.727 4.247-6.762 4.247-10.725S28.554 8.003 25.69 5.276"/></svg>'
+            + '</span>';
         this._ttsBtn.innerHTML = this._ttsIconOff;
+        // Breathing room from the right edge of the input bar.
+        this._ttsBtn.style.marginRight = '10px';
         this._ttsActive = false;
         this._ttsBtn.addEventListener('click', () => {
             this._ttsActive = !this._ttsActive;
@@ -1840,5 +1866,16 @@ export class ChatPanel {
         this._ttsActive = active;
         this._ttsBtn.classList.toggle('active', active);
         this._ttsBtn.innerHTML = active ? this._ttsIconOn : this._ttsIconOff;
+    }
+
+    /** Toggle the mic's "listening now" pulse (the .listening CSS class
+     * adds a pulsing red pill around the icon). Wired from ChatService's
+     * VAD onSpeechStart / onSpeechEnd handlers so users get an explicit
+     * "I hear you" cue when speaking. No-op when STT is toggled off so
+     * we never pulse without the user knowing the mic is hot. */
+    setMicListening(active) {
+        if (!this._sttBtn) return;
+        if (active && !this._sttActive) return;
+        this._sttBtn.classList.toggle('listening', !!active);
     }
 }
