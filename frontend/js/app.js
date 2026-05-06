@@ -986,7 +986,7 @@ class App {
             // populate the dropdown.
             let projects = [];
             try {
-                const resp = await fetch('api/files');
+                const resp = await fetch('api/files/');
                 if (resp.ok) {
                     const data = await resp.json();
                     const ps = (data.projects || []).map(p => ({
