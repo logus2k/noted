@@ -99,7 +99,16 @@ Total estimate: **~5-7 focused days** for a robust v1. Realistic reliability: ~8
 
 ---
 
-## 9. Notes / Known wrinkles
+## 9. STT pipeline (stt_server)
+
+| ID | Item | Effort | Notes |
+|---|---|---|---|
+| **STT-1** | Chunked Whisper decoding for utterances > 30s | ~½ day | Whisper-large-v3-turbo's encoder is capped at ~30s natively. Today's `_transcribe_sync` calls `model.generate(input_features)` directly so any audio segment longer than 30s gets truncated by the processor. Fix is `pipeline(... chunk_length_s=30)` or manual split-and-stitch with overlap windows. The 60s buffer fix (2026-05-05) raised the segment ceiling to Whisper's native limit; this item raises the ceiling beyond 30s. Validation: a 45-60s captured utterance round-trips to a complete transcript. |
+| **STT-2** | `/stt_server/data/captures/` is `:ro` bind-mount, every diagnostic capture write fails with `[Errno 30] Read-only file system` and a `Wave_write.__del__` AttributeError traceback in stt_server logs | trivial (~10 min) | Either flip the bind-mount to `:rw` in the stt_server compose entry (`~/env/assets/stt_server/data:/stt_server/data:rw`) so the diagnostic capture path actually works, OR guard the `wave.open` call with a write-permission probe and skip silently. The traceback is benign (capture is wrapped in try/except) but pollutes the logs and obscures real errors. |
+
+---
+
+## 10. Notes / Known wrinkles
 
 - **Off-limits containers**: `femulator`, `scipredictor`, `gan_game` — never stop, restart, modify, or rebuild without explicit user authorization (per session rule).
 - **Restart safety**: `git`-related destructive ops, container restarts, force-pushes, and history-rewriting commands always require explicit user authorization.

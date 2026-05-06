@@ -1091,7 +1091,7 @@ export class ChatPanel {
         if (this._liveThinkingPendingCollapse && this._liveThinkingDetails && token && token.trim()) {
             this._liveThinkingDetails.open = false;
             const label = this._liveThinkingDetails._summaryLabel;
-            if (label) label.textContent = 'Show thinking';
+            if (label) label.textContent = 'Thinking';
             this._liveThinkingPendingCollapse = false;
         }
         this._recordStreamingChars(token);
@@ -1313,10 +1313,10 @@ export class ChatPanel {
         // button inside <summary> doesn't get clobbered on toggle.
         const labelEl = document.createElement('span');
         labelEl.className = 'chat-thinking-summary-label';
-        labelEl.textContent = 'Show thinking';
+        labelEl.textContent = 'Thinking';
         summary.appendChild(labelEl);
         details.addEventListener('toggle', () => {
-            labelEl.textContent = details.open ? 'Hide thinking' : 'Show thinking';
+            labelEl.textContent = 'Thinking';
         });
         details.appendChild(summary);
         details._summaryLabel = labelEl;
@@ -1533,7 +1533,7 @@ export class ChatPanel {
         let completedForThisMessage = false;
         details.addEventListener('toggle', () => {
             if (completedForThisMessage) {
-                labelEl.textContent = details.open ? 'Hide thinking' : 'Show thinking';
+                labelEl.textContent = 'Thinking';
             }
         });
         // Stash a setter so endLiveThinkingSection can flip the per-message
@@ -1661,8 +1661,7 @@ export class ChatPanel {
         // current open state. Without this, the last-heading text would
         // remain visible after the model finished thinking.
         if (this._liveThinkingDetails._summaryLabel) {
-            this._liveThinkingDetails._summaryLabel.textContent =
-                this._liveThinkingDetails.open ? 'Hide thinking' : 'Show thinking';
+            this._liveThinkingDetails._summaryLabel.textContent = 'Thinking';
         }
         // Arm the deferred collapse — appendToken will trigger it when
         // the first non-empty answer token actually arrives.
