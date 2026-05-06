@@ -1372,10 +1372,13 @@ export class ChatService {
                         // Bumped from vad-web default 0.3 to reduce
                         // speculative onSpeechStart misfires that cut TTS
                         // playback when the mic picked up TTS bleed-
-                        // through or mouth/breath noise. Real barge-in
-                        // (user actually starting to speak) easily
-                        // crosses 0.5; transient noise rarely does.
-                        positiveSpeechThreshold: 0.5,
+                        // through or mouth/breath noise. 0.5 wasn't
+                        // enough for open-speaker setups (browser AEC
+                        // adapts in 100-200ms, before which TTS leaks
+                        // through and crosses 0.5). 0.6 raises the bar
+                        // enough to ignore most echo while still letting
+                        // a real spoken interruption through.
+                        positiveSpeechThreshold: 0.6,
                         onSpeechStart: () => {
                             if (this._ttsActive) this._bargeIn();
                             // Pulse the mic icon while speech is detected
