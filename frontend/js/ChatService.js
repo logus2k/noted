@@ -1265,6 +1265,40 @@ export class ChatService {
      *  resolved when the chunk gets queued for synthesis. */
     _sendVoiceToTTS(text) {
         if (!this._ttsSocket?.connected || !text) return;
+
+        // Sanitize: strip markdown + citation tags + structural markers
+        // before sending to Kokoro. The voice block is supposed to carry
+        // 1-3 plain spoken sentences, but Gemma occasionally embeds the
+        // full answer body inside <voice>...</voice> (markdown headings,
+        // [E:...] / [R:...] / [C\d+] / [markdown_chunk:...] citation
+        // tags, bullets, bold/italic markers, code fences). Without this
+        // pass, Kokoro literally voices "hash hash overview" or
+        // "bracket E colon concept colon...". This is the defensive half
+        // of the voice-runaway fix; the structural side (constraining
+        // Gemma's voice block) is in the backlog.
+        text = String(text)
+            // Drop fenced code blocks entirely (rarely useful spoken).
+            .replace(/```[\s\S]*?```/g, ' ')
+            // Citation tags in every form.
+            .replace(/\[(?:E|R|markdown_chunk):[^\]]+\]/g, '')
+            .replace(/\[C\d+\]/g, '')
+            .replace(/\[[0-9a-f]{8,16}\]/g, '')
+            // Markdown headings, bullets, ordered list markers.
+            .replace(/^\s*#{1,6}\s+/gm, '')
+            .replace(/^\s*[\*\-+]\s+/gm, '')
+            .replace(/^\s*\d+\.\s+/gm, '')
+            // Bold / italic / inline-code markers (keep the text).
+            .replace(/\*\*([^*]+)\*\*/g, '$1')
+            .replace(/\*([^*]+)\*/g, '$1')
+            .replace(/(^|\s)_([^_]+)_(\s|$)/g, '$1$2$3')
+            .replace(/`([^`]+)`/g, '$1')
+            // Collapse paragraph breaks to a sentence pause, then trim
+            // any remaining multi-whitespace.
+            .replace(/\n{2,}/g, '. ')
+            .replace(/\s+/g, ' ')
+            .trim();
+        if (!text) return;
+
         // New TTS request — re-open the audio chunk pipeline that
         // _bargeIn closed. Without this, every turn after the first
         // barge-in would be silent.

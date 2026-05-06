@@ -952,6 +952,28 @@
 .chat-tts-btn.active .chat-icon-outline { color: #202020; }
 .chat-tts-btn.active:hover { background-color: #a5d6a7; }
 
+/* Citation family icon — small leading file/graph glyph that splits
+ * citations into two visual families (document vs knowledge-graph) so
+ * the family is unmistakable at a glance, while the existing pill hue
+ * continues to carry the graph sub-distinction (entity/edge/community).
+ * inline-flex wrapper keeps icon + pill paired across line wraps. */
+.chat-citation-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    white-space: nowrap;
+}
+.chat-citation-icon {
+    font-size: 10px;
+    line-height: 1;
+}
+.chat-citation-wrap.cite-family-doc .chat-citation-icon {
+    color: #2e6e1f;
+}
+.chat-citation-wrap.cite-family-graph .chat-citation-icon {
+    color: #5a809c;
+}
+
 /* Citation badges. Rendered by ChatPanel._renderCitations after the
  * markdown pass; replace `[markdown_chunk:<hex>]` tags with a small
  * professional pill that opens the source document on click. */

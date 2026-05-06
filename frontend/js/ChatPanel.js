@@ -1263,19 +1263,28 @@ export class ChatPanel {
                 }
                 const parts = m[1].match(TAG_RE) || [];
                 parts.forEach((rawTag) => {
-                    // Normalize + classify
+                    // Normalize + classify into family + sub-type. Family
+                    // determines the leading icon (fa-file-lines for
+                    // document, fa-share-nodes for graph) so a reader can
+                    // tell at a glance which kind of citation this is;
+                    // hue inside the badge keeps carrying the graph
+                    // sub-distinction.
                     let tag = rawTag.trim();
                     let typeClass;
                     let title;
+                    let isGraph = false;
                     if (tag.startsWith('E:')) {
                         typeClass = 'cite-entity';
                         title = 'Open entity in graph trace';
+                        isGraph = true;
                     } else if (tag.startsWith('R:')) {
                         typeClass = 'cite-edge';
                         title = 'Open relationship in graph trace';
+                        isGraph = true;
                     } else if (/^C\d+$/.test(tag)) {
                         typeClass = 'cite-community';
                         title = 'Open community summary';
+                        isGraph = true;
                     } else {
                         // chunk: normalize bare hex to canonical
                         if (/^[0-9a-f]{8,16}$/.test(tag)) tag = `markdown_chunk:${tag}`;
@@ -1284,13 +1293,27 @@ export class ChatPanel {
                     }
                     if (!numbering.has(tag)) numbering.set(tag, numbering.size + 1);
                     const ord = numbering.get(tag);
+
+                    // inline-flex wrapper keeps icon + pill paired across
+                    // wraps (so the icon never gets stranded on a previous
+                    // line away from its number).
+                    const wrap = document.createElement('span');
+                    wrap.className = `chat-citation-wrap ${isGraph ? 'cite-family-graph' : 'cite-family-doc'}`;
+
+                    const icon = document.createElement('i');
+                    icon.className = `fa-solid ${isGraph ? 'fa-share-nodes' : 'fa-file-lines'} chat-citation-icon`;
+                    icon.setAttribute('aria-hidden', 'true');
+                    wrap.appendChild(icon);
+
                     const a = document.createElement('a');
                     a.className = `chat-citation ${typeClass}`;
                     a.href = 'javascript:void(0)';
                     a.dataset.citationTag = tag;
                     a.title = title;
                     a.textContent = String(ord);
-                    frag.appendChild(a);
+                    wrap.appendChild(a);
+
+                    frag.appendChild(wrap);
                 });
                 lastIdx = m.index + m[0].length;
             }

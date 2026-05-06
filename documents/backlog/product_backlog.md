@@ -42,6 +42,7 @@ Last updated: 2026-05-05
 | **UX-1** | "Reconnecting…" state during transient backend unreachability | small | KB Monitor jumps straight to "Unreachable" on the first failed `/status` poll during a `noted` rebuild. After N consecutive failures fall to "Unreachable"; before that, show "Reconnecting…" with a spinner. |
 | **UX-2** | Replace "~25 minutes" stale wording in pending-recluster banner | trivial | Banner says "full re-extraction, ~25 minutes" — predates Phase 1 + 2. Either drop the time estimate or make it dynamic. |
 | **UX-3** | Phase 0a — wire preflight as a step inside the doc-add UI flow | small | Today preflight is a manual button in KB Manager. Hooking into the upload modal so it fires automatically, with results visible before the long ingestion commits. |
+| **UX-4** | Citation badges — no visible distinction between **document** (chunk) and **graph** (entity / edge / community) families | done (staged) | Shipped 2026-05-06: each badge now carries a small leading FontAwesome icon — `fa-file-lines` (green) for chunks, `fa-share-nodes` (slate) for the graph trio. Icon + pill wrapped in an `inline-flex` span (`.chat-citation-wrap`) so the pair never breaks across line wraps. Hue inside the pill continues to carry the sub-distinction (entity blue / edge amber / community purple). Files: `frontend/js/ChatPanel.js` (`_renderCitations`), `frontend/css/chat-panel.css`. Needs noted rebuild to land. |
 
 ---
 
