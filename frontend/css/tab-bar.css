@@ -169,6 +169,71 @@ body.resizing #service-tab-container iframe {
     margin-left: auto;
 }
 
+/* Centered cluster — used by the PDF page-navigation controls in doc
+   tabs. Absolute positioning so the cluster centers against the bar's
+   width regardless of any -left/-right siblings on the same bar. */
+.service-second-bar-center {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+}
+
+/* PDF page-navigation controls (prev / page input / total / next). */
+.pdf-controls .pdf-ctl-btn {
+    height: 20px;
+    padding: 0 6px;
+    background: transparent;
+    border: 0.5px solid #999;
+    border-radius: 3px;
+    color: #333;
+    cursor: pointer;
+    font-size: 10px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.12s, border-color 0.12s;
+}
+.pdf-controls .pdf-ctl-btn:hover {
+    background: #ffe7a2;
+    border-color: #555;
+}
+.pdf-controls .pdf-ctl-btn:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+.pdf-controls .pdf-ctl-page-input {
+    width: 36px;
+    height: 20px;
+    padding: 0 4px;
+    border: 0.5px solid #999;
+    border-radius: 3px;
+    background: #ffffff;
+    color: #333;
+    font-size: 11px;
+    text-align: center;
+    font-family: var(--font-sans);
+    box-sizing: border-box;
+    /* Hide the spinner controls — we have our own prev/next. */
+    -moz-appearance: textfield;
+}
+.pdf-controls .pdf-ctl-page-input::-webkit-inner-spin-button,
+.pdf-controls .pdf-ctl-page-input::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+.pdf-controls .pdf-ctl-total {
+    color: #555;
+    font-size: 11px;
+    line-height: 1;
+    user-select: none;
+    margin-right: 2px;
+}
+
 /* Connection status LED */
 .service-status-led {
     width: 7px;

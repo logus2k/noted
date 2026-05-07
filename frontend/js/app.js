@@ -1517,6 +1517,89 @@ class App {
             left.appendChild(toggleBtn);
             secondBar.appendChild(left);
         }
+        // PDF document tabs: centered page-navigation controls in the
+        // second bar. Detected from doc.location's extension; the
+        // viewer's onReady fires after PDF placeholders are set up,
+        // populating the page-input + total. onPageChange keeps the
+        // input in sync as the user scrolls. Zoom controls are a
+        // follow-up — page nav lands first.
+        const isPdf = (doc?.location || '').toLowerCase().endsWith('.pdf');
+        if (isPdf) {
+            const viewer = this._documentViewers.get(key);
+            const center = document.createElement('span');
+            center.className = 'service-second-bar-center pdf-controls';
+
+            const prevBtn = document.createElement('button');
+            prevBtn.className = 'pdf-ctl-btn';
+            prevBtn.innerHTML = '<i class="fa-solid fa-chevron-left"></i>';
+            prevBtn.title = 'Previous page';
+
+            const pageInput = document.createElement('input');
+            pageInput.type = 'number';
+            pageInput.min = '1';
+            pageInput.className = 'pdf-ctl-page-input';
+            pageInput.value = '';
+
+            const totalEl = document.createElement('span');
+            totalEl.className = 'pdf-ctl-total';
+            totalEl.textContent = '/ —';
+
+            const nextBtn = document.createElement('button');
+            nextBtn.className = 'pdf-ctl-btn';
+            nextBtn.innerHTML = '<i class="fa-solid fa-chevron-right"></i>';
+            nextBtn.title = 'Next page';
+
+            center.appendChild(prevBtn);
+            center.appendChild(pageInput);
+            center.appendChild(totalEl);
+            center.appendChild(nextBtn);
+            secondBar.appendChild(center);
+
+            const syncDisplay = () => {
+                if (!viewer) return;
+                const cur = viewer.getCurrentPage();
+                const total = viewer.pageCount;
+                if (total > 0) {
+                    pageInput.max = String(total);
+                    if (document.activeElement !== pageInput) {
+                        pageInput.value = String(cur || 1);
+                    }
+                    totalEl.textContent = `/ ${total}`;
+                }
+            };
+
+            prevBtn.addEventListener('click', () => {
+                if (!viewer) return;
+                const cur = viewer.getCurrentPage() || 1;
+                viewer.goToPage(cur - 1);
+            });
+            nextBtn.addEventListener('click', () => {
+                if (!viewer) return;
+                const cur = viewer.getCurrentPage() || 1;
+                viewer.goToPage(cur + 1);
+            });
+            const submitPage = () => {
+                if (!viewer) return;
+                const n = parseInt(pageInput.value, 10);
+                if (Number.isFinite(n) && n > 0) {
+                    viewer.goToPage(n);
+                }
+            };
+            pageInput.addEventListener('change', submitPage);
+            pageInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') { e.preventDefault(); submitPage(); pageInput.blur(); }
+            });
+
+            // The viewer may already be loaded (re-activating an existing
+            // doc tab) OR brand-new (first activation). Try to populate
+            // immediately for the first case, AND register onReady for
+            // the second. onPageChange runs for the lifetime of this bar.
+            syncDisplay();
+            if (viewer) {
+                viewer.onReady(() => syncDisplay());
+                viewer.onPageChange(() => syncDisplay());
+            }
+        }
         frag.appendChild(secondBar);
         return frag;
     }

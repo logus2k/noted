@@ -15,11 +15,95 @@ export class DocumentViewer {
         this._pdfState = null; // { pdfDoc, pageDivs, observers, renderVersion }
         this._pdfModule = null; // lazy-loaded pdf.js module
         this._editTextarea = null; // present only while in buffer edit mode
+        // PDF control hooks consumed by the second-bar controls in
+        // _buildDocumentBars. _onReadyCb fires once after a fresh PDF
+        // finishes setting up its placeholders (page count is then
+        // known); _onPageChangeCb fires when the user scrolls into a
+        // different page so the page-input field auto-updates.
+        // `_currentPage` is the canonical visible-page state, updated
+        // by the scroll listener and read by `getCurrentPage()`.
+        // Caching here (instead of recomputing on demand) means tab-
+        // switch bar rebuilds get the right value even while the
+        // viewer's element is briefly detached from the DOM — at
+        // which point a scroll-position-based recompute would return
+        // 1 from layout-zero math.
+        this._onReadyCb = null;
+        this._onPageChangeCb = null;
+        this._currentPage = 0;
+        this._wrapper.addEventListener('scroll', () => {
+            if (!this._pdfState) return;
+            const cur = this._computeCurrentPage();
+            if (cur && cur !== this._currentPage) {
+                this._currentPage = cur;
+                if (this._onPageChangeCb) {
+                    try { this._onPageChangeCb(cur, this.pageCount); }
+                    catch (e) { /* defensive — never break scroll on cb failures */ }
+                }
+            }
+        });
     }
 
     get element() { return this._wrapper; }
 
     get isEditing() { return !!this._editTextarea; }
+
+    /** Number of pages in the current PDF, or 0 when no PDF is loaded. */
+    get pageCount() {
+        return this._pdfState ? this._pdfState.pageDivs.length : 0;
+    }
+
+    /** 1-based current visible page. Reads the cached `_currentPage`
+     *  set by the scroll listener — survives tab-switch detach/reattach
+     *  without re-querying layout (which would return 1 while the
+     *  element is out of the DOM). Returns 0 when no PDF is loaded. */
+    getCurrentPage() {
+        return this._currentPage;
+    }
+
+    /** Recompute the visible page from current scroll geometry. Only
+     *  called from the scroll listener; callers that need the current
+     *  page should use `getCurrentPage()` which returns the cached
+     *  value. Returns 0 when no PDF or empty page list. */
+    _computeCurrentPage() {
+        if (!this._pdfState || this._pdfState.pageDivs.length === 0) return 0;
+        const wrapper = this._wrapper;
+        const scrollMid = wrapper.scrollTop + wrapper.clientHeight / 2;
+        let bestIdx = 0;
+        let bestDist = Infinity;
+        const pageDivs = this._pdfState.pageDivs;
+        for (let i = 0; i < pageDivs.length; i++) {
+            const pd = pageDivs[i];
+            const center = pd.offsetTop + pd.offsetHeight / 2;
+            const dist = Math.abs(center - scrollMid);
+            if (dist < bestDist) { bestDist = dist; bestIdx = i; }
+        }
+        return bestIdx + 1;
+    }
+
+    /** Scroll the wrapper so the given page (1-based) is at the top of
+     *  view. Clamped to [1, pageCount]; no-op when no PDF is loaded. */
+    goToPage(n) {
+        if (!this._pdfState) return;
+        const idx = Math.max(0, Math.min(this._pdfState.pageDivs.length - 1, (n | 0) - 1));
+        const pd = this._pdfState.pageDivs[idx];
+        if (!pd) return;
+        const wrapper = this._wrapper;
+        const hostRect = wrapper.getBoundingClientRect();
+        const targetRect = pd.getBoundingClientRect();
+        wrapper.scrollTop += targetRect.top - hostRect.top;
+    }
+
+    /** Register a callback fired once after a fresh PDF's placeholders
+     *  are set up — at that point pageCount is reliable. Replaces any
+     *  previously-registered callback (single-listener pattern). */
+    onReady(cb) { this._onReadyCb = cb; }
+
+    /** Register a callback fired when the visible page changes due to
+     *  scroll. Receives (currentPage, totalPages). Single-listener.
+     *  No state reset needed — the dedup is now keyed on the cached
+     *  `_currentPage`, which by construction matches the input field's
+     *  display value. */
+    onPageChange(cb) { this._onPageChangeCb = cb; }
 
     /** Read the current textarea value when the viewer is in edit mode.
      * Returns null when not editing. */
@@ -415,6 +499,18 @@ export class DocumentViewer {
 
             await this._setupPdfPlaceholders(state);
             this._startPdfLazyRendering(state);
+            // Initialise the page cache to 1 — placeholders are at the
+            // top of the wrapper, no scroll yet. The scroll listener
+            // updates this as the user navigates; tab-switch rebuilds
+            // of the bar read it via getCurrentPage().
+            this._currentPage = 1;
+            // PDF is now ready for navigation queries (pageCount,
+            // getCurrentPage). Fire the ready callback exactly once so
+            // the second-bar PDF controls can populate "X / N".
+            if (this._onReadyCb) {
+                try { this._onReadyCb({ pageCount: state.pageDivs.length }); }
+                catch (e) { /* defensive */ }
+            }
         } catch (err) {
             this._content.innerHTML = `<div class="document-viewer-error">Failed to load PDF: ${err.message}</div>`;
         }

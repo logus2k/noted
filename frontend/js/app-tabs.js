@@ -222,7 +222,11 @@ export function initTabs(app) {
             // viewed tab no longer reloads the doc to page 1.
             notebookContainer.style.display = 'none';
             serviceContainer.style.display = 'flex';
-            serviceContainer.appendChild(app._buildDocumentBars(key));
+            // IMPORTANT: viewer must exist BEFORE the bars are built —
+            // _buildDocumentBars's PDF-controls block reads
+            // _documentViewers.get(key) to wire onReady / onPageChange.
+            // Building bars first would leave the page input + total
+            // unbound on first activation.
             const doc = app._documentTabs.get(key);
             let viewer = app._documentViewers.get(key);
             const isFirstShow = !viewer;
@@ -231,6 +235,7 @@ export function initTabs(app) {
                 viewer.element.dataset.tabKey = key;  // for scroll-restore on tab switch
                 app._documentViewers.set(key, viewer);
             }
+            serviceContainer.appendChild(app._buildDocumentBars(key));
             serviceContainer.appendChild(viewer.element);
             // Restore scroll position from a previous activation of this
             // tab (the outgoing-cleanup block above stashed it on blur).

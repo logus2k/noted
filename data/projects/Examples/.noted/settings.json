@@ -4,5 +4,11 @@
     "name": "welcome_env",
     "runtime_id": "python/3.12"
   },
-  "hydra_view": true
+  "hydra_view": true,
+  "venv_overrides": {
+    "Examples/weather_client.js": {
+      "name": "js_test_env",
+      "runtime_id": "javascript/22"
+    }
+  }
 }
