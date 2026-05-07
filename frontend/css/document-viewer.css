@@ -225,7 +225,7 @@
 .pdf-page canvas {
     display: block;
     width: 100% !important;
-    height: 100%;
+    height: auto;
 }
 
 /* Dual-page layout: pages flow two-up, each fixed at half the single

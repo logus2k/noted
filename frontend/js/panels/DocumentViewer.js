@@ -845,16 +845,7 @@ export class DocumentViewer {
         if (pageDiv._renderState !== 'rendering') return;
 
         pageDiv.appendChild(canvas);
-        // Keep the placeholder's aspect-ratio CSS in place. Pairs with
-        // `.pdf-page canvas { height: 100% }` — together, the pageDiv's
-        // height is driven solely by aspect-ratio × width (constant
-        // across render/unload cycles) and the canvas fills it exactly.
-        // Clearing aspect-ratio would let the canvas's intrinsic
-        // dimensions take over, which differ from the placeholder by
-        // a sub-pixel fraction (Math.floor on render scale); a TOC
-        // jump cascades render+unload across ~50 pages, accumulating
-        // many sub-pixel shifts that the browser's scroll anchoring
-        // visibly compensates for over ~1s.
+        pageDiv.style.aspectRatio = '';
 
         // Text layer
         try {
