@@ -551,6 +551,20 @@ def build_chart_option(intent: dict, projects_root: str) -> dict:
     if err or df is None:
         return {"ok": False, "option": None, "title": intent.get("title", ""), "chart_type": intent.get("chart_type", ""), "error": err}
 
+    # For inline data, the keys in the value objects ARE the column
+    # names — `x`/`y`/`series`/`category`/`value`/`label` at the top
+    # level are pure ceremony for the chart_designer to fill in. Default
+    # them from the resolved DataFrame's columns when the LLM left them
+    # unset, so the prompt doesn't have to teach a redundant rule. Only
+    # touches missing fields; a non-None value the LLM did set is left
+    # alone so the per-type builders can surface a clear column-not-found
+    # error if it's bogus.
+    if (intent.get("data_source") or {}).get("kind") == "inline":
+        cols = set(df.columns)
+        for field in ("x", "y", "series", "category", "value", "label"):
+            if not intent.get(field) and field in cols:
+                intent[field] = field
+
     chart_type = intent["chart_type"]
     builder = _BUILDERS.get(chart_type)
     if builder is None:

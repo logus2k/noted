@@ -468,7 +468,7 @@
 .chat-thinking {
     display: inline-block;
     margin-bottom: 6px;
-    font-size: 12px;
+    font-size: 11px;
 }
 
 .chat-trace-btn {
@@ -493,9 +493,14 @@
 .chat-thinking summary {
     cursor: pointer;
     color: #1d1d1d;
-    font-style: italic;
     user-select: none;
-    margin-bottom: 2px;
+}
+
+/* Italic only while reasoning is still streaming. Once the first answer
+ * token arrives, ChatPanel removes `chat-thinking-live` from the
+ * details element and the label drops back to upright. */
+.chat-thinking.chat-thinking-live summary {
+    font-style: italic;
 }
 
 /* Add 3px gap between the disclosure-triangle marker and the summary
@@ -959,13 +964,13 @@
  * inline-flex wrapper keeps icon + pill paired across line wraps. */
 .chat-citation-wrap {
     display: inline-flex;
-    align-items: center;
-    gap: 2px;
     white-space: nowrap;
+    align-items: center;
 }
 .chat-citation-icon {
-    font-size: 10px;
+    font-size: 11px;
     line-height: 1;
+    cursor: pointer;
 }
 .chat-citation-wrap.cite-family-doc .chat-citation-icon {
     color: #2e6e1f;
@@ -990,17 +995,17 @@
  * professional pill that opens the source document on click. */
 .chat-citation {
     display: inline-block;
-    min-width: 13px;
+    min-width: 14px;
     padding: 0px;
-    margin: 0px 2px;
-    font-size: 8px;
+    margin: 0px 3px 0px 3px;
+    font-size: 7px;
     font-weight: 600;
-    line-height: 11px;
+    line-height: 12px;
     text-align: center;
     text-decoration: none;
-    color: #1565c0;
-    background: #e5ffd5;
-    border: 0.5px solid #5a809c;
+    color: #1d1d1d !important;
+    background: #ffffff;
+    border: 0.5px solid #1d1d1d;
     border-radius: 10px;
     cursor: pointer;
     user-select: none;

@@ -203,7 +203,7 @@ def scan_pdf(
         section_path = ' > '.join(raw.meta.headings or []) or '(root)'
 
         # HybridChunker(merge_peers=True) merges adjacent doc_items into one
-        # chunk. Two consequences:
+        # chunk. Three consequences for bbox computation:
         #   1. Marginalia labels and cross-reference glyphs are extracted by
         #      Docling as their own (tiny) doc_items and get merged with the
         #      body paragraph. Taking only the first prov's bbox highlighted
@@ -211,16 +211,27 @@ def scan_pdf(
         #   2. A merged chunk can span page breaks. The body of one
         #      paragraph may end on page N+1 while its earlier doc_items
         #      sit on page N.
-        # Group every prov by page_no, union the bboxes per page, and emit
-        # `regions` so the deep-jump highlight can paint a rectangle on
-        # each page the chunk touches. `page_no`/`bbox` mirror regions[0]
-        # for code paths that still consume the single-region fields.
+        #   3. A chunk can mix prose with a PictureItem (figure embedded
+        #      in a section). Unioning the picture's bbox into the prose
+        #      union inflates the highlight to span "top of paragraph →
+        #      bottom of figure", looking broken.
+        # Strategy: per page, emit ONE region for the union of TEXT items,
+        # PLUS one region per PICTURE item (un-unioned with text or with
+        # other pictures). Tables stay in the text union — they contribute
+        # markdown content to the chunk text and the table-region is the
+        # right thing to highlight. The deep-jump highlight paints every
+        # region as a separate rectangle, so a section + figure becomes
+        # two rectangles on the same page rather than one giant box.
+        # `page_no`/`bbox` mirror regions[0] for callers that still consume
+        # the single-region fields.
         regions: list[dict] | None = None
         bbox = None
         page_no = None
-        per_page_bboxes: dict[int, list[tuple[float, float, float, float]]] = {}
+        text_bboxes_per_page: dict[int, list[tuple[float, float, float, float]]] = {}
+        picture_bboxes_per_page: dict[int, list[tuple[float, float, float, float]]] = {}
         first_page_seen: int | None = None
         for item in (raw.meta.doc_items or []):
+            is_picture = getattr(item, 'label', None) == DocItemLabel.PICTURE
             for p in (getattr(item, 'prov', None) or []):
                 p_page = getattr(p, 'page_no', None)
                 bb = getattr(p, 'bbox', None)
@@ -230,26 +241,42 @@ def scan_pdf(
                     tup = tuple(float(v) for v in bb.as_tuple())
                 except Exception:
                     continue
-                per_page_bboxes.setdefault(int(p_page), []).append(tup)
+                page_int = int(p_page)
+                if is_picture:
+                    picture_bboxes_per_page.setdefault(page_int, []).append(tup)
+                else:
+                    text_bboxes_per_page.setdefault(page_int, []).append(tup)
                 if first_page_seen is None:
-                    first_page_seen = int(p_page)
-        if per_page_bboxes:
+                    first_page_seen = page_int
+        if text_bboxes_per_page or picture_bboxes_per_page:
             # Region order: first page seen first (matches reading order),
-            # then any other pages sorted ascending. Deep-jump scrolls to
-            # regions[0] so this picks the earliest-touched page.
-            other_pages = sorted(p for p in per_page_bboxes if p != first_page_seen)
-            ordered_pages = [first_page_seen] + other_pages
+            # then any other pages sorted ascending. Within each page,
+            # text-region first (chunks usually start with prose), then
+            # picture regions in encounter order.
+            all_pages = set(text_bboxes_per_page) | set(picture_bboxes_per_page)
+            other_pages = sorted(p for p in all_pages if p != first_page_seen)
+            ordered_pages = (
+                [first_page_seen] + other_pages if first_page_seen is not None
+                else sorted(all_pages)
+            )
             regions = []
             for p_page in ordered_pages:
-                bbs = per_page_bboxes[p_page]
-                xs0 = [b[0] for b in bbs]; ys0 = [b[1] for b in bbs]
-                xs1 = [b[2] for b in bbs]; ys1 = [b[3] for b in bbs]
-                regions.append({
-                    'page_no': p_page,
-                    'bbox': [min(xs0), min(ys0), max(xs1), max(ys1)],
-                })
-            page_no = regions[0]['page_no']
-            bbox = regions[0]['bbox']
+                text_bbs = text_bboxes_per_page.get(p_page) or []
+                if text_bbs:
+                    xs0 = [b[0] for b in text_bbs]; ys0 = [b[1] for b in text_bbs]
+                    xs1 = [b[2] for b in text_bbs]; ys1 = [b[3] for b in text_bbs]
+                    regions.append({
+                        'page_no': p_page,
+                        'bbox': [min(xs0), min(ys0), max(xs1), max(ys1)],
+                    })
+                for pb in (picture_bboxes_per_page.get(p_page) or []):
+                    regions.append({
+                        'page_no': p_page,
+                        'bbox': [pb[0], pb[1], pb[2], pb[3]],
+                    })
+            if regions:
+                page_no = regions[0]['page_no']
+                bbox = regions[0]['bbox']
 
         section_level = getattr(raw.meta, 'headings_level', None)
 

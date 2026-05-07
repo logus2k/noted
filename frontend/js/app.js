@@ -992,19 +992,22 @@ class App {
         }
 
         if (!projectId || !relPath) {
-            // Save-As: ask for project + path. Fetch projects + mounts to
-            // populate the dropdown.
+            // Save-As: ask for project + path. Fetch projects + mounts and
+            // surface them as a single, undifferentiated "Projects" list —
+            // the user shouldn't have to care which kind of project root
+            // they're saving into. Backend resolves the right root_type
+            // server-side at write time.
             let projects = [];
             try {
                 const resp = await fetch('api/files/');
                 if (resp.ok) {
                     const data = await resp.json();
                     const ps = (data.projects || []).map(p => ({
-                        label: `project: ${typeof p === 'string' ? p : (p.name || p.id || JSON.stringify(p))}`,
+                        label: typeof p === 'string' ? p : (p.name || p.id || JSON.stringify(p)),
                         value: typeof p === 'string' ? p : (p.name || p.id || ''),
                     })).filter(o => o.value);
                     const ms = (data.mounts || []).map(m => ({
-                        label: `mount: ${m.name}`,
+                        label: m.name,
                         value: m.name,
                     })).filter(o => o.value);
                     projects = [...ps, ...ms];
@@ -1013,14 +1016,14 @@ class App {
                 console.warn('[app] _saveBuffer: failed to list projects', e);
             }
             if (projects.length === 0) {
-                modalAlert('No projects or mounts available to save into.', { title: 'Save As' });
+                modalAlert('No projects available to save into.', { title: 'Save As' });
                 return;
             }
 
             const result = await modalForm([
                 {
                     key: 'project_id',
-                    label: 'Project / mount',
+                    label: 'Project',
                     type: 'select',
                     options: projects,
                     defaultValue: projects[0].value,

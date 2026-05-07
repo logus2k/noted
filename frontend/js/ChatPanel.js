@@ -44,6 +44,20 @@
     });
 }());
 
+/** Decide whether a graph_provenance payload has anything worth showing
+ *  in the trace panel. Prevents the "Show graph" icon from appearing on
+ *  conceptual / definitional questions where graph traversal returned
+ *  nothing — the trace would just open to "0 entities, 0 grounded
+ *  relationships" and look broken. Counts as content if any of:
+ *  entities, edges, or chunk_excerpts is non-empty. */
+function _traceHasContent(payload) {
+    if (!payload || typeof payload !== 'object') return false;
+    const e = Array.isArray(payload.entities) ? payload.entities.length : 0;
+    const r = Array.isArray(payload.edges) ? payload.edges.length : 0;
+    const c = Array.isArray(payload.chunk_excerpts) ? payload.chunk_excerpts.length : 0;
+    return (e + r + c) > 0;
+}
+
 /**
  * ChatPanel - Chat UI component for the assistant panel.
  * Builds header, messages area, typing indicator, and input area.
@@ -213,12 +227,17 @@ export class ChatPanel {
         this._messagesArea = document.createElement('div');
         this._messagesArea.className = 'chat-messages';
         // Delegated handler: chat-citation badges (rendered by
-        // _renderCitations) carry their tag in data-citation-tag.
+        // _renderCitations) carry their tag in data-citation-tag on the
+        // surrounding wrap, so clicking either the icon or the number
+        // both fire the same handler. Either selector resolves to the
+        // wrap; the anchor inside keeps its tag for keyboard nav.
         this._messagesArea.addEventListener('click', (e) => {
-            const cite = e.target.closest('a.chat-citation');
-            if (cite && this._onCitationClick) {
+            const wrap = e.target.closest('.chat-citation-wrap');
+            if (wrap && this._onCitationClick) {
                 e.preventDefault();
-                this._onCitationClick(cite.dataset.citationTag, cite);
+                const tag = wrap.dataset.citationTag
+                    || wrap.querySelector('a.chat-citation')?.dataset.citationTag;
+                if (tag) this._onCitationClick(tag, wrap);
             }
         });
         panel.appendChild(this._messagesArea);
@@ -1142,6 +1161,9 @@ export class ChatPanel {
         // only tokens so a stray "\n" doesn't fire the collapse early.
         if (this._liveThinkingPendingCollapse && this._liveThinkingDetails && token && token.trim()) {
             this._liveThinkingDetails.open = false;
+            // Drop the live class so the summary label loses its italic —
+            // CSS gates `font-style: italic` to .chat-thinking-live only.
+            this._liveThinkingDetails.classList.remove('chat-thinking-live');
             const label = this._liveThinkingDetails._summaryLabel;
             if (label) label.textContent = 'Thinking';
             this._liveThinkingPendingCollapse = false;
@@ -1177,6 +1199,10 @@ export class ChatPanel {
         if (thinkingDetails && !thinkingDetails.parentNode) {
             this._streamingMsg.insertBefore(thinkingDetails, this._streamingContent);
         }
+        // Belt-and-braces: if the deferred-collapse path never fired (no
+        // answer tokens streamed, finalize arrived directly), the live
+        // class would still linger and keep the italic. Drop it here too.
+        if (thinkingDetails) thinkingDetails.classList.remove('chat-thinking-live');
         // Defense-in-depth: re-run citation transform on the (possibly
         // streamed) thinking body. setLiveThinkingContent calls this at
         // thinking_end, but if the thinking_end signal was missed or
@@ -1191,8 +1217,11 @@ export class ChatPanel {
         // when the graph_provenance SSE event arrives (before answer
         // streaming starts). If for some reason that didn't happen but
         // the payload still made it to finalize, attach now as a fallback.
+        // Same content gate as the early path — no point surfacing the
+        // icon when the trace would open empty.
         const traceData = graphProvenance || this._pendingGraphTrace;
-        if (traceData && !this._traceButtonEl && this._onShowGraphTrace && this._graphRagEnabled) {
+        if (traceData && !this._traceButtonEl && this._onShowGraphTrace
+                && this._graphRagEnabled && _traceHasContent(traceData)) {
             this._traceButtonEl = this._attachTraceButton(thinkingDetails, traceData);
         }
 
@@ -1351,9 +1380,18 @@ export class ChatPanel {
                     // line away from its number).
                     const wrap = document.createElement('span');
                     wrap.className = `chat-citation-wrap ${isGraph ? 'cite-family-graph' : 'cite-family-doc'}`;
+                    // Make the whole wrap (icon + anchor) the click target —
+                    // the delegate at the messages-area level reads tag from
+                    // here. Also lets CSS apply cursor:pointer to the icon.
+                    wrap.dataset.citationTag = tag;
+                    wrap.title = title;
 
                     const icon = document.createElement('i');
-                    icon.className = `fa-solid ${isGraph ? 'fa-share-nodes' : 'fa-file-lines'} chat-citation-icon`;
+                    // File icon uses the regular (outline) variant; graph
+                    // share-nodes stays solid (no regular variant in FA free).
+                    icon.className = isGraph
+                        ? 'fa-solid fa-share-nodes chat-citation-icon'
+                        : 'fa-regular fa-file-lines chat-citation-icon';
                     icon.setAttribute('aria-hidden', 'true');
                     wrap.appendChild(icon);
 
@@ -1470,6 +1508,14 @@ export class ChatPanel {
         // "Show graph" affordance even if a provenance event happens to
         // arrive — defense in depth so the UI honors the toggle.
         if (!this._graphRagEnabled) return;
+        // Don't surface the trace icon when there's nothing meaningful
+        // to display. Definitional / conceptual questions ground in
+        // chunks only — entry-point entity extraction yields nothing,
+        // graph traversal returns empty, and the trace panel would
+        // open to a blank "0 entities, 0 grounded relationships" view
+        // that looks broken. Show the icon only when at least one of
+        // entities / edges / chunk_excerpts has content.
+        if (!_traceHasContent(payload)) return;
         if (!this._streamingMsg) this.startStreamingMessage();
         this._traceButtonEl = this._attachTraceButton(this._liveThinkingDetails, payload);
     }
@@ -1607,7 +1653,7 @@ export class ChatPanel {
         // <summary> itself would clobber every child element.
         const labelEl = document.createElement('span');
         labelEl.className = 'chat-thinking-summary-label';
-        labelEl.textContent = 'Thinking…';
+        labelEl.textContent = 'Thinking...';
         summary.appendChild(labelEl);
         // Per-instance "thinking finished" flag captured by the toggle
         // closure. We CANNOT rely on `this._liveThinkingComplete` here
@@ -1684,8 +1730,8 @@ export class ChatPanel {
 
     /** While the thinking block is streaming, surface the most recent
      * level-1 markdown heading (`# Title`) as the summary label so the
-     * user sees the model's current step instead of a static "Thinking…".
-     * Falls back to "Thinking…" until the first heading arrives. Skips
+     * user sees the model's current step instead of a static "Thinking...".
+     * Falls back to "Thinking..." until the first heading arrives. Skips
      * `#` lines inside fenced code blocks. Reverts to the standard
      * Show/Hide labels at endLiveThinkingSection. */
     _updateLiveThinkingLabel() {
@@ -1702,7 +1748,7 @@ export class ChatPanel {
             const m = line.match(/^#\s+(.+?)\s*$/);
             if (m) lastHeading = m[1];
         }
-        labelEl.textContent = lastHeading || 'Thinking…';
+        labelEl.textContent = lastHeading || 'Thinking...';
     }
 
     /** Replace the live thinking body content with the provided text.
