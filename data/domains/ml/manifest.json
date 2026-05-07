@@ -60,20 +60,21 @@
       "mode": "read_store",
       "added_at": "2026-05-07T02:48:26.743950+00:00",
       "category": "Machine Learning/Deep Learning",
-      "display_name": ""
+      "display_name": "A Visual Introduction to Deep Learning"
     },
     {
       "path": "Deep Learning Book.pdf",
       "mode": "read_store",
       "added_at": "2026-05-07T02:48:30.101454+00:00",
       "category": "Machine Learning/Deep Learning",
-      "display_name": ""
+      "display_name": "Deep Learning"
     },
     {
       "path": "Deep Learning Illustrated.pdf",
       "mode": "read_store",
       "added_at": "2026-05-07T02:48:32.009467+00:00",
-      "category": "Machine Learning/Deep Learning"
+      "category": "Machine Learning/Deep Learning",
+      "display_name": ""
     }
   ],
   "arcadedb_database": "ml",
