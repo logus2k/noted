@@ -222,7 +222,8 @@ body.resizing #service-tab-container iframe {
    hover replaces the amber background hover used elsewhere. */
 .pdf-ctl-download,
 .pdf-ctl-info,
-.pdf-ctl-sliders {
+.pdf-ctl-sliders,
+.pdf-ctl-expand {
     background: transparent;
     border: none;
     cursor: pointer;
@@ -235,7 +236,8 @@ body.resizing #service-tab-container iframe {
 }
 .pdf-ctl-download:hover,
 .pdf-ctl-info:hover,
-.pdf-ctl-sliders:hover {
+.pdf-ctl-sliders:hover,
+.pdf-ctl-expand:hover {
     background: transparent;
     opacity: 0.75;
 }
@@ -268,6 +270,12 @@ body.resizing #service-tab-container iframe {
     height: 13px;
     -webkit-mask-image: url('../images/sliders-horizontal-16.svg');
             mask-image: url('../images/sliders-horizontal-16.svg');
+}
+.pdf-ctl-icon-expand {
+    background-color: #1d1d1d;
+    height: 13px;
+    -webkit-mask-image: url('../images/expand-lines.svg');
+            mask-image: url('../images/expand-lines.svg');
 }
 
 /* Document Information jsPanel rows. Two-column k/v layout, section

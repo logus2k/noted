@@ -598,6 +598,26 @@ class App {
             console.error('Server error:', data.message, data.code);
         });
 
+        // PDF doc tab keyboard navigation: PageUp / PageDown step exactly
+        // one PDF page (rather than the browser's default which scrolls
+        // by the wrapper's clientHeight — not aligned to page boundaries
+        // when zoom is below fit-height). Runs only when a PDF doc tab
+        // is the active tab and no input/textarea/contenteditable has
+        // focus, so it doesn't steal keys from form fields.
+        document.addEventListener('keydown', (e) => {
+            if (e.key !== 'PageUp' && e.key !== 'PageDown') return;
+            const target = e.target;
+            const tag = target?.tagName;
+            if (tag === 'INPUT' || tag === 'TEXTAREA' || target?.isContentEditable) return;
+            const activeKey = this._tabBar?.activeKey;
+            if (!activeKey || !activeKey.startsWith('doc:')) return;
+            const viewer = this._documentViewers.get(activeKey);
+            if (!viewer || !viewer._pdfState) return;
+            e.preventDefault();
+            e.stopPropagation();
+            viewer.pageStep(e.key === 'PageDown' ? 1 : -1);
+        }, true);
+
         // Keyboard shortcuts (capture phase so they fire before CodeMirror)
         // Only intercept for notebook tabs; file editors handle their own navigation.
         document.addEventListener('keydown', (e) => {
@@ -1648,12 +1668,28 @@ class App {
                 viewer.onPageChange(() => syncDisplay());
             }
 
-            // Sliders / settings icon on the right of the second bar —
-            // opens a popover with page-layout radios + zoom slider,
-            // anchored under the icon. Visible in both docked and
-            // floating modes (the second bar shows in both).
+            // Right cluster of the second bar: fit-to-one-page button
+            // followed by sliders/settings. Both visible in docked and
+            // floating modes.
             const right = document.createElement('span');
             right.className = 'service-second-bar-right';
+
+            // Fit-to-one-page: switches the layout to single, auto-fits
+            // zoom, and re-centers the current page vertically (the
+            // single-page fit can leave vertical slack when the page
+            // aspect is constrained by width).
+            const fitBtn = document.createElement('button');
+            fitBtn.className = 'pdf-ctl-expand';
+            fitBtn.innerHTML = '<span class="pdf-ctl-icon pdf-ctl-icon-expand" aria-hidden="true"></span>';
+            fitBtn.title = 'Fit one page';
+            fitBtn.addEventListener('click', () => {
+                if (!viewer) return;
+                const cur = viewer.getCurrentPage() || 1;
+                viewer.setPageLayout('single');
+                viewer.goToPageCentered(cur);
+            });
+            right.appendChild(fitBtn);
+
             const slidersBtn = document.createElement('button');
             slidersBtn.className = 'pdf-ctl-sliders';
             slidersBtn.innerHTML = '<span class="pdf-ctl-icon pdf-ctl-icon-sliders" aria-hidden="true"></span>';
@@ -1735,7 +1771,12 @@ class App {
         pop.querySelectorAll('input[name="pdf-settings-layout"]').forEach(r => {
             r.addEventListener('change', () => {
                 if (!r.checked) return;
+                const cur = viewer.getCurrentPage() || 1;
                 viewer.setPageLayout(r.value);
+                // Centre the current page after the layout switch — same
+                // reasoning as the fit-to-one-page button (single/dual
+                // mode auto-fits zoom, often leaving vertical slack).
+                viewer.goToPageCentered(cur);
                 const newPct = Math.round(viewer.getZoom() * 100);
                 slider.value = String(newPct);
                 zoomVal.textContent = `${newPct}%`;

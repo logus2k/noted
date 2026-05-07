@@ -6,6 +6,7 @@
     box-sizing: border-box;
     background: #e9e9e9;
     margin-right: 5px;
+    overflow-x: hidden;
 }
 
 .document-viewer-wrapper::-webkit-scrollbar-track {
@@ -224,7 +225,7 @@
 .pdf-page canvas {
     display: block;
     width: 100% !important;
-    height: auto;
+    height: 100%;
 }
 
 /* Dual-page layout: pages flow two-up, each fixed at half the single

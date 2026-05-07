@@ -88,6 +88,52 @@ export class DocumentViewer {
         return bestIdx + 1;
     }
 
+    /** Scroll so the given page is vertically CENTERED in the wrapper
+     *  (rather than aligned to the top, which is goToPage's behavior).
+     *  Used by the fit-to-one-page action: after switching to single
+     *  layout the page may be shorter than the wrapper, leaving blank
+     *  space above and below; centering puts it in the middle.
+     *  Uses getBoundingClientRect delta math (the same pattern used in
+     *  goToPage and citation jumps) rather than pd.offsetTop — neither
+     *  the wrapper nor .pdf-page sets position:relative, so offsetTop
+     *  resolves against an ancestor that includes ~100px of chrome
+     *  above the wrapper (toolbars / bars), which would over-scroll. */
+    goToPageCentered(n) {
+        if (!this._pdfState) return;
+        const idx = Math.max(0, Math.min(this._pdfState.pageDivs.length - 1, (n | 0) - 1));
+        const pd = this._pdfState.pageDivs[idx];
+        if (!pd) return;
+        const wrapper = this._wrapper;
+        const hostRect = wrapper.getBoundingClientRect();
+        const targetRect = pd.getBoundingClientRect();
+        const slack = wrapper.clientHeight - pd.clientHeight;
+        const offset = slack > 0 ? slack / 2 : 0;
+        wrapper.scrollTop += (targetRect.top - hostRect.top) - offset;
+    }
+
+    /** Step `delta` pages from the current page while preserving the
+     *  current page's vertical visual offset within the wrapper.
+     *  Different from goToPage(cur+delta), which forces the new page's
+     *  top to the wrapper's top edge — that erases whatever centering
+     *  / margin the user was reading at (e.g. after Fit One Page) and
+     *  also overshoots by a few pixels because of the content's top
+     *  padding. The delta-of-rect-tops math here keeps the new page in
+     *  the same screen position the previous page occupied. */
+    pageStep(delta) {
+        if (!this._pdfState) return;
+        const pageDivs = this._pdfState.pageDivs;
+        if (!pageDivs.length) return;
+        const cur = this._currentPage || 1;
+        const target = cur + delta;
+        const curIdx = Math.max(0, Math.min(pageDivs.length - 1, cur - 1));
+        const targetIdx = Math.max(0, Math.min(pageDivs.length - 1, target - 1));
+        if (curIdx === targetIdx) return;
+        const wrapper = this._wrapper;
+        const curRect = pageDivs[curIdx].getBoundingClientRect();
+        const targetRect = pageDivs[targetIdx].getBoundingClientRect();
+        wrapper.scrollTop += targetRect.top - curRect.top;
+    }
+
     /** Scroll the wrapper so the given page (1-based) is at the top of
      *  view. Clamped to [1, pageCount]; no-op when no PDF is loaded. */
     goToPage(n) {
@@ -799,7 +845,16 @@ export class DocumentViewer {
         if (pageDiv._renderState !== 'rendering') return;
 
         pageDiv.appendChild(canvas);
-        pageDiv.style.aspectRatio = '';
+        // Keep the placeholder's aspect-ratio CSS in place. Pairs with
+        // `.pdf-page canvas { height: 100% }` — together, the pageDiv's
+        // height is driven solely by aspect-ratio × width (constant
+        // across render/unload cycles) and the canvas fills it exactly.
+        // Clearing aspect-ratio would let the canvas's intrinsic
+        // dimensions take over, which differ from the placeholder by
+        // a sub-pixel fraction (Math.floor on render scale); a TOC
+        // jump cascades render+unload across ~50 pages, accumulating
+        // many sub-pixel shifts that the browser's scroll anchoring
+        // visibly compensates for over ~1s.
 
         // Text layer
         try {

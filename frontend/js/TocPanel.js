@@ -42,6 +42,16 @@ export class TocPanel {
 
         this._list = document.createElement('ul');
         this._el.appendChild(this._list);
+
+        // Drive a class on the panel from real pointer enter/leave events.
+        // The scrollbar thumb's visibility was previously gated on
+        // `.toc-nav:hover ::-webkit-scrollbar-thumb`, but Chromium's
+        // :hover state on scrollbar pseudos is unreliable: after a click
+        // elsewhere in the document, re-hovering the panel sometimes
+        // doesn't re-fire the hover style on the thumb. A JS-driven
+        // `is-hovered` class survives that and re-applies cleanly.
+        this._el.addEventListener('mouseenter', () => this._el.classList.add('is-hovered'));
+        this._el.addEventListener('mouseleave', () => this._el.classList.remove('is-hovered'));
     }
 
     get element() {
@@ -403,11 +413,28 @@ export class TocPanel {
         li.className = `toc-h${level}`;
 
         const a = document.createElement('a');
-        a.textContent = text;
         a.href = 'javascript:void(0)';
+        const textSpan = document.createElement('span');
+        textSpan.className = 'toc-text';
+        textSpan.textContent = text;
+        const pageSpan = document.createElement('span');
+        pageSpan.className = 'toc-page';
+        pageSpan.textContent = String(pageIndex + 1);
+        a.appendChild(textSpan);
+        a.appendChild(pageSpan);
         a.addEventListener('click', (e) => {
             e.preventDefault();
+            // Set the click target as active manually (and lock
+            // _updateActive). All TOC entries that point to the same
+            // page share the same pageDiv element, so layout-derived
+            // active selection can't distinguish among them and would
+            // pick whichever entry happens to be last in iteration —
+            // not the one the user clicked.
+            for (const h of this._headingEls) h.li.classList.remove('toc-active');
+            li.classList.add('toc-active');
+            this._clickLock = true;
             this._scrollPdfToPage(pageIndex);
+            requestAnimationFrame(() => requestAnimationFrame(() => { this._clickLock = false; }));
         });
 
         li.appendChild(a);
@@ -439,11 +466,26 @@ export class TocPanel {
             li.className = `toc-h${Math.min(level, 6)}`;
 
             const a = document.createElement('a');
-            a.textContent = text;
             a.href = 'javascript:void(0)';
+            const textSpan = document.createElement('span');
+            textSpan.className = 'toc-text';
+            textSpan.textContent = text;
+            const pageSpan = document.createElement('span');
+            pageSpan.className = 'toc-page';
+            // pageIndex of -1 means we couldn't resolve the destination —
+            // omit the number rather than show "0" or "-1".
+            if (pageIndex >= 0) pageSpan.textContent = String(pageIndex + 1);
+            a.appendChild(textSpan);
+            a.appendChild(pageSpan);
             a.addEventListener('click', (e) => {
                 e.preventDefault();
+                // Manual active-state set + _clickLock — see the matching
+                // comment in _addPdfHeadingEntry for the reasoning.
+                for (const h of this._headingEls) h.li.classList.remove('toc-active');
+                li.classList.add('toc-active');
+                this._clickLock = true;
                 this._scrollPdfToPage(pageIndex);
+                requestAnimationFrame(() => requestAnimationFrame(() => { this._clickLock = false; }));
             });
 
             li.appendChild(a);
@@ -520,13 +562,6 @@ export class TocPanel {
         for (const h of this._headingEls) {
             const relTop = h.el.getBoundingClientRect().top - hostRect.top;
             if (relTop <= 80) active = h;
-        }
-
-        if (host.scrollTop < 2) {
-            active = this._headingEls[0];
-        }
-        if (Math.abs((host.scrollTop + host.clientHeight) - host.scrollHeight) < 2) {
-            active = this._headingEls[this._headingEls.length - 1];
         }
 
         for (const h of this._headingEls) {
