@@ -657,13 +657,20 @@ export function initTabs(app) {
             if (ext === 'pdf') {
                 const floatingViewer = new DocumentViewer();
                 floatingViewer.element.style.cssText = 'flex:1;min-height:0;overflow:auto';
+                // Build bars with the floating viewer as the override so
+                // PDF page-navigation controls drive THIS viewer (not the
+                // docked one). Bars first → viewer below; both children
+                // of the flex column wrapper.
+                wrapper.appendChild(app._buildDocumentBars(key, floatingViewer, true));
                 wrapper.appendChild(floatingViewer.element);
                 contentEl = wrapper;
 
                 onCallback = () => {
                     // Call show() AFTER the wrapper is in the DOM so the
                     // IntersectionObserver inside DocumentViewer can resolve
-                    // intersections against its wrapper as root.
+                    // intersections against its wrapper as root. The bars'
+                    // syncDisplay is wired via floatingViewer.onReady,
+                    // which fires inside show() when placeholders settle.
                     floatingViewer.show(doc);
                 };
                 onDock = () => {
@@ -920,6 +927,16 @@ export function initTabs(app) {
         const isNotebook = key.startsWith('notebook:');
         const isService = key === 'mlflow' || key === 'airflow' || key === 'minio' || key === 'evidently' || key === 'arcadedb';
 
+        // Dock-vs-close intent tracked via closure rather than a property on
+        // the jsPanel object. Property-based signaling (`p._docking = true`)
+        // proved unreliable when multiple floating panels coexist — the
+        // panel reference passed to `onclosed` doesn't always preserve
+        // ad-hoc properties set on the same object reference earlier.
+        // The closure flag is panel-local and survives whatever jsPanel
+        // does internally between the click and `onclosed`.
+        let dockingIntent = false;
+        let onclosedHandled = false;
+
         const panel = jsPanel.create({
             headerTitle: `${icon}${label}`,
             theme: 'none',
@@ -930,11 +947,16 @@ export function initTabs(app) {
             boxShadow: 3,
             headerControls: { minimize: 'remove', smallify: 'remove', normalize: 'remove', maximize: 'remove' },
             addCloseControl: 1,
-            onclosed: (panel) => {
-                const docking = panel._docking;
+            onclosed: () => {
+                // jsPanel can fire onclosed more than once for a single
+                // close (observed when a destroyed panel re-emits during
+                // animation cleanup). Dedupe so the dock-vs-close branch
+                // only runs once per panel lifecycle.
+                if (onclosedHandled) return;
+                onclosedHandled = true;
                 app._undockedPanels.delete(key);
 
-                if (docking) {
+                if (dockingIntent) {
                     onDock();
                     app._tabBar.dockTab(key);
                 } else {
@@ -994,7 +1016,10 @@ export function initTabs(app) {
                     dockBtn.title = 'Dock back to tab bar';
                     dockBtn.style.cssText = 'cursor:pointer;background:none;border:none;padding:4px;margin:0;line-height:1;display:flex;align-items:center;';
                     dockBtn.innerHTML = '<i class="fa-solid fa-down-left-and-up-right-to-center" style="font-size:12px;color:#555555"></i>';
-                    dockBtn.addEventListener('click', () => { p._docking = true; p.close(); });
+                    dockBtn.addEventListener('click', () => {
+                        dockingIntent = true;
+                        p.close();
+                    });
                     const closeBtn = controlbar.querySelector('.jsPanel-btn-close');
                     if (closeBtn) {
                         controlbar.insertBefore(dockBtn, closeBtn);

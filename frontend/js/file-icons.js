@@ -180,6 +180,22 @@ function _resolve(key) {
     return ICON_BASE + key + '.svg';
 }
 
+/** Per-extension icon override for KB document leaf nodes (Knowledge
+ *  Base → Documents tree). PDF / Word / HTML use bespoke SVGs in
+ *  frontend/images/ (served at /static/images/); Markdown uses the
+ *  FontAwesome brand mark — Wunderbaum accepts an FA class string in
+ *  the `icon` field. Anything else falls through to the vendor
+ *  vscode-icons set. */
+export function kbDocIconForFile(filename) {
+    const name = (filename || '').split('/').pop().toLowerCase();
+    const ext = name.includes('.') ? name.split('.').pop() : '';
+    if (ext === 'pdf') return 'static/images/file-type-pdf2.svg';
+    if (ext === 'md' || ext === 'markdown') return 'fa-brands fa-markdown';
+    if (ext === 'doc' || ext === 'docx') return 'static/images/microsoft-word.svg';
+    if (ext === 'html' || ext === 'htm') return 'static/images/html-5.svg';
+    return iconPathForFile(filename);
+}
+
 /** Return the SVG path for a given filename. */
 export function iconPathForFile(filename) {
     const name = filename.split('/').pop();

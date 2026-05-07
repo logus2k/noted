@@ -91,6 +91,38 @@ def rename_document(req: RenameDocumentRequest):
         raise HTTPException(status_code=404, detail=str(e))
 
 
+@router.get("/documents/info")
+async def document_info(domain: str, path: str):
+    """Aggregated stats for the Document Information panel.
+
+    URL: /api/documents/info?domain=<domain_id>&path=<rel_path>
+
+    Proxies to noted-graph's `/research/<domain>/document_info` which
+    returns file stats (size, modified_at), manifest entry (mode,
+    category, display_name, added_at), per-doc chunk + section + caption
+    counts, per-doc thematic-entity count, and whole-domain entity +
+    relationship counts. Single round-trip; designed to feel instant in
+    the UI.
+    """
+    import httpx
+    from app.routers.kb import NOTED_GRAPH_BASE
+    if not domain or not path:
+        raise HTTPException(status_code=400, detail="domain and path query params are required")
+    async with httpx.AsyncClient(timeout=10) as client:
+        try:
+            r = await client.get(
+                f"{NOTED_GRAPH_BASE}/research/{domain}/document_info",
+                params={"path": path},
+            )
+        except httpx.RequestError as e:
+            raise HTTPException(status_code=502, detail=f"noted-graph unreachable: {e}")
+    if r.status_code == 404:
+        raise HTTPException(status_code=404, detail=f"unknown Domain: {domain!r}")
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text[:300])
+    return r.json()
+
+
 @router.get("/documents/files/{file_path:path}")
 def serve_document_file(file_path: str):
     """Serve a document file (PDF, MD, etc.) from a Domain's sources/ dir.

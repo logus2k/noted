@@ -30,6 +30,14 @@ export class DocumentViewer {
         this._onReadyCb = null;
         this._onPageChangeCb = null;
         this._currentPage = 0;
+        // Zoom + page-layout state. `_pdfZoom` is the multiplier on the
+        // 900px (single) / 450px (dual/custom) page width; `_pageLayout`
+        // is one of 'single' | 'dual' | 'custom'. Both are applied to
+        // the content wrapper via the `--pdf-zoom` CSS variable + a
+        // layout class — see _applyZoom / _applyPageLayout below.
+        this._pdfZoom = 1;
+        this._pageLayout = 'single';
+        this._layoutResizeObserver = null;
         this._wrapper.addEventListener('scroll', () => {
             if (!this._pdfState) return;
             const cur = this._computeCurrentPage();
@@ -104,6 +112,118 @@ export class DocumentViewer {
      *  `_currentPage`, which by construction matches the input field's
      *  display value. */
     onPageChange(cb) { this._onPageChangeCb = cb; }
+
+    /** Current zoom multiplier (1 == 100%). 0.1 to 3.0 in normal use. */
+    getZoom() { return this._pdfZoom; }
+
+    /** Current page-layout mode: 'single' | 'dual' | 'custom'. */
+    getPageLayout() { return this._pageLayout; }
+
+    /** Set the zoom multiplier. Applied via the `--pdf-zoom` CSS
+     *  variable on the content wrapper — page widths scale, no canvas
+     *  re-render. Crisp up to ~200% (canvases are oversampled at DPR);
+     *  softens past that. We accept the tradeoff (matches docbro). */
+    setZoom(z) {
+        if (!Number.isFinite(z)) return;
+        const clamped = Math.max(0.1, Math.min(3.0, z));
+        this._pdfZoom = clamped;
+        this._applyZoom();
+    }
+
+    /** Set the page-layout mode. Switches between single column (one
+     *  page per row), dual-page (two side-by-side), and custom (flow
+     *  multiple pages per row, each fixed at 450px*zoom). */
+    setPageLayout(mode) {
+        if (mode !== 'single' && mode !== 'dual' && mode !== 'custom') return;
+        this._pageLayout = mode;
+        this._applyPageLayout();
+        if (mode === 'single' || mode === 'dual') {
+            this._pdfZoom = this._computeFitZoom(mode);
+            this._applyZoom();
+        }
+        this._setupLayoutResizeObserver();
+    }
+
+    _applyZoom() {
+        if (!this._content) return;
+        this._content.style.setProperty('--pdf-zoom', this._pdfZoom);
+    }
+
+    _applyPageLayout() {
+        if (!this._content) return;
+        this._content.classList.remove('pdf-layout-dual', 'pdf-layout-custom');
+        if (this._pageLayout === 'dual') {
+            this._content.classList.add('pdf-layout-dual');
+        } else if (this._pageLayout === 'custom') {
+            this._content.classList.add('pdf-layout-custom');
+        }
+    }
+
+    /** Compute a zoom multiplier that fits the requested layout into
+     *  the wrapper's visible area. Uses the first page's pdf.js viewport
+     *  for aspect ratio when available; falls back to 900x1165. Mirrors
+     *  docbro's LayoutManager.computeFitZoom. */
+    _computeFitZoom(mode) {
+        if (!this._pdfState || !this._pdfState.pageDivs.length) return 1;
+        const wrapper = this._wrapper;
+        const style = getComputedStyle(this._content);
+        const padLeft = parseFloat(style.paddingLeft) || 0;
+        const padRight = parseFloat(style.paddingRight) || 0;
+        const padTop = parseFloat(style.paddingTop) || 0;
+        const padBottom = parseFloat(style.paddingBottom) || 0;
+        const availableWidth = wrapper.clientWidth - padLeft - padRight;
+        const availableHeight = wrapper.clientHeight - padTop - padBottom;
+        if (availableWidth <= 0 || availableHeight <= 0) return this._pdfZoom;
+
+        let pageAspect = 900 / 1165;
+        const firstDiv = this._pdfState.pageDivs[0];
+        if (firstDiv && firstDiv._pdfViewport) {
+            const vp = firstDiv._pdfViewport;
+            pageAspect = vp.width / vp.height;
+        }
+
+        if (mode === 'single') {
+            const zoomByWidth = availableWidth / 900;
+            const zoomByHeight = (availableHeight * pageAspect) / 900;
+            return Math.min(zoomByWidth, zoomByHeight);
+        }
+        if (mode === 'dual') {
+            const zoomByWidth = (availableWidth - 6) / 900;
+            const zoomByHeight = (availableHeight * pageAspect) / 450;
+            return Math.min(zoomByWidth, zoomByHeight);
+        }
+        return this._pdfZoom;
+    }
+
+    /** Re-fit the zoom on wrapper resize for single + dual modes. The
+     *  observer is replaced (not stacked) on every layout change; custom
+     *  mode disconnects it because the user explicitly chose a free
+     *  zoom. The `_onZoomChangeCb` hook lets the settings popover keep
+     *  its slider in sync with auto-fit recomputes. */
+    _setupLayoutResizeObserver() {
+        if (this._layoutResizeObserver) {
+            this._layoutResizeObserver.disconnect();
+            this._layoutResizeObserver = null;
+        }
+        if (this._pageLayout !== 'single' && this._pageLayout !== 'dual') return;
+        if (!this._wrapper) return;
+        this._layoutResizeObserver = new ResizeObserver(() => {
+            if (this._pageLayout !== 'single' && this._pageLayout !== 'dual') return;
+            const newZoom = this._computeFitZoom(this._pageLayout);
+            if (Math.abs(newZoom - this._pdfZoom) < 0.005) return;
+            this._pdfZoom = newZoom;
+            this._applyZoom();
+            if (this._onZoomChangeCb) {
+                try { this._onZoomChangeCb(newZoom); } catch (e) { /* defensive */ }
+            }
+        });
+        this._layoutResizeObserver.observe(this._wrapper);
+    }
+
+    /** Register a callback fired when the zoom changes via auto-fit.
+     *  The settings popover uses this to update its slider's UI without
+     *  driving a feedback loop back into setZoom. */
+    onZoomChange(cb) { this._onZoomChangeCb = cb; }
 
     /** Read the current textarea value when the viewer is in edit mode.
      * Returns null when not editing. */
@@ -504,6 +624,11 @@ export class DocumentViewer {
             // updates this as the user navigates; tab-switch rebuilds
             // of the bar read it via getCurrentPage().
             this._currentPage = 1;
+            // Default every fresh PDF to "One page" layout. This both
+            // resets state (in case the same viewer instance previously
+            // held a different layout/zoom) and wires up the auto-fit
+            // ResizeObserver so the page rescales with the wrapper.
+            this.setPageLayout('single');
             // PDF is now ready for navigation queries (pageCount,
             // getCurrentPage). Fire the ready callback exactly once so
             // the second-bar PDF controls can populate "X / N".
@@ -795,6 +920,14 @@ export class DocumentViewer {
     }
 
     _cleanup() {
+        // Layout-fit observer is owned by the viewer (not by _pdfState),
+        // so disconnect it independently of whether a PDF was actually
+        // loaded — it can outlive a PDF if setPageLayout was called
+        // before show().
+        if (this._layoutResizeObserver) {
+            this._layoutResizeObserver.disconnect();
+            this._layoutResizeObserver = null;
+        }
         if (!this._pdfState) return;
         const state = this._pdfState;
 

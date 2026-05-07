@@ -1371,8 +1371,13 @@ class App {
         if (key && key.startsWith('notebook:')) {
             this._tocPanel.setNotebookMode();
         } else if (key && key.startsWith('doc:')) {
-            // Document viewer — markdown or PDF
-            const dv = this._documentViewer;
+            // Document viewer — markdown or PDF. Per-tab viewers live in
+            // the `_documentViewers` Map (keyed by tab key); the singular
+            // `_documentViewer` was a legacy single-shared instance that
+            // never gets populated, so reading from it always pointed at
+            // an empty viewer and short-circuited to the markdown empty
+            // state.
+            const dv = this._documentViewers.get(key);
             if (dv && dv._pdfState && dv._pdfState.pdfDoc) {
                 // PDF document
                 this._tocPanel.setPdfMode(
@@ -1428,7 +1433,7 @@ class App {
         return frag;
     }
 
-    _buildDocumentBars(key) {
+    _buildDocumentBars(key, viewerOverride = null, floating = false) {
         const frag = document.createDocumentFragment();
 
         const bar = document.createElement('div');
@@ -1477,20 +1482,26 @@ class App {
         const spacer = document.createElement('span');
         spacer.style.flex = '1';
         bar.appendChild(spacer);
-        // Undock button
-        const undockBtn = document.createElement('button');
-        undockBtn.className = 'info-bar-text-btn';
-        undockBtn.innerHTML = '<i class="fa-solid fa-up-right-from-square" style="font-size:11px;color:#555555"></i>';
-        undockBtn.title = 'Undock to floating panel';
-        undockBtn.addEventListener('click', () => this._tabBar.undockTab(key));
-        bar.appendChild(undockBtn);
-        // Close button
-        const closeBtn = document.createElement('button');
-        closeBtn.className = 'info-bar-text-btn';
-        closeBtn.innerHTML = '<i class="fa-solid fa-xmark" style="font-size:11px;color:#555555"></i>';
-        closeBtn.title = 'Close';
-        closeBtn.addEventListener('click', () => this._tabBar.closeTab(key));
-        bar.appendChild(closeBtn);
+
+        // Undock + Close buttons. Only shown in the docked layout; the
+        // floating panel has its own header controls (jsPanel's "dock"
+        // and "close" icons in the title bar) that already cover both
+        // actions, so showing them here too would be redundant.
+        if (!floating) {
+            const undockBtn = document.createElement('button');
+            undockBtn.className = 'info-bar-text-btn';
+            undockBtn.innerHTML = '<i class="fa-solid fa-up-right-from-square" style="font-size:11px;color:#555555"></i>';
+            undockBtn.title = 'Undock to floating panel';
+            undockBtn.addEventListener('click', () => this._tabBar.undockTab(key));
+            bar.appendChild(undockBtn);
+
+            const closeBtn = document.createElement('button');
+            closeBtn.className = 'info-bar-text-btn';
+            closeBtn.innerHTML = '<i class="fa-solid fa-xmark" style="font-size:11px;color:#555555"></i>';
+            closeBtn.title = 'Close';
+            closeBtn.addEventListener('click', () => this._tabBar.closeTab(key));
+            bar.appendChild(closeBtn);
+        }
 
         frag.appendChild(bar);
 
@@ -1525,13 +1536,50 @@ class App {
         // follow-up — page nav lands first.
         const isPdf = (doc?.location || '').toLowerCase().endsWith('.pdf');
         if (isPdf) {
-            const viewer = this._documentViewers.get(key);
+            // Floating panels pass an explicit viewer (their own
+            // DocumentViewer instance is independent of the docked tab's).
+            // Default: look up the docked viewer by tab key.
+            const viewer = viewerOverride || this._documentViewers.get(key);
+
+            // Download button on the left — same URL the DocumentViewer
+            // uses for fetching the PDF, just routed through an <a download>
+            // so the browser saves it instead of streaming. Filename is
+            // the source path's basename.
+            const left = document.createElement('span');
+            left.className = 'service-second-bar-left';
+            const downloadBtn = document.createElement('button');
+            downloadBtn.className = 'pdf-ctl-btn pdf-ctl-download';
+            downloadBtn.innerHTML = '<span class="pdf-ctl-icon pdf-ctl-icon-download" aria-hidden="true"></span>';
+            downloadBtn.title = 'Download PDF';
+            downloadBtn.addEventListener('click', () => {
+                const locPath = (doc?.location || '').replace(/^files\//, '');
+                if (!locPath) return;
+                const url = 'api/documents/files/' + locPath.split('/').map(encodeURIComponent).join('/');
+                const filename = locPath.split('/').pop() || 'download.pdf';
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+            });
+            left.appendChild(downloadBtn);
+
+            const infoBtn = document.createElement('button');
+            infoBtn.className = 'pdf-ctl-btn pdf-ctl-info';
+            infoBtn.innerHTML = '<span class="pdf-ctl-icon pdf-ctl-icon-info" aria-hidden="true"></span>';
+            infoBtn.title = 'Document information';
+            infoBtn.addEventListener('click', () => this._openDocumentInfoPanel(doc, viewer));
+            left.appendChild(infoBtn);
+
+            secondBar.appendChild(left);
+
             const center = document.createElement('span');
             center.className = 'service-second-bar-center pdf-controls';
 
             const prevBtn = document.createElement('button');
             prevBtn.className = 'pdf-ctl-btn';
-            prevBtn.innerHTML = '<i class="fa-solid fa-chevron-left"></i>';
+            prevBtn.innerHTML = '<i class="fa-solid fa-caret-left"></i>';
             prevBtn.title = 'Previous page';
 
             const pageInput = document.createElement('input');
@@ -1546,7 +1594,7 @@ class App {
 
             const nextBtn = document.createElement('button');
             nextBtn.className = 'pdf-ctl-btn';
-            nextBtn.innerHTML = '<i class="fa-solid fa-chevron-right"></i>';
+            nextBtn.innerHTML = '<i class="fa-solid fa-caret-right"></i>';
             nextBtn.title = 'Next page';
 
             center.appendChild(prevBtn);
@@ -1599,9 +1647,272 @@ class App {
                 viewer.onReady(() => syncDisplay());
                 viewer.onPageChange(() => syncDisplay());
             }
+
+            // Sliders / settings icon on the right of the second bar —
+            // opens a popover with page-layout radios + zoom slider,
+            // anchored under the icon. Visible in both docked and
+            // floating modes (the second bar shows in both).
+            const right = document.createElement('span');
+            right.className = 'service-second-bar-right';
+            const slidersBtn = document.createElement('button');
+            slidersBtn.className = 'pdf-ctl-sliders';
+            slidersBtn.innerHTML = '<span class="pdf-ctl-icon pdf-ctl-icon-sliders" aria-hidden="true"></span>';
+            slidersBtn.title = 'Settings';
+            slidersBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (!viewer) return;
+                this._openPdfSettingsPopover(slidersBtn, viewer);
+            });
+            right.appendChild(slidersBtn);
+            secondBar.appendChild(right);
         }
         frag.appendChild(secondBar);
         return frag;
+    }
+
+    /** Build a small floating popover anchored under `anchorEl` with the
+     *  PDF page-layout radios (One / Two / Custom) and a zoom slider.
+     *  Toggles on second click of the same anchor; click-outside dismiss
+     *  is wired with `capture: true` so it fires before the popover's
+     *  internal handlers swallow the event. The viewer is the override-
+     *  aware instance from the caller — drives THAT viewer, not the
+     *  shared docked one. Auto-fit recomputes on resize call back into
+     *  the slider via viewer.onZoomChange. */
+    _openPdfSettingsPopover(anchorEl, viewer) {
+        // Toggle: if already open AND anchored to the same button, close.
+        if (this._pdfSettingsPopover && this._pdfSettingsPopover._anchorEl === anchorEl) {
+            this._closePdfSettingsPopover();
+            return;
+        }
+        this._closePdfSettingsPopover();
+
+        const pop = document.createElement('div');
+        pop.className = 'pdf-settings-popover';
+        pop._anchorEl = anchorEl;
+
+        const layout = viewer.getPageLayout();
+        const zoomPct = Math.round(viewer.getZoom() * 100);
+
+        const radioRow = (value, label) => {
+            const checked = layout === value ? 'checked' : '';
+            return `
+                <label class="pdf-settings-radio">
+                    <input type="radio" name="pdf-settings-layout" value="${value}" ${checked}>
+                    <span>${label}</span>
+                </label>`;
+        };
+
+        pop.innerHTML = `
+            <div class="pdf-settings-section">
+                <div class="pdf-settings-label">Page layout</div>
+                ${radioRow('single', 'One page')}
+                ${radioRow('dual', 'Two pages')}
+                ${radioRow('custom', 'Custom')}
+            </div>
+            <div class="pdf-settings-section">
+                <div class="pdf-settings-label">Zoom</div>
+                <div class="pdf-settings-zoom-row">
+                    <input type="range" class="pdf-settings-zoom-slider"
+                        min="10" max="300" step="1" value="${zoomPct}">
+                    <span class="pdf-settings-zoom-value">${zoomPct}%</span>
+                </div>
+            </div>
+        `;
+
+        // Position under the anchor, right-aligned so the popover doesn't
+        // run off the breadcrumb bar. Use position: fixed so the popover
+        // floats above the floating jsPanel for undocked PDFs.
+        document.body.appendChild(pop);
+        const rect = anchorEl.getBoundingClientRect();
+        const popRect = pop.getBoundingClientRect();
+        const top = rect.bottom + 4;
+        let left = rect.right - popRect.width;
+        if (left < 8) left = 8;
+        pop.style.top = `${top}px`;
+        pop.style.left = `${left}px`;
+
+        // Wire layout radios.
+        pop.querySelectorAll('input[name="pdf-settings-layout"]').forEach(r => {
+            r.addEventListener('change', () => {
+                if (!r.checked) return;
+                viewer.setPageLayout(r.value);
+                const newPct = Math.round(viewer.getZoom() * 100);
+                slider.value = String(newPct);
+                zoomVal.textContent = `${newPct}%`;
+            });
+        });
+
+        // Wire zoom slider. Slider input switches the layout to "custom"
+        // (ResizeObserver-driven auto-fit would otherwise immediately
+        // overwrite a user-set zoom on the next resize event for single
+        // and dual modes). Mirrors docbro's behavior.
+        const slider = pop.querySelector('.pdf-settings-zoom-slider');
+        const zoomVal = pop.querySelector('.pdf-settings-zoom-value');
+        slider.addEventListener('input', () => {
+            const pct = parseInt(slider.value, 10);
+            if (!Number.isFinite(pct)) return;
+            zoomVal.textContent = `${pct}%`;
+            // Ensure no auto-fit fights the user.
+            if (viewer.getPageLayout() !== 'custom') {
+                viewer.setPageLayout('custom');
+                const customRadio = pop.querySelector('input[value="custom"]');
+                if (customRadio) customRadio.checked = true;
+            }
+            viewer.setZoom(pct / 100);
+        });
+
+        // Auto-fit feedback for single + dual: keep the slider in sync
+        // when the wrapper resize triggers a zoom recompute.
+        viewer.onZoomChange((z) => {
+            const pct = Math.round(z * 100);
+            slider.value = String(pct);
+            zoomVal.textContent = `${pct}%`;
+        });
+
+        // Hover-out dismiss. The popover opens on click but should close
+        // as soon as the user moves the pointer away from it. Two-step:
+        //   1. Wait for the mouse to actually enter the popover (so the
+        //      popover doesn't close immediately when it appears under
+        //      a pointer that's still on the anchor — there's a 4px gap
+        //      between anchor and popover that briefly counts as "out").
+        //   2. After that first enter, any mouseleave closes.
+        let entered = false;
+        pop.addEventListener('mouseenter', () => { entered = true; });
+        pop.addEventListener('mouseleave', () => {
+            if (entered) this._closePdfSettingsPopover();
+        });
+        // Click-outside dismiss as a fallback for the case where the
+        // user clicks the anchor but never moves the pointer onto the
+        // popover (mouseleave never fires). capture:true so the handler
+        // fires before any inner click on the popover itself stops
+        // propagation. Skip dismissal when the click lands inside the
+        // popover or on the anchor (the toggle path handles re-anchor
+        // clicks). Deferred to next frame so the opening click doesn't
+        // immediately close.
+        const onDocClick = (ev) => {
+            if (pop.contains(ev.target) || anchorEl.contains(ev.target)) return;
+            this._closePdfSettingsPopover();
+        };
+        requestAnimationFrame(() => {
+            document.addEventListener('mousedown', onDocClick, true);
+            pop._onDocClick = onDocClick;
+        });
+
+        this._pdfSettingsPopover = pop;
+    }
+
+    _closePdfSettingsPopover() {
+        const pop = this._pdfSettingsPopover;
+        if (!pop) return;
+        if (pop._onDocClick) {
+            document.removeEventListener('mousedown', pop._onDocClick, true);
+        }
+        pop.remove();
+        this._pdfSettingsPopover = null;
+    }
+
+    /** Open a floating Document Information jsPanel with file stats and
+     *  knowledge-base counts for a PDF doc. Two phases:
+     *    1. Render immediately with locally-known fields (title, path,
+     *       pages from the viewer) and "Loading…" placeholders for the
+     *       fields that need a backend round-trip.
+     *    2. Fetch /api/documents/info?domain=<>&path=<> in the background;
+     *       fill in size, modified date, mode, chunk/section/caption
+     *       counts, entity counts (per-doc + whole-domain).
+     *  No panel-level cache — each open re-fetches. The endpoint is
+     *  cheap so re-fetch is cheaper than tracking invalidation. */
+    _openDocumentInfoPanel(doc, viewer) {
+        const jp = window.jsPanel;
+        if (!jp) return;
+        const locPath = (doc?.location || '').replace(/^files\//, '');
+        const segments = locPath.split('/');
+        const domain = segments[0] || '';
+        const relPath = segments.slice(1).join('/');
+        const basename = relPath.split('/').pop() || locPath || 'Document';
+        const pageCount = viewer && viewer.pageCount ? viewer.pageCount : null;
+
+        const fmtBytes = (n) => {
+            if (n == null) return '—';
+            if (n < 1024) return `${n} B`;
+            if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+            if (n < 1024 * 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1)} MB`;
+            return `${(n / 1024 / 1024 / 1024).toFixed(2)} GB`;
+        };
+        const fmtDate = (iso) => {
+            if (!iso) return '—';
+            try { return new Date(iso).toLocaleString(); }
+            catch { return iso; }
+        };
+        const escape = (s) => String(s == null ? '' : s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const row = (k, v) => `
+            <div class="docinfo-row">
+                <span class="docinfo-k">${k}</span>
+                <span class="docinfo-v">${v}</span>
+            </div>`;
+        const sectionHeader = (label) => `
+            <div class="docinfo-section">${label}</div>`;
+
+        const renderBody = (info) => {
+            const pages = pageCount != null ? String(pageCount) : '—';
+            const size = fmtBytes(info?.size);
+            const modified = fmtDate(info?.modified_at);
+            const mode = info?.manifest?.mode || '—';
+
+            const chunks = info?.chunks != null ? String(info.chunks) : '—';
+            const sections = info?.sections != null ? String(info.sections) : '—';
+            const picCaps = info?.picture_captions != null ? String(info.picture_captions) : '—';
+            const tabCaps = info?.table_captions != null ? String(info.table_captions) : '—';
+            const entDoc = info?.entities_in_doc != null ? String(info.entities_in_doc) : '—';
+            const entDom = info?.entities_in_domain != null ? String(info.entities_in_domain) : '—';
+            const relsDom = info?.relationships_in_domain != null ? String(info.relationships_in_domain) : '—';
+
+            const showCaptions = info && (info.picture_captions > 0 || info.table_captions > 0);
+
+            return `
+                ${sectionHeader('Document')}
+                ${row('Title', escape(basename))}
+                ${row('Path', escape(locPath))}
+                ${row('Pages', pages)}
+                ${row('Size', size)}
+                ${row('Modified', modified)}
+                ${row('Ingestion mode', escape(mode))}
+
+                ${sectionHeader('Knowledge Base')}
+                ${row('Domain', escape(domain || '—'))}
+                ${row('Vector chunks', chunks)}
+                ${row('Sections', sections)}
+                ${showCaptions ? row('Picture captions', picCaps) : ''}
+                ${showCaptions ? row('Table captions', tabCaps) : ''}
+                ${row('Graph entities (this doc)', entDoc)}
+                ${row('Graph entities (domain)', entDom)}
+                ${row('Graph relationships (domain)', relsDom)}
+            `;
+        };
+
+        const panel = jp.create({
+            id: `document-info-${Date.now()}`,
+            headerTitle: `<i class="fa-solid fa-circle-info" style="color:#5a809c;margin-right:6px;font-size:12px"></i>Document Information`,
+            theme: 'none',
+            borderRadius: '5px',
+            border: '1px solid var(--border-color)',
+            boxShadow: 3,
+            position: 'center',
+            panelSize: { width: 480, height: 560 },
+            headerControls: { minimize: 'remove', smallify: 'remove', normalize: 'remove', maximize: 'remove' },
+            callback: (p) => {
+                p.content.style.cssText = 'padding:14px 18px;font-size:12px;color:var(--text-color);overflow:auto;background:#fdfaf3;font-family:var(--font-sans)';
+                p.content.innerHTML = renderBody(null);
+                if (!domain || !relPath) return;
+                fetch(`api/documents/info?domain=${encodeURIComponent(domain)}&path=${encodeURIComponent(relPath)}`)
+                    .then((r) => r.ok ? r.json() : null)
+                    .then((info) => {
+                        if (info) p.content.innerHTML = renderBody(info);
+                    })
+                    .catch(() => {});
+            },
+        });
+        return panel;
     }
 
     /** Toggle a buffer doc tab between rendered preview and raw markdown

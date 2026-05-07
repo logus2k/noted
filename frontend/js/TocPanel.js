@@ -200,9 +200,14 @@ export class TocPanel {
         a.href = 'javascript:void(0)';
         a.addEventListener('click', (e) => {
             e.preventDefault();
-            // Force this entry active immediately on click
             for (const h of this._headingEls) h.li.classList.remove('toc-active');
             li.classList.add('toc-active');
+            // Block _updateActive from re-deriving the active heading
+            // from layout math during the click. After the scroll lands,
+            // the topmost-visible heading by viewport position can be
+            // the one ABOVE the clicked target (when the scrollHost sits
+            // below the 80px threshold), which would silently overwrite
+            // the click-applied state.
             this._clickLock = true;
 
             const target = headingEl || cell.element;
@@ -214,7 +219,6 @@ export class TocPanel {
             } else {
                 target.scrollIntoView({ behavior: 'instant', block: 'start' });
             }
-            // Release lock after scroll settles
             requestAnimationFrame(() => requestAnimationFrame(() => { this._clickLock = false; }));
             if (this._onSelectCell) {
                 this._onSelectCell(cellIndex);
@@ -502,10 +506,20 @@ export class TocPanel {
 
         const host = this._scrollHost;
         if (!host) return;
+        const hostRect = host.getBoundingClientRect();
         let active = this._headingEls[0];
 
+        // Host-relative position — the heading's top measured from the
+        // scrollable area's top edge, not the viewport's. Earlier code
+        // used viewport-relative math (`top <= 80`), which broke when
+        // toolbars and sidebars pushed the scrollHost more than ~50px
+        // below the viewport top: after clicking heading B, B would
+        // land at viewport y ≈ scrollHost.top + 30 ≈ 130 (failing the
+        // 80 threshold) while heading A just above sat at viewport
+        // y ≈ 60 (passing it), so A silently overwrote B.
         for (const h of this._headingEls) {
-            if (h.el.getBoundingClientRect().top <= 80) active = h;
+            const relTop = h.el.getBoundingClientRect().top - hostRect.top;
+            if (relTop <= 80) active = h;
         }
 
         if (host.scrollTop < 2) {
@@ -519,19 +533,5 @@ export class TocPanel {
             h.li.classList.remove('toc-active');
         }
         active.li.classList.add('toc-active');
-
-        // Keep active item visible in TOC panel
-        const tocEl = this._el;
-        const liRect = active.li.getBoundingClientRect();
-        const tocRect = tocEl.getBoundingClientRect();
-        const padTop = parseFloat(getComputedStyle(tocEl).paddingTop);
-        const padBottom = parseFloat(getComputedStyle(tocEl).paddingBottom);
-        const visibleTop = tocRect.top + padTop;
-        const visibleBottom = tocRect.bottom - padBottom;
-        if (liRect.top < visibleTop) {
-            tocEl.scrollTop += liRect.top - visibleTop;
-        } else if (liRect.bottom > visibleBottom) {
-            tocEl.scrollTop += liRect.bottom - visibleBottom;
-        }
     }
 }

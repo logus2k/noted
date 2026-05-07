@@ -860,6 +860,149 @@ def entity_neighborhood(
     }
 
 
+@router.get('/{domain_id}/document_info')
+def document_info(domain_id: str, path: str):
+    """Per-document statistics for the Document Information panel.
+
+    Returns chunk counts (total + per-kind for caption chunks), section
+    counts, and entity counts both attributable to this doc and across
+    the whole domain. Two ArcadeDB queries (chunks + entities) plus the
+    domain's global_counts snapshot. Designed to complete in <500ms for
+    typical corpora.
+
+    Path is the Domain-relative source path (e.g. `Deep Learning Book.pdf`).
+    """
+    kb = _get_domain(domain_id)
+    if not kb.has_knowledge():
+        return {
+            'has_knowledge': False,
+            'chunks': 0, 'sections': 0,
+            'picture_captions': 0, 'table_captions': 0,
+            'entities_in_doc': 0,
+            'entities_in_domain': 0,
+            'relationships_in_domain': 0,
+        }
+
+    # Chunks for this doc. CONTAINS is a fast prefilter (uses the
+    # properties_json content); we re-validate by parsing properties_json
+    # because CONTAINS can match on substring noise. Using STARTS WITH on
+    # the id avoids the stale Entity.type index pattern.
+    chunk_count = 0
+    section_paths: set[str] = set()
+    pic_caps = 0
+    tab_caps = 0
+    try:
+        rows = kb.storage._c.query(
+            '''MATCH (c:Entity)
+               WHERE $pid IN c.project_ids
+                 AND c.id STARTS WITH "markdown_chunk:"
+                 AND c.properties_json CONTAINS $doc_path
+               RETURN c.properties_json AS props''',
+            {'pid': kb.project_id, 'doc_path': path},
+        )
+    except ArcadeDBError as e:
+        raise HTTPException(status_code=500, detail=f'ArcadeDB error: {e}')
+
+    for r in rows:
+        try:
+            props = _json.loads(r.get('props') or '{}')
+        except Exception:
+            continue
+        if props.get('doc_path') != path:
+            # CONTAINS can match if doc_path string appears in some other
+            # field — drop the false positive.
+            continue
+        chunk_count += 1
+        sp = props.get('section_path')
+        if sp:
+            section_paths.add(sp)
+        kind = props.get('kind')
+        if kind == 'picture_caption':
+            pic_caps += 1
+        elif kind == 'table_caption':
+            tab_caps += 1
+
+    # Thematic entities attributable to this doc — entities whose
+    # source_doc_paths list includes this path. Skip chunk / community /
+    # community_summary / markdown_doc entities; those aren't "extracted
+    # entities" in the user-facing sense.
+    entities_in_doc = 0
+    try:
+        e_rows = kb.storage._c.query(
+            '''MATCH (e:Entity)
+               WHERE $pid IN e.project_ids
+                 AND e.properties_json CONTAINS $doc_path
+                 AND NOT e.id STARTS WITH "markdown_chunk:"
+                 AND NOT e.id STARTS WITH "markdown_doc:"
+                 AND NOT e.id STARTS WITH "community:"
+                 AND NOT e.id STARTS WITH "community_summary:"
+               RETURN e.properties_json AS props''',
+            {'pid': kb.project_id, 'doc_path': path},
+        )
+    except ArcadeDBError as e:
+        raise HTTPException(status_code=500, detail=f'ArcadeDB error: {e}')
+
+    for r in e_rows:
+        try:
+            props = _json.loads(r.get('props') or '{}')
+        except Exception:
+            continue
+        sources = props.get('source_doc_paths') or []
+        if path in sources:
+            entities_in_doc += 1
+
+    # Whole-domain counts.
+    try:
+        counts = kb.storage.counts()
+    except ArcadeDBError:
+        counts = {'entities': 0, 'relationships': 0}
+
+    # File stats from disk (size + mtime) and manifest entry (mode +
+    # added_at + display_name). Both are best-effort: missing file or
+    # missing manifest entry just yields nulls.
+    from app import corpus as _corpus
+    abs_path = _corpus.source_abs_path(domain_id, path)
+    size = None
+    mtime_iso = None
+    try:
+        st = os.stat(abs_path)
+        size = int(st.st_size)
+        from datetime import datetime, timezone
+        mtime_iso = datetime.fromtimestamp(st.st_mtime, tz=timezone.utc).isoformat()
+    except OSError:
+        pass
+
+    manifest_entry = None
+    try:
+        for d in _corpus.list_documents(domain_id):
+            if d.get('path') == path:
+                manifest_entry = {
+                    'mode': d.get('mode'),
+                    'added_at': d.get('added_at') or None,
+                    'category': d.get('category') or None,
+                    'display_name': d.get('display_name') or None,
+                }
+                break
+    except Exception:
+        pass
+
+    return {
+        'has_knowledge': True,
+        'domain_id': domain_id,
+        'path': path,
+        'size': size,
+        'modified_at': mtime_iso,
+        'manifest': manifest_entry,
+        'chunks': chunk_count,
+        'sections': len(section_paths),
+        'picture_captions': pic_caps,
+        'table_captions': tab_caps,
+        'entities_in_doc': entities_in_doc,
+        'entities_in_domain': int(counts.get('entities') or 0),
+        'relationships_in_domain': int(counts.get('relationships') or 0),
+    }
+
+
 @router.get('/{domain_id}/chunk/{chunk_id:path}')
 def chunk_lookup(domain_id: str, chunk_id: str):
     """Resolve a markdown_chunk entity id to its provenance.

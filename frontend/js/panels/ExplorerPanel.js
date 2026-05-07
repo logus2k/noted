@@ -1,4 +1,4 @@
-import { iconPathForFile, iconPath, isTextEditable, isMediaViewable, FOLDER_ICON, FOLDER_OPEN_ICON } from '../file-icons.js';
+import { iconPathForFile, iconPath, isTextEditable, isMediaViewable, kbDocIconForFile, FOLDER_ICON, FOLDER_OPEN_ICON } from '../file-icons.js';
 import { clearActionBar, createDetailHeader } from './explorer/ExplorerHelpers.js';
 import { notify } from '../Notify.js';
 import { createProjectViews } from './explorer/ExplorerProjectViews.js';
@@ -3016,7 +3016,7 @@ export class ExplorerPanel {
             return {
                 title: baseTitle + modeBadge,
                 key: `kb-documents:doc:${x.domain_id}:${x.path}`,
-                icon: x.exists === false ? 'fa-solid fa-file-circle-exclamation' : 'fa-solid fa-file-lines',
+                icon: x.exists === false ? 'fa-solid fa-file-circle-exclamation' : kbDocIconForFile(x.path),
                 tooltip: `${x.path}\nDomain: ${x.domain_name}` + (x.exists === false ? '  [missing on disk]' : '') + (x.category ? `\nFolder: ${x.category}` : ''),
                 data: { path: x.path, mode: x.mode, exists: x.exists, added_at: x.added_at, category: x.category || '', display_name: x.display_name || '', domain_id: x.domain_id, domain_name: x.domain_name },
             };

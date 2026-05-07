@@ -3,7 +3,7 @@
  */
 
 import { modalConfirm, modalError } from '../../modal.js';
-import { iconPathForFile } from '../../file-icons.js';
+import { kbDocIconForFile } from '../../file-icons.js';
 import { createDetailHeader, addParentLabel } from './ExplorerHelpers.js';
 
 /**
@@ -260,7 +260,7 @@ export function createDocsViews(ctx) {
             children: docsByCategory[cat].map(doc => ({
                 title: doc.name,
                 key: `doc:${cat}:${doc.name}`,
-                icon: iconPathForFile(doc.location),
+                icon: kbDocIconForFile(doc.location),
             })),
         }));
 

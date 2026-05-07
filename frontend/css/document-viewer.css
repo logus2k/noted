@@ -4,7 +4,8 @@
     flex: 1;
     overflow-y: auto;
     box-sizing: border-box;
-    background: var(--bg-primary);
+    background: #e9e9e9;
+    margin-right: 5px;
 }
 
 .document-viewer-wrapper::-webkit-scrollbar-track {
@@ -209,21 +210,54 @@
     flex-direction: column;
     align-items: center;
     gap: 8px;
-    background: #ebebeb;
+    background: #e9e9e9;
 }
 
 .pdf-page {
     position: relative;
     width: 100%;
-    max-width: 900px;
+    max-width: calc(900px * var(--pdf-zoom, 1));
     background: white;
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
 }
 
 .pdf-page canvas {
     display: block;
-    width: 100%;
+    width: 100% !important;
     height: auto;
+}
+
+/* Dual-page layout: pages flow two-up, each fixed at half the single
+   width × the zoom multiplier. Wrapper switches to wrap+row layout. */
+.document-viewer-content.document-viewer-pdf.pdf-layout-dual {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    align-items: flex-start;
+    align-content: flex-start;
+    gap: 6px;
+}
+
+.document-viewer-content.document-viewer-pdf.pdf-layout-dual .pdf-page {
+    width: calc(450px * var(--pdf-zoom, 1));
+    max-width: calc(50% - 3px);
+    flex: 0 0 auto;
+}
+
+/* Custom layout: pages flow as many per row as the zoom permits. */
+.document-viewer-content.document-viewer-pdf.pdf-layout-custom {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    align-items: flex-start;
+    align-content: flex-start;
+    gap: 6px;
+}
+
+.document-viewer-content.document-viewer-pdf.pdf-layout-custom .pdf-page {
+    width: calc(450px * var(--pdf-zoom, 1));
+    max-width: calc(450px * var(--pdf-zoom, 1));
+    flex: 0 0 auto;
 }
 
 /* PDF text layer (for text selection only - the text itself must stay
