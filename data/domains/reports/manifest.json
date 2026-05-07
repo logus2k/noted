@@ -11,20 +11,21 @@
       "mode": "read_store",
       "added_at": "2026-05-06T19:08:11.643274+00:00",
       "category": "Reports/EU",
-      "display_name": ""
+      "display_name": "Address by Mario Draghi"
     },
     {
       "path": "The future of European competitiveness_ In-depth analysis and recommendations_0.pdf",
       "mode": "read_store",
       "added_at": "2026-05-06T19:08:12.692819+00:00",
       "category": "Reports/EU",
-      "display_name": ""
+      "display_name": "The Future of European Competitiveness - Analysis and Recommendations"
     },
     {
       "path": "The future of European competitiveness _ A competitiveness strategy for Europe.pdf",
       "mode": "read_store",
       "added_at": "2026-05-06T19:08:13.022006+00:00",
-      "category": "Reports/EU"
+      "category": "Reports/EU",
+      "display_name": "The Future of European Competitiveness - Mario Draghi Report"
     }
   ],
   "arcadedb_database": "reports",

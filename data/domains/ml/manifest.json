@@ -11,13 +11,13 @@
       "mode": "read_store",
       "added_at": "2026-04-30T16:14:15.641512+00:00",
       "category": "Machine Learning",
-      "display_name": ""
+      "display_name": "Introduction to Machine Learning"
     },
     {
       "path": "deep-learning-material-dept-ece-ase-blr-1.pdf",
       "mode": "read_store",
       "added_at": "2026-04-30T20:42:48.561054+00:00",
-      "category": "Machine Learning",
+      "category": "Machine Learning/Deep Learning",
       "display_name": "Fundamentals of Deep Learning"
     },
     {
@@ -32,28 +32,48 @@
       "mode": "read_store",
       "added_at": "2026-04-30T20:42:50.855648+00:00",
       "category": "Machine Learning",
-      "display_name": ""
+      "display_name": "Machine Learning - The Basics"
     },
     {
       "path": "mml-book.pdf",
       "mode": "read_store",
       "added_at": "2026-04-30T20:42:52.402112+00:00",
       "category": "Machine Learning",
-      "display_name": ""
+      "display_name": "Mathematics for Machine Learning"
     },
     {
       "path": "The Hundred-Page Machine Learning Book PDF.pdf",
       "mode": "read_store",
       "added_at": "2026-04-30T20:42:52.632176+00:00",
       "category": "Machine Learning",
-      "display_name": ""
+      "display_name": "The Hundred-Page Machine Learning Book"
     },
     {
       "path": "optimization_for_machine_learning.pdf",
       "mode": "read_store",
       "added_at": "2026-05-05T01:09:32.851347+00:00",
       "category": "Machine Learning",
+      "display_name": "Optimization for Machine Learning"
+    },
+    {
+      "path": "A Visual Introduction to Deep Learning.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-07T02:48:26.743950+00:00",
+      "category": "Machine Learning/Deep Learning",
       "display_name": ""
+    },
+    {
+      "path": "Deep Learning Book.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-07T02:48:30.101454+00:00",
+      "category": "Machine Learning/Deep Learning",
+      "display_name": ""
+    },
+    {
+      "path": "Deep Learning Illustrated.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-07T02:48:32.009467+00:00",
+      "category": "Machine Learning/Deep Learning"
     }
   ],
   "arcadedb_database": "ml",

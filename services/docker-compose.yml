@@ -349,6 +349,12 @@ services:
       DOCLING_TABLE_MODE: ${DOCLING_TABLE_MODE:-accurate}
       DOCLING_MAX_PAGES: ${DOCLING_MAX_PAGES:-2000}
       DOCLING_OCR: ${DOCLING_OCR:-false}
+      # Picture + table caption pass during ingest. When ON, every
+      # Docling PictureItem / TableItem in a converted PDF/DOCX/PPTX/HTML
+      # gets a short LLM caption (via agent_server's picture_describer /
+      # table_describer presets) injected into the chunk stream so it
+      # flows through embed + extraction identically to native text.
+      ENABLE_DOC_DESCRIPTIONS: ${ENABLE_DOC_DESCRIPTIONS:-true}
     volumes:
       # data/ is RW because noted-graph writes the corpus config + uploads
       # via the UI-driven /research/corpus endpoints. Application code is

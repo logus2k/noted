@@ -240,6 +240,35 @@ def recluster(domain_id: str):
         kb.rebuild_lock.release()
 
 
+@router.post('/{domain_id}/backfill_descriptions')
+def backfill_descriptions(domain_id: str):
+    """One-shot picture/table caption backfill for an existing corpus.
+
+    Run once after deploying ENABLE_DOC_DESCRIPTIONS=true to retroactively
+    caption pictures and tables in documents that were ingested before
+    the feature existed. Idempotent — re-running skips already-captioned
+    items via the `caption_for=<self_ref>` chunk-metadata marker.
+
+    Implementation lives in `ResearchBuilder.backfill_descriptions`; this
+    endpoint is the HTTP surface. Returns a summary dict on success.
+    """
+    kb = _get_domain(domain_id)
+    _require_knowledge(kb)
+    if not kb.rebuild_lock.acquire(blocking=False):
+        raise HTTPException(status_code=409, detail='Rebuild or recluster in progress')
+    try:
+        return kb.builder.backfill_descriptions()
+    except NotImplementedError as e:
+        raise HTTPException(status_code=501, detail=str(e))
+    except ArcadeDBError as e:
+        raise HTTPException(status_code=500, detail=f'ArcadeDB error: {e}')
+    except Exception as e:
+        logger.exception('backfill_descriptions failed')
+        raise HTTPException(status_code=500, detail=f'{type(e).__name__}: {e}')
+    finally:
+        kb.rebuild_lock.release()
+
+
 # ── Query / retrieve ──────────────────────────────────────────────
 
 @router.post('/{domain_id}/query')
@@ -882,4 +911,10 @@ def chunk_lookup(domain_id: str, chunk_id: str):
         'bbox': props.get('bbox'),
         'regions': regions or [],
         'snippet': (props.get('text') or '')[:200],
+        # Caption-chunk hint for the frontend's citation icon family.
+        # 'text' for ordinary prose / table chunks; 'picture_caption' /
+        # 'table_caption' for chunks where the LLM described a Docling
+        # PictureItem / TableItem at this provenance. Default 'text' for
+        # any chunk ingested before the captioning pipeline existed.
+        'kind': props.get('kind') or 'text',
     }

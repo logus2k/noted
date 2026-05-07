@@ -58,6 +58,29 @@ COMMUNITY_SUMMARY_PARALLELISM = int(
     os.environ.get('COMMUNITY_SUMMARY_PARALLELISM', str(ENTITY_EXTRACT_PARALLELISM))
 )
 
+# Picture + table description pass during ingest. When ON, every Docling
+# `PictureItem` / `TableItem` in a converted PDF/DOCX/PPTX/HTML gets a
+# short caption from the corresponding agent_server preset
+# (`picture_describer` / `table_describer`). Captions are folded into
+# the chunk stream just before extraction so they flow through embed +
+# entity extraction identically to native text. Default OFF until
+# validated on a real corpus; flip to true via env once the new
+# ingest path lands and is tested.
+ENABLE_DOC_DESCRIPTIONS = os.environ.get('ENABLE_DOC_DESCRIPTIONS', 'false').lower() == 'true'
+# Concurrent description workers. Same llama-server slot constraint as
+# entity extraction — raising past the gemma-4 slot count just queues
+# server-side. Defaults to ENTITY_EXTRACT_PARALLELISM so all GPU-bound
+# ingest phases share one knob in practice.
+DOC_DESCRIPTION_PARALLELISM = int(
+    os.environ.get('DOC_DESCRIPTION_PARALLELISM', str(ENTITY_EXTRACT_PARALLELISM))
+)
+# Skip pictures smaller than this many pixels (width × height). Filters
+# decorative bullet glyphs, separator marks, and tiny inline icons that
+# would just waste a vision call.
+PICTURE_DESCRIPTION_MIN_AREA_PX = int(
+    os.environ.get('PICTURE_DESCRIPTION_MIN_AREA_PX', '10000')
+)
+
 # Feature flag: route per-doc graph writes (`add_doc_merge`) through the
 # GraphBatch HTTP endpoint (`POST /api/v1/batch/<db>?lightEdges=false`)
 # introduced in ArcadeDB v26.3.2. The legacy UNWIND+MATCH+CREATE path

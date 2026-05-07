@@ -69,7 +69,7 @@ export class DomainManagerPanel {
             border: '1px solid var(--border-color)',
             boxShadow: 3,
             position: 'center',
-            panelSize: { width: 920, height: 620 },
+            panelSize: { width: 1288, height: 620 },
             headerControls: { minimize: 'remove', smallify: 'remove', normalize: 'remove', maximize: 'remove' },
             onclosed: () => this.destroy(),
             callback: (panel) => {

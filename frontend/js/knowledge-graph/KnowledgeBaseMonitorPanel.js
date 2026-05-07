@@ -71,6 +71,12 @@ const PHASE_SEQUENCES = {
         { key: 'caching',      label: 'Caching' },
         { key: 'done',         label: 'Done' },
     ],
+    backfill_descriptions: [
+        { key: 'scanning',   label: 'Scanning' },
+        { key: 'extracting', label: 'Extracting captions' },
+        { key: 'writing',    label: 'Writing' },
+        { key: 'done',       label: 'Done' },
+    ],
 };
 
 /** Pick a sensible default Domain when none is passed: prefer the first
@@ -196,6 +202,8 @@ export class KnowledgeBaseMonitorPanel {
                 <div class="grm-row"><span class="grm-k">entities accepted</span><span id="grm-entities" class="grm-v">0</span></div>
                 <div class="grm-row"><span class="grm-k">docs scanned</span><span id="grm-md-docs" class="grm-v">0</span></div>
                 <div class="grm-row"><span class="grm-k">communities</span><span id="grm-communities" class="grm-v">0 / 0 summarized</span></div>
+                <div id="grm-pictures-row" class="grm-row" style="display:none"><span class="grm-k">pictures</span><span id="grm-pictures" class="grm-v">-</span></div>
+                <div id="grm-tables-row" class="grm-row" style="display:none"><span class="grm-k">tables</span><span id="grm-tables" class="grm-v">-</span></div>
             </div>
 
             <div class="grm-card">
@@ -239,6 +247,7 @@ export class KnowledgeBaseMonitorPanel {
             'bar-label', 'chunks', 'progress-bar', 'progress-pct', 'rate', 'current-doc',
             'sub-row', 'sub',
             'stepper-row', 'stepper',
+            'pictures-row', 'pictures', 'tables-row', 'tables',
             'entities', 'md-docs', 'communities', 'db-entities', 'db-rels',
             'last-build', 'last-build-json', 'error-card', 'error-msg',
         ]) {
@@ -519,6 +528,30 @@ export class KnowledgeBaseMonitorPanel {
         this._els['communities'].textContent =
             (progress.communities_summarized || 0) + ' / ' + (progress.communities_total || 0) + ' summarized';
 
+        // Picture / table caption counters. Hidden when the corpus has
+        // none of the corresponding kind. Shows X / Y captioned plus a
+        // failed-count tail when any failed; clean when all succeeded.
+        const picTotal = progress.pictures_total || 0;
+        const picDone = progress.pictures_captioned || 0;
+        const picFailed = progress.pictures_failed || 0;
+        if (picTotal > 0) {
+            const tail = picFailed > 0 ? ` (${picFailed} failed)` : '';
+            this._els['pictures'].textContent = `${picDone} / ${picTotal} captioned${tail}`;
+            this._els['pictures-row'].style.display = '';
+        } else {
+            this._els['pictures-row'].style.display = 'none';
+        }
+        const tabTotal = progress.tables_total || 0;
+        const tabDone = progress.tables_captioned || 0;
+        const tabFailed = progress.tables_failed || 0;
+        if (tabTotal > 0) {
+            const tail = tabFailed > 0 ? ` (${tabFailed} failed)` : '';
+            this._els['tables'].textContent = `${tabDone} / ${tabTotal} captioned${tail}`;
+            this._els['tables-row'].style.display = '';
+        } else {
+            this._els['tables-row'].style.display = 'none';
+        }
+
         const counts = graph.global_counts || {};
         this._els['db-entities'].textContent = counts.entities ?? 0;
         this._els['db-rels'].textContent = counts.relationships ?? 0;
@@ -715,11 +748,26 @@ function _phaseBarStats(phase, progress) {
         return { done: 1, total: 1, label: 'writing', unit: '', showRate: false };
     }
     // Fast / instrumentation-less phases: fill the bar so the user sees
-    // we're moving through it rather than staring at a 0% bar.
+    // we're moving through it rather than staring at a 0% bar — UNLESS
+    // a sub_phase counter is in flight (e.g. picture/table captioning
+    // during scanning / adding_doc / parsing). Sub-phase data wins
+    // because it's more informative than a frozen full bar.
     const FAST = ['scanning', 'caching', 'sameas', 'merge_identity', 'similar_to',
                   'analytics', 'adding_doc', 'removing_doc', 'recluster_loading',
                   'parsing'];
     if (FAST.includes(phase)) {
+        if (hasSub) {
+            const label = sub === 'captioning_pictures' ? 'captioning pictures'
+                : sub === 'captioning_tables' ? 'captioning tables'
+                : sub;
+            return {
+                done: subDone, total: subTotal, label,
+                unit: sub === 'captioning_pictures' ? 'pictures'
+                    : sub === 'captioning_tables' ? 'tables'
+                    : 'items',
+                showRate: subTotal > 1,
+            };
+        }
         return { done: 1, total: 1, label: phase.replace('_', ' '), unit: '', showRate: false };
     }
     if (phase === 'done') {

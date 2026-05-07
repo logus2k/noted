@@ -11,27 +11,28 @@
       "mode": "read_store",
       "added_at": "2026-05-03T16:11:41.637922+00:00",
       "category": "Whitepapers/Transformers",
-      "display_name": ""
+      "display_name": "CLIP - Learning Transferable Visual Models From Natural Language Supervision"
     },
     {
       "path": "attention_is_all_you_need.pdf",
       "mode": "read_store",
       "added_at": "2026-05-03T17:02:00.325092+00:00",
       "category": "Whitepapers/Transformers",
-      "display_name": ""
+      "display_name": "Attention Is All You Need"
     },
     {
       "path": "training_llm_to_follow_instructions_with_hf.pdf",
       "mode": "read_store",
       "added_at": "2026-05-03T17:08:19.972609+00:00",
       "category": "Whitepapers/Transformers",
-      "display_name": ""
+      "display_name": "Training Language Models To Follow Instructions With Human Feedback"
     },
     {
       "path": "transformers_applications_survey.pdf",
       "mode": "read_store",
       "added_at": "2026-05-06T19:15:30.924367+00:00",
-      "category": "Whitepapers/Transformers"
+      "category": "Whitepapers/Transformers",
+      "display_name": "A Comprehensive Survey On Applications Of Transformers for Deep Learning Tasks"
     }
   ],
   "arcadedb_database": "ai_papers",

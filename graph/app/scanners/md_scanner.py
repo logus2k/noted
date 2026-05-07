@@ -76,6 +76,17 @@ class MdChunk:
     # rectangles on each page. `page_no`/`bbox` mirror regions[0] for
     # back-compat with code that still reads the single-region fields.
     regions: list[dict] | None = None       # [{'page_no': int, 'bbox': [x0,y0,x1,y1]}, ...]
+    # Caption-chunk marker. 'text' for normal prose / table chunks
+    # produced by the chunker; 'picture_caption' / 'table_caption' for
+    # chunks that carry an LLM-generated description of a Docling
+    # PictureItem or TableItem at this provenance. Used by:
+    #   - the citation icon-family branching in ChatPanel.js
+    #   - the backfill idempotency check (skip items already captioned)
+    kind: str = 'text'
+    # When kind is a caption, this points to the source Docling item's
+    # self_ref string (e.g. '#/pictures/3'). Lets backfill detect that a
+    # given picture/table has already been captioned in a previous pass.
+    caption_for: str | None = None
 
 
 class MdScanner:
@@ -88,13 +99,18 @@ class MdScanner:
         self._kb_id = kb_id or 'noted'
         self._root = repo_root or _sources_dir(self._kb_id)
 
-    def scan(self) -> tuple[list[Entity], list[Relationship], list[MdChunk]]:
+    def scan(self, progress_writer=None) -> tuple[list[Entity], list[Relationship], list[MdChunk]]:
         """Walk the corpus. Returns (entities, relationships, chunks).
 
         Chunks are returned separately because the caller (the rebuild
         orchestrator) needs chunk text to feed the extractor. The graph
         only stores chunk metadata + text; the text field is kept for
         prompt assembly later.
+
+        `progress_writer` is an optional callable that merges its dict
+        argument into the caller's progress dict. Forwarded into
+        `scan_pdf` so the picture/table captioning sub-phase + counters
+        surface in the KB Monitor during full rebuilds.
         """
         entities: list[Entity] = []
         rels: list[Relationship] = []
@@ -112,7 +128,11 @@ class MdScanner:
                     # Docling path. scan_pdf returns MdChunks; we build the
                     # markdown_doc entity inline (mirrors add_doc_pdf).
                     from app.scanners.pdf_scanner import scan_pdf
-                    chunks = scan_pdf(abs_path, repo_root=self._root)
+                    chunks = scan_pdf(
+                        abs_path,
+                        repo_root=self._root,
+                        progress_writer=progress_writer,
+                    )
                     try:
                         stat = os.stat(abs_path)
                         mtime = stat.st_mtime
@@ -153,6 +173,14 @@ class MdScanner:
                         'bbox': c.bbox,
                         'regions': c.regions,
                         'section_level': c.section_level,
+                        # Caption-chunk markers. Default 'text' / None for
+                        # ordinary prose; 'picture_caption' / 'table_caption'
+                        # plus a self_ref tag for chunks where the LLM
+                        # described a Docling PictureItem / TableItem at
+                        # this provenance. Used by the chat-side citation
+                        # icon family + the backfill idempotency check.
+                        'kind': c.kind,
+                        'caption_for': c.caption_for,
                         'purpose': 'extraction',
                         'parent_embedding_chunk_id': None,
                         'embedding_id': None,

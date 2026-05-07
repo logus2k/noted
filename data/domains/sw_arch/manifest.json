@@ -25,14 +25,14 @@
       "mode": "read_store",
       "added_at": "2026-04-28T02:31:01.589086+00:00",
       "category": "Software Agents",
-      "display_name": ""
+      "display_name": "Agentic Design Pattern Catalogue"
     },
     {
       "path": "ai-agents-playbook-en.pdf",
       "mode": "read_store",
       "added_at": "2026-04-28T02:31:02.494230+00:00",
       "category": "Software Agents",
-      "display_name": ""
+      "display_name": "Agentic AI Playbook"
     },
     {
       "path": "2026 Agentic Coding Trends Report.pdf",
@@ -46,7 +46,7 @@
       "mode": "read_store",
       "added_at": "2026-04-28T02:31:02.995201+00:00",
       "category": "Software Agents",
-      "display_name": ""
+      "display_name": "The 2026 State of AI Agents Report"
     }
   ],
   "arcadedb_database": "sw_arch",

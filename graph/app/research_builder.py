@@ -188,7 +188,9 @@ class ResearchBuilder:
 
         # 1. Scan markdown.
         self._set_phase('scanning')
-        md_entities, md_rels, chunks = self._scanner.scan()
+        md_entities, md_rels, chunks = self._scanner.scan(
+            progress_writer=self.progress.update,
+        )
         md_docs = sum(1 for e in md_entities if e.type == 'markdown_doc')
         logger.info(
             'Research build: md_scanner produced %d entities, %d rels, %d chunks',
@@ -688,7 +690,11 @@ class ResearchBuilder:
         # space during the 30-90s parse.
         self.progress['sub_phase'] = 'parsing'
         try:
-            chunks = scan_pdf(abs_path, repo_root=sources_root)
+            chunks = scan_pdf(
+                abs_path,
+                repo_root=sources_root,
+                progress_writer=self.progress.update,
+            )
         except Exception as e:
             self._set_phase('idle')
             logger.exception('add_doc_pdf: scanning %s failed', rel_path)
@@ -798,6 +804,11 @@ class ResearchBuilder:
                     'bbox': c.bbox,
                     'regions': c.regions,
                     'section_level': c.section_level,
+                    # See md_scanner equivalent — these flow through to
+                    # citations so the chat icon-family branching can
+                    # render fa-image / fa-table for caption chunks.
+                    'kind': c.kind,
+                    'caption_for': c.caption_for,
                     'purpose': 'extraction',
                     'parent_embedding_chunk_id': None,
                     'embedding_id': None,
@@ -1018,6 +1029,36 @@ class ResearchBuilder:
         self._set_phase('done', **{k: v for k, v in out.items() if k != 'started_at'})
         logger.info('Recluster complete: %s', out)
         return out
+
+    def backfill_descriptions(self) -> dict:
+        """One-shot backfill of picture + table captions for an existing
+        corpus that was ingested before ENABLE_DOC_DESCRIPTIONS was on.
+
+        For every doc in the corpus:
+          - Re-parse with Docling (fast — ~30s, no LLM cost).
+          - Caption every PictureItem and TableItem we haven't seen before,
+            detected via the `caption_for=<self_ref>` chunk-metadata marker.
+          - Augment existing chunks (or emit new caption-only chunks) and
+            run entity extraction over just the new caption text.
+          - Write the new chunks + entities + relationships into the graph
+            and the vector store.
+        Sets pending_recluster on success so the user can fire Recluster
+        Now afterwards to fold the new entities into communities.
+
+        Idempotent. Re-running on a doc that already has captions for all
+        its pictures/tables is a no-op.
+
+        NOTE: this method is a stub for the implementation that the
+        backfill endpoint will wire up after the main captioning path is
+        validated end-to-end. It currently raises so the endpoint surfaces
+        a clean 'not yet implemented' message rather than silently doing
+        nothing.
+        """
+        raise NotImplementedError(
+            'backfill_descriptions is staged but not yet implemented; '
+            'expected to land after the main captioning pipeline is '
+            'validated on a fresh import.'
+        )
 
 
 def _canonical_key(type_: str, name: str) -> str:

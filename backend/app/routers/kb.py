@@ -686,3 +686,26 @@ async def rebuild(domain_id: str):
             }
         except httpx.RequestError as e:
             raise HTTPException(status_code=502, detail=f"noted-graph unreachable: {e}")
+
+
+@router.post("/{domain_id}/backfill_descriptions")
+async def backfill_descriptions(domain_id: str):
+    """One-shot retroactive picture/table caption pass for an existing
+    corpus. No UI surface — fired manually via curl after enabling
+    ENABLE_DOC_DESCRIPTIONS so docs ingested before the feature get
+    their pictures/tables captioned without a full reimport.
+
+    Idempotent: re-running skips already-captioned items via the
+    `caption_for=<self_ref>` marker on caption chunks."""
+    async with httpx.AsyncClient(timeout=14400) as client:
+        try:
+            r = await client.post(
+                f"{NOTED_BASE}/api/graph/research/{domain_id}/backfill_descriptions"
+            )
+            if r.status_code == 404:
+                raise HTTPException(status_code=404, detail=f"unknown Domain: {domain_id!r}")
+            return r.json() if r.status_code == 200 else {
+                "status": "error", "code": r.status_code, "detail": r.text[:300],
+            }
+        except httpx.RequestError as e:
+            raise HTTPException(status_code=502, detail=f"noted-graph unreachable: {e}")

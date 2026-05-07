@@ -744,7 +744,7 @@
 
 .chat-attach-menu-item {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 10px;
     width: 100%;
     padding: 6px 10px;
@@ -972,6 +972,17 @@
 }
 .chat-citation-wrap.cite-family-graph .chat-citation-icon {
     color: #5a809c;
+}
+/* Caption-chunk citation icons. The chat panel async-resolves a chunk
+   citation's `kind` after render and swaps the family class when the
+   chunk is a picture or table caption. Distinct hues so a reader
+   scanning the reply can spot at a glance which claims are grounded
+   in images vs tables vs ordinary prose. */
+.chat-citation-wrap.cite-family-picture .chat-citation-icon {
+    color: #c77800;
+}
+.chat-citation-wrap.cite-family-table .chat-citation-icon {
+    color: #3a7e7e;
 }
 
 /* Citation badges. Rendered by ChatPanel._renderCitations after the

@@ -759,6 +759,58 @@ export class ChatPanel {
      * the tag (e.g. `markdown_chunk:abc123def4`) and the anchor element. */
     onCitationClick(cb) { this._onCitationClick = cb; }
 
+    /** Async-upgrade a chunk-citation's icon to fa-image / fa-table when
+     * the chunk is a picture/table caption. The badge is rendered with
+     * the default fa-file-lines first; this fetch resolves the chunk's
+     * `kind` from the existing /api/citations resolver and swaps classes
+     * if needed. Per-tag cache prevents duplicate fetches when several
+     * citations point at the same chunk. Failures are silent — the
+     * default icon stays. */
+    _upgradeCitationIcon(tag, wrap, icon) {
+        if (!this._citationKindCache) this._citationKindCache = new Map();
+        const cached = this._citationKindCache.get(tag);
+        const apply = (kind) => {
+            if (kind === 'picture_caption') {
+                wrap.classList.remove('cite-family-doc');
+                wrap.classList.add('cite-family-picture');
+                icon.classList.remove('fa-file-lines');
+                icon.classList.add('fa-image');
+            } else if (kind === 'table_caption') {
+                wrap.classList.remove('cite-family-doc');
+                wrap.classList.add('cite-family-table');
+                icon.classList.remove('fa-file-lines');
+                icon.classList.add('fa-table');
+            }
+        };
+        if (cached !== undefined) {
+            apply(cached);
+            return;
+        }
+        // Mark in-flight so concurrent renders for the same tag don't all
+        // queue fetches; they wait for the first promise instead.
+        if (this._citationKindInFlight && this._citationKindInFlight.has(tag)) {
+            this._citationKindInFlight.get(tag).then((kind) => apply(kind));
+            return;
+        }
+        if (!this._citationKindInFlight) this._citationKindInFlight = new Map();
+        const promise = (async () => {
+            try {
+                const r = await fetch(`api/citations/${encodeURIComponent(tag)}`);
+                if (!r.ok) return 'text';
+                const meta = await r.json();
+                const kind = meta && meta.kind ? meta.kind : 'text';
+                this._citationKindCache.set(tag, kind);
+                return kind;
+            } catch {
+                return 'text';
+            } finally {
+                this._citationKindInFlight.delete(tag);
+            }
+        })();
+        this._citationKindInFlight.set(tag, promise);
+        promise.then((kind) => apply(kind));
+    }
+
     /** Revert the dropdown to the previously confirmed model without firing the change event. */
     revertModelSelect() {
         if (this._lastConfirmedModel) {
@@ -1304,6 +1356,15 @@ export class ChatPanel {
                     icon.className = `fa-solid ${isGraph ? 'fa-share-nodes' : 'fa-file-lines'} chat-citation-icon`;
                     icon.setAttribute('aria-hidden', 'true');
                     wrap.appendChild(icon);
+
+                    // For chunk citations, async-resolve the chunk's `kind`
+                    // and upgrade the icon family for picture/table caption
+                    // chunks. The default fa-file-lines stays put for
+                    // ordinary prose chunks. Cached per-tag so multiple
+                    // citations to the same chunk make at most one fetch.
+                    if (!isGraph && /^markdown_chunk:[0-9a-f]{8,16}$/.test(tag)) {
+                        this._upgradeCitationIcon(tag, wrap, icon);
+                    }
 
                     const a = document.createElement('a');
                     a.className = `chat-citation ${typeClass}`;
