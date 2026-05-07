@@ -14,9 +14,33 @@ export class DocumentViewer {
         this._currentDoc = null;
         this._pdfState = null; // { pdfDoc, pageDivs, observers, renderVersion }
         this._pdfModule = null; // lazy-loaded pdf.js module
+        this._editTextarea = null; // present only while in buffer edit mode
     }
 
     get element() { return this._wrapper; }
+
+    get isEditing() { return !!this._editTextarea; }
+
+    /** Read the current textarea value when the viewer is in edit mode.
+     * Returns null when not editing. */
+    getEditValue() {
+        return this._editTextarea ? this._editTextarea.value : null;
+    }
+
+    /** Render a buffer doc as a raw-markdown textarea instead of rendered HTML.
+     * Same `doc` shape as show(); only kind === 'buffer' is supported. */
+    showEdit(doc) {
+        this._cleanup();
+        this._currentDoc = doc;
+        this._content.innerHTML = '';
+        this._content.className = 'document-viewer-content document-viewer-edit';
+        const ta = document.createElement('textarea');
+        ta.className = 'document-viewer-edit-textarea';
+        ta.value = doc.content || '';
+        ta.spellcheck = false;
+        this._content.appendChild(ta);
+        this._editTextarea = ta;
+    }
 
     /**
      * Load and display a document.
@@ -27,6 +51,7 @@ export class DocumentViewer {
      */
     async show(doc) {
         this._cleanup();
+        this._editTextarea = null;
         this._currentDoc = doc;
         this._content.innerHTML = '';
 

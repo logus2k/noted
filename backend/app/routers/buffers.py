@@ -29,6 +29,7 @@ _file_mgr = FileManager()
 class SaveBufferRequest(BaseModel):
     project_id: str
     path: str
+    content: str | None = None
 
 
 @router.get("/{buffer_id}")
@@ -49,6 +50,13 @@ def save_buffer(buffer_id: str, body: SaveBufferRequest):
     rel_path = (body.path or "").strip().lstrip("/")
     if not project_id or not rel_path:
         raise HTTPException(status_code=400, detail="project_id and path are required")
+
+    # If the frontend is editing in-place, ship the textarea content with the
+    # save call so the server-side buffer reflects the user's current edits
+    # before the on-disk write.
+    if body.content is not None:
+        notes_buffer.replace(buffer_id, body.content)
+        buf = notes_buffer.get(buffer_id)
 
     registry = get_registry()
     root_type = "mount" if registry.is_mount(project_id) else "project"

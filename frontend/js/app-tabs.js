@@ -749,7 +749,7 @@ export function initTabs(app) {
             if (!wrapper) return;
             const iframe = wrapper.querySelector('iframe');
             const currentUrl = iframe?.contentWindow?.location?.href || iframe?.src || `/${key}`;
-            const names = { airflow: 'Apache Airflow', mlflow: 'MLflow', minio: 'MinIO', evidently: 'Evidently', arcadedb: 'ArcadeDB Studio' };
+            const names = { airflow: 'Apache Airflow', mlflow: 'MLflow', minio: 'MinIO', evidently: 'Evidently', arcadedb: 'ArcadeDB' };
             const icons = {
                 mlflow: `<img src="static/images/mlflow.png" style="height:13px;margin-right:6px;vertical-align:top">`,
                 airflow: `<img src="static/images/airflow.png" style="height:13px;margin-right:6px;vertical-align:top">`,

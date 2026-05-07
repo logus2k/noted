@@ -75,6 +75,11 @@ class App {
          *  singleton _documentViewer above stays for shared markdown-rendering
          *  helpers used by md preview tabs and other non-doc-tab callers. */
         this._documentViewers = new Map();
+        /** @type {Map<string, boolean>} per-tab edit-mode flag for buffer doc tabs.
+         *  `true` while the user is editing the raw markdown source via the
+         *  Edit toggle in the second top bar. Skips SSE updates that would
+         *  otherwise clobber the textarea content. */
+        this._documentEditMode = new Map();
         /** @type {Map<string, FileEditor>} keyed by tab key "pyfile:{projectId}:{filename}" */
         this._fileEditors = new Map();
         /** @type {Map<string, MediaViewer>} keyed by tab key "media:{projectId}:{filename}" */
@@ -888,6 +893,11 @@ class App {
 
         const doc = this._documentTabs.get(tabKey);
         if (!doc) return;
+        // While the user is editing the raw markdown source, ignore live
+        // assistant updates to this buffer — applying them would clobber
+        // the textarea. Updates resume once the user toggles back to
+        // preview mode.
+        if (this._documentEditMode.get(tabKey)) return;
         doc.content = content || '';
         if (typeof name === 'string' && name) doc.name = name;
         if (typeof path === 'string') doc.path = path;
@@ -1034,11 +1044,24 @@ class App {
             }
         }
 
+        // If the user is currently in edit mode, ship the textarea content
+        // with the save call so on-disk state matches what's on screen.
+        let contentOverride = null;
+        const viewer = this._documentViewers.get(tabKey);
+        if (viewer?.isEditing) {
+            contentOverride = viewer.getEditValue();
+            if (typeof contentOverride === 'string') doc.content = contentOverride;
+        }
+
         try {
             const resp = await fetch(`api/buffers/${encodeURIComponent(bufferId)}/save`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ project_id: projectId, path: relPath }),
+                body: JSON.stringify({
+                    project_id: projectId,
+                    path: relPath,
+                    ...(contentOverride !== null ? { content: contentOverride } : {}),
+                }),
             });
             if (!resp.ok) {
                 const text = await resp.text();
@@ -1047,13 +1070,15 @@ class App {
             }
             const out = await resp.json();
             doc.path = out.bound_path || `${projectId}/${relPath}`;
-            // Refresh the top bar so the Save tooltip updates and reflects
-            // the bound path. _tabBar redraws bars on activation; re-activate
-            // to pick up the change.
-            if (this._tabBar.activeKey === tabKey) {
-                this._tabBar.activate(tabKey);
+            // Re-render the document tab's top bars so the breadcrumb and
+            // Save tooltip pick up the newly-bound path. activate() short-
+            // circuits if the tab is already active, so rebuild directly.
+            const serviceContainer = document.getElementById('service-tab-container');
+            if (serviceContainer && this._tabBar.activeKey === tabKey) {
+                serviceContainer.querySelectorAll(':scope > .service-top-bar, :scope > .service-second-bar').forEach(el => el.remove());
+                serviceContainer.insertBefore(this._buildDocumentBars(tabKey), serviceContainer.firstChild);
             }
-            notify(`Saved to ${doc.path}`, { type: 'success', timeout: 3000 });
+            notify.success(`Saved to ${doc.path}`);
         } catch (e) {
             modalAlert(`Save failed: ${e.message || e}`, { title: 'Save error' });
         }
@@ -1406,28 +1431,49 @@ class App {
         const bar = document.createElement('div');
         bar.className = 'service-top-bar';
 
+        // Breadcrumb path as the title.
+        // - Buffer doc tabs:
+        //     unsaved → ['Knowledge Base', '__buffer__', '<id>']
+        //     saved   → ['Knowledge Base', <project>, ...rel_path-segments]
+        // - Other doc tabs: ['Knowledge Base', <category>, <docName>] from the key.
+        const parts = key.substring(4).split(':');
+        const isBuffer = key.startsWith('doc:__buffer__:');
+        const doc = this._documentTabs.get(key);
+        let crumbs;
+        if (isBuffer && doc?.path) {
+            const slash = doc.path.indexOf('/');
+            if (slash > 0) {
+                const projectId = doc.path.substring(0, slash);
+                const relPath = doc.path.substring(slash + 1);
+                crumbs = ['Knowledge Base', projectId, ...relPath.split('/').filter(Boolean)];
+            } else {
+                crumbs = ['Knowledge Base', doc.path];
+            }
+        } else {
+            const category = parts[0] || '';
+            const docName = parts.slice(1).join(':') || '';
+            crumbs = ['Knowledge Base', category, docName].filter(Boolean);
+        }
         const title = document.createElement('span');
         title.className = 'service-top-bar-title';
-        // Extract document name from key "doc:category:name"
-        const parts = key.substring(4).split(':');
-        title.textContent = parts.length > 1 ? parts.slice(1).join(':') : key;
+        crumbs.forEach((text, i) => {
+            if (i > 0) {
+                const sep = document.createElement('span');
+                sep.className = 'breadcrumb-sep';
+                sep.textContent = ' / ';
+                title.appendChild(sep);
+            }
+            const span = document.createElement('span');
+            span.className = 'breadcrumb-segment';
+            if (i === crumbs.length - 1) span.classList.add('breadcrumb-current');
+            span.textContent = text;
+            title.appendChild(span);
+        });
         bar.appendChild(title);
 
         const spacer = document.createElement('span');
         spacer.style.flex = '1';
         bar.appendChild(spacer);
-        // Save button — only visible for in-memory note-taking buffers
-        // (NOTES-2). Existing on-disk documents are read-only here.
-        const isBuffer = key.startsWith('doc:__buffer__:');
-        if (isBuffer) {
-            const doc = this._documentTabs.get(key);
-            const saveBtn = document.createElement('button');
-            saveBtn.className = 'info-bar-text-btn';
-            saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk" style="font-size:11px;color:#555555"></i>';
-            saveBtn.title = doc?.path ? `Save (${doc.path})` : 'Save As…';
-            saveBtn.addEventListener('click', () => this._saveBuffer?.(key));
-            bar.appendChild(saveBtn);
-        }
         // Undock button
         const undockBtn = document.createElement('button');
         undockBtn.className = 'info-bar-text-btn';
@@ -1445,26 +1491,58 @@ class App {
 
         frag.appendChild(bar);
 
-        // Second bar with breadcrumbs
+        // Second bar — Save + Edit/Preview toggle on the left for buffer docs
         const secondBar = this._buildSecondBar();
-        const category = parts[0] || '';
-        const docName = parts.slice(1).join(':') || '';
-        const crumbs = ['Knowledge Base', category, docName].filter(Boolean);
-        crumbs.forEach((text, i) => {
-            if (i > 0) {
-                const sep = document.createElement('span');
-                sep.className = 'breadcrumb-sep';
-                sep.textContent = ' / ';
-                secondBar.appendChild(sep);
-            }
-            const span = document.createElement('span');
-            span.className = 'breadcrumb-segment';
-            if (i === crumbs.length - 1) span.classList.add('breadcrumb-current');
-            span.textContent = text;
-            secondBar.appendChild(span);
-        });
+        if (isBuffer) {
+            const left = document.createElement('span');
+            left.className = 'service-second-bar-left';
+            const saveBtn = document.createElement('button');
+            saveBtn.className = 'info-bar-text-btn';
+            saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk" style="font-size:14px;color:#4caf50"></i>';
+            saveBtn.title = doc?.path ? `Save (${doc.path})` : 'Save As…';
+            saveBtn.addEventListener('click', () => this._saveBuffer?.(key));
+            left.appendChild(saveBtn);
+
+            const editing = !!this._documentEditMode.get(key);
+            const toggleBtn = document.createElement('button');
+            toggleBtn.className = 'info-bar-text-btn';
+            toggleBtn.innerHTML = editing
+                ? '<i class="fa-solid fa-eye" style="font-size:14px;color:#42a5f5"></i>'
+                : '<i class="fa-solid fa-pen-to-square" style="font-size:14px;color:#f0a040"></i>';
+            toggleBtn.title = editing ? 'Preview' : 'Edit markdown';
+            toggleBtn.addEventListener('click', () => this._toggleBufferEdit(key));
+            left.appendChild(toggleBtn);
+            secondBar.appendChild(left);
+        }
         frag.appendChild(secondBar);
         return frag;
+    }
+
+    /** Toggle a buffer doc tab between rendered preview and raw markdown
+     * editing. Captures the textarea content into doc.content on the way
+     * out of edit mode so a subsequent re-render shows the user's changes,
+     * and re-renders the bars to swap the toggle icon. */
+    _toggleBufferEdit(key) {
+        const doc = this._documentTabs.get(key);
+        const viewer = this._documentViewers.get(key);
+        if (!doc || !viewer) return;
+        const wasEditing = !!this._documentEditMode.get(key);
+        if (wasEditing) {
+            const edited = viewer.getEditValue();
+            if (typeof edited === 'string') doc.content = edited;
+            this._documentEditMode.set(key, false);
+            viewer.show(doc);
+        } else {
+            this._documentEditMode.set(key, true);
+            viewer.showEdit(doc);
+        }
+        // Re-render bars to flip the toggle icon. Direct rebuild of the
+        // service-top-bar pair — the tab bar isn't involved in this swap.
+        const serviceContainer = document.getElementById('service-tab-container');
+        if (serviceContainer) {
+            serviceContainer.querySelectorAll(':scope > .service-top-bar, :scope > .service-second-bar').forEach(el => el.remove());
+            serviceContainer.insertBefore(this._buildDocumentBars(key), serviceContainer.firstChild);
+        }
     }
 
     _openGitCommitTab(repoPath, commit) {
@@ -1749,6 +1827,7 @@ class App {
         // Clean up document viewer when its tab is closed
         if (key.startsWith('doc:')) {
             this._documentTabs.delete(key);
+            this._documentEditMode.delete(key);
             // Dispose the per-tab viewer so its PDF.js doc + rendered page
             // canvases get freed (otherwise the bitmaps leak in browser RAM).
             const perTab = this._documentViewers.get(key);

@@ -20,6 +20,31 @@
     color: var(--text-primary);
 }
 
+/* Buffer edit mode — raw markdown textarea filling the viewer pane */
+.document-viewer-edit {
+    padding: 0;
+    height: 100%;
+    display: flex;
+}
+
+.document-viewer-edit-textarea {
+    flex: 1;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 16px 24px;
+    border: none;
+    outline: none;
+    resize: none;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1.6;
+    white-space: pre;
+    overflow: auto;
+    tab-size: 4;
+}
+
 .document-viewer-markdown h1 {
     font-size: 1.8em;
     font-weight: 700;

@@ -551,10 +551,17 @@ def list_communities(domain_id: str):
     kb = _get_domain(domain_id)
     if not kb.has_knowledge():
         return _empty_knowledge_response('communities')
+    # Avoid `MATCH (c:Entity {type: "community"})` — Entity.type's index
+    # goes stale after large DETACH DELETEs (full rebuild) and points at
+    # records that no longer exist, surfacing as `Record #X:Y not found`
+    # at query time. Community entity ids are deterministic
+    # `community:<cid>`, so the id-prefix filter is both correct and
+    # immune to the stale index. Same pattern repeats below.
     try:
         rows = kb.storage._c.query(
-            '''MATCH (c:Entity {type: "community"})
-               WHERE $pid IN c.project_ids
+            '''MATCH (c:Entity)
+               WHERE c.id STARTS WITH "community:"
+                 AND $pid IN c.project_ids
                RETURN c.community_id AS cid, c.properties_json AS props''',
             {'pid': kb.project_id},
         )
@@ -585,29 +592,35 @@ def community_detail(domain_id: str, cid: int, top_n: int = 15):
         )
     # The three queries below are independent: community node, summary,
     # and top-N members. Run them concurrently rather than serially.
+    # Use exact-id MATCH instead of `{type: "..."}` for the same reason
+    # documented in list_communities above (stale Entity.type index).
+    cnid = f'community:{cid}'
+    sid = f'community_summary:{cid}'
+
     def _fetch_community() -> list[dict]:
         return kb.storage._c.query(
-            '''MATCH (c:Entity {type: "community", community_id: $cid})
+            '''MATCH (c:Entity {id: $cnid})
                WHERE $pid IN c.project_ids
                RETURN c.properties_json AS props''',
-            {'cid': cid, 'pid': kb.project_id},
+            {'cnid': cnid, 'pid': kb.project_id},
         )
 
     def _fetch_summary() -> list[dict]:
         return kb.storage._c.query(
-            '''MATCH (s:Entity {type: "community_summary"})
-               WHERE $pid IN s.project_ids AND s.id = $sid
+            '''MATCH (s:Entity {id: $sid})
+               WHERE $pid IN s.project_ids
                RETURN s.properties_json AS props''',
-            {'sid': f'community_summary:{cid}', 'pid': kb.project_id},
+            {'sid': sid, 'pid': kb.project_id},
         )
 
     def _fetch_members() -> list[dict]:
         return kb.storage._c.query(
-            '''MATCH (e:Entity)-[:RELATES {type: "member_of"}]->(c:Entity {type: "community", community_id: $cid})
+            '''MATCH (e:Entity)-[r:RELATES]->(c:Entity {id: $cnid})
+               WHERE r.type = "member_of"
                RETURN e.id AS id, e.label AS label, e.type AS type, e.rank AS rank, e.properties_json AS props
                ORDER BY e.rank DESC
                LIMIT $n''',
-            {'cid': cid, 'n': top_n},
+            {'cnid': cnid, 'n': top_n},
         )
 
     with ThreadPoolExecutor(max_workers=3) as ex:

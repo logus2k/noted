@@ -1396,7 +1396,7 @@ export function createContextMenu(ctx) {
         const ok = await modalConfirm(
             `Rebuild the Knowledge Graph for "${domainLabel}"?\n\n` +
             'This will rescan the corpus, re-extract entities via Gemma, recompute communities + summaries, ' +
-            'and atomically swap into ArcadeDB. Expected duration: ~25-30 minutes on the current corpus.\n\n' +
+            'and atomically swap into ArcadeDB.\n\n' +
             'You can monitor progress via View > Knowledge Base Monitor.',
             { title: `Rebuild Knowledge Graph: ${domainLabel}`, confirmText: 'Rebuild' }
         );

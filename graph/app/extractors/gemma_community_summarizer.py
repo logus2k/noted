@@ -9,8 +9,10 @@ the relevant communities.
 from __future__ import annotations
 
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 
+from app.config import COMMUNITY_SUMMARY_PARALLELISM
 from app.llm_client import LLMClient, LLMError
 from app.models import Entity, Relationship
 
@@ -45,6 +47,56 @@ def _user_prompt(members: list[Entity]) -> str:
     return '\n'.join(lines)
 
 
+def _summarize_one(
+    ce: Entity,
+    by_cid: dict[int, list[str]],
+    entity_by_id: dict[str, Entity],
+    llm: LLMClient,
+) -> tuple[Entity, Relationship] | None:
+    """Build one community summary. Returns None when the community is
+    skipped (no community_id, fewer than 2 thematic members, LLM error,
+    or empty summary text). Pure function over its inputs — safe to call
+    from worker threads sharing the same LLMClient."""
+    cid = ce.properties.get('community_id')
+    if cid is None:
+        return None
+    members = [entity_by_id[mid] for mid in by_cid.get(cid, []) if mid in entity_by_id]
+    thematic = [m for m in members if m.type in {'concept', 'person', 'organization', 'term'}]
+    if len(thematic) < 2:
+        return None
+    try:
+        parsed = llm.chat_json(
+            system_prompt=_SYSTEM_PROMPT,
+            user_prompt=_user_prompt(thematic),
+            temperature=0.2,
+            max_tokens=1024,
+        )
+    except LLMError as e:
+        logger.warning('Community %s summarization failed: %s', cid, e)
+        return None
+    text = (parsed.get('summary') or '').strip()
+    if not text:
+        return None
+    summary_id = f'community_summary:{cid}'
+    summary_entity = Entity(
+        id=summary_id,
+        type='community_summary',
+        label=f'Summary for community {cid}',
+        properties={
+            'community_id': cid,
+            'text': text,
+            'generated_at': datetime.now(timezone.utc).isoformat(),
+            'token_count': max(1, int(len(text) / 3.8)),
+        },
+    )
+    rel = Relationship(
+        source=summary_id,
+        target=ce.id,
+        type='summarizes',
+    )
+    return summary_entity, rel
+
+
 def summarize_communities(
     community_entities: list[Entity],
     community_memberships: dict[str, int],
@@ -53,7 +105,12 @@ def summarize_communities(
 ) -> tuple[list[Entity], list[Relationship]]:
     """Generate one community_summary entity per community.
 
-    Returns the new summary entities plus :summarizes edges.
+    Returns the new summary entities plus :summarizes edges. The per-
+    community Gemma calls run in parallel up to COMMUNITY_SUMMARY_PARALLELISM
+    workers; the same llama-server slot constraint as entity extraction
+    applies (raising past the slot count just queues server-side). Output
+    order matches input order so downstream consumers see deterministic
+    results.
     """
     if not community_entities:
         return [], []
@@ -64,48 +121,30 @@ def summarize_communities(
     for eid, cid in community_memberships.items():
         by_cid.setdefault(cid, []).append(eid)
 
+    workers = max(1, COMMUNITY_SUMMARY_PARALLELISM)
     summary_entities: list[Entity] = []
     rels: list[Relationship] = []
 
-    for ce in community_entities:
-        cid = ce.properties.get('community_id')
-        if cid is None:
-            continue
-        members = [entity_by_id[mid] for mid in by_cid.get(cid, []) if mid in entity_by_id]
-        # Skip communities with no thematic members (they'd summarize nothing useful)
-        thematic = [m for m in members if m.type in {'concept', 'person', 'organization', 'term'}]
-        if len(thematic) < 2:
-            continue
-        try:
-            parsed = llm.chat_json(
-                system_prompt=_SYSTEM_PROMPT,
-                user_prompt=_user_prompt(thematic),
-                temperature=0.2,
-                max_tokens=1024,
-            )
-        except LLMError as e:
-            logger.warning('Community %s summarization failed: %s', cid, e)
-            continue
-        text = (parsed.get('summary') or '').strip()
-        if not text:
-            continue
-        summary_id = f'community_summary:{cid}'
-        summary_entities.append(Entity(
-            id=summary_id,
-            type='community_summary',
-            label=f'Summary for community {cid}',
-            properties={
-                'community_id': cid,
-                'text': text,
-                'generated_at': datetime.now(timezone.utc).isoformat(),
-                'token_count': max(1, int(len(text) / 3.8)),
-            },
-        ))
-        rels.append(Relationship(
-            source=summary_id,
-            target=ce.id,
-            type='summarizes',
-        ))
+    # ThreadPoolExecutor.map preserves input order. _summarize_one is a
+    # pure function of (ce, by_cid, entity_by_id, llm) — by_cid and
+    # entity_by_id are read-only here; LLMClient is already used
+    # concurrently from extraction's 4-way pool so it's thread-safe.
+    if workers == 1:
+        results = (_summarize_one(ce, by_cid, entity_by_id, llm) for ce in community_entities)
+    else:
+        pool = ThreadPoolExecutor(max_workers=workers, thread_name_prefix='gemma-summary')
+        results = pool.map(lambda ce: _summarize_one(ce, by_cid, entity_by_id, llm), community_entities)
 
-    logger.info('Community summaries: generated %d', len(summary_entities))
+    try:
+        for r in results:
+            if r is None:
+                continue
+            summary_entities.append(r[0])
+            rels.append(r[1])
+    finally:
+        if workers > 1:
+            pool.shutdown(wait=True)
+
+    logger.info('Community summaries: generated %d (parallelism=%d)',
+                len(summary_entities), workers)
     return summary_entities, rels

@@ -89,16 +89,32 @@ class GraphStorage:
         self,
         entities: Iterable[Entity],
         relationships: Iterable[Relationship],
+        progress_cb=None,
     ) -> dict[str, int]:
         """Atomically replace every vertex/edge for the configured project_id.
 
         Returns counts of what was written, so callers can log the outcome.
+
+        `progress_cb` is an optional callable `(sub_phase: str, done: int,
+        total: int) -> None` invoked between sub-steps so the Monitor can
+        show what's happening during the otherwise-silent ~10-15 minute
+        bulk-write. Mirrors the callback already wired through
+        `add_doc_merge`. Each `progress_cb` call is wrapped in try/except
+        so a misbehaving consumer can never break the write.
         """
         self.ensure_ready()
         project_id = self.project_id
 
         entities = list(entities)
         relationships = list(relationships)
+
+        def _report(sub_phase: str, done: int, total: int) -> None:
+            if progress_cb is None:
+                return
+            try:
+                progress_cb(sub_phase, done, total)
+            except Exception:
+                logger.exception('replace_project_graph progress_cb raised; ignoring')
 
         phase_t0 = time.perf_counter()
         logger.info('writing.replace_project_graph: start (entities=%d, relationships=%d, project=%s)',
@@ -109,19 +125,23 @@ class GraphStorage:
         #    so we use ArcadeDB SQL for the two-step cleanup.
         t0 = time.perf_counter()
         logger.info('writing.replace_project_graph.step1a: SQL strip project_ids — start')
+        _report('writing.strip_project_ids', 0, 1)
         self._c.command_sql(
             "UPDATE Entity REMOVE project_ids = :pid WHERE project_ids CONTAINS :pid",
             {'pid': project_id},
         )
+        _report('writing.strip_project_ids', 1, 1)
         logger.info('writing.replace_project_graph.step1a: end (%.2fs)', time.perf_counter() - t0)
 
         # Delete entities whose project_ids list is now empty. DETACH DELETE
         # via Cypher drops incident edges in one shot.
         t0 = time.perf_counter()
         logger.info('writing.replace_project_graph.step1b: DETACH DELETE empty entities — start')
+        _report('writing.delete_orphans', 0, 1)
         self._c.command(
             'MATCH (n:Entity) WHERE size(n.project_ids) = 0 DETACH DELETE n',
         )
+        _report('writing.delete_orphans', 1, 1)
         logger.info('writing.replace_project_graph.step1b: end (%.2fs)', time.perf_counter() - t0)
 
         # 2. Bulk-upsert entities, chunked. Hot retrieval properties
@@ -132,6 +152,7 @@ class GraphStorage:
         n_chunks_2 = (len(entities) + _CHUNK_VERTICES - 1) // _CHUNK_VERTICES
         logger.info('writing.replace_project_graph.step2: insert %d entities in %d chunks — start',
                     len(entities), n_chunks_2)
+        _report('writing.entities', 0, n_chunks_2)
         n_entities = 0
         for ci, chunk in enumerate(_chunks(entities, _CHUNK_VERTICES), 1):
             ct0 = time.perf_counter()
@@ -169,6 +190,7 @@ class GraphStorage:
                 {'rows': rows, 'pid': project_id},
             )
             n_entities += len(chunk)
+            _report('writing.entities', ci, n_chunks_2)
             logger.info('writing.replace_project_graph.step2: chunk %d/%d (%d rows) %.2fs',
                         ci, n_chunks_2, len(chunk), time.perf_counter() - ct0)
         logger.info('writing.replace_project_graph.step2: end (%.2fs)', time.perf_counter() - t0)
@@ -179,6 +201,7 @@ class GraphStorage:
         n_chunks_3 = (len(relationships) + _CHUNK_EDGES - 1) // _CHUNK_EDGES
         logger.info('writing.replace_project_graph.step3: insert %d edges in %d chunks — start',
                     len(relationships), n_chunks_3)
+        _report('writing.relationships', 0, n_chunks_3)
         n_rels = 0
         for ci, chunk in enumerate(_chunks(relationships, _CHUNK_EDGES), 1):
             ct0 = time.perf_counter()
@@ -204,6 +227,7 @@ class GraphStorage:
                 {'rows': rows},
             )
             n_rels += len(chunk)
+            _report('writing.relationships', ci, n_chunks_3)
             logger.info('writing.replace_project_graph.step3: chunk %d/%d (%d rows) %.2fs',
                         ci, n_chunks_3, len(chunk), time.perf_counter() - ct0)
         logger.info('writing.replace_project_graph.step3: end (%.2fs)', time.perf_counter() - t0)

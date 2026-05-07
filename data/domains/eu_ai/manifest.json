@@ -19,6 +19,13 @@
       "added_at": "2026-04-29T15:28:33.868561+00:00",
       "category": "Legal/EU",
       "display_name": "EU GDPR - Regulation 2016/679"
+    },
+    {
+      "path": "digital_services_act.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-07T00:25:28.967615+00:00",
+      "category": "Legal/EU",
+      "display_name": "EU Digital Services Act - Regulation 2022/2065"
     }
   ],
   "arcadedb_database": "eu_ai",

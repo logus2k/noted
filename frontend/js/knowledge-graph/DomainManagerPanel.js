@@ -63,7 +63,7 @@ export class DomainManagerPanel {
         }
         this._panel = jsPanel.create({
             id: 'domain-manager-panel',
-            headerTitle: '<i class="fa-solid fa-landmark dm-i-manage" style="margin-right:6px"></i>Domain Manager',
+            headerTitle: '<i class="fa-solid fa-landmark" style="color:#ffffff;-webkit-text-stroke:1.5px #666666;paint-order:stroke fill;margin-right:6px"></i>Domain Manager',
             theme: 'none',
             borderRadius: '5px',
             border: '1px solid var(--border-color)',

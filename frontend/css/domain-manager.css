@@ -68,12 +68,12 @@
 
 .dm-list-row {
     display: flex;
-    align-items: center;
     gap: 8px;
     padding: 8px 12px;
     cursor: pointer;
     border-left: 3px solid transparent;
     user-select: none;
+    align-items: flex-start;
 }
 
 .dm-list-row:hover {

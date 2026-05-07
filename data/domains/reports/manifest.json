@@ -1,0 +1,34 @@
+{
+  "domain_id": "reports",
+  "name": "Reports",
+  "description": "Reports",
+  "created_at": "2026-05-06T19:05:22.949829+00:00",
+  "embeddings_model": "bge-m3",
+  "pinned": false,
+  "included_files": [
+    {
+      "path": "Address by Mario Draghi at the Presentation of the report on the future of European competitiveness.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-06T19:08:11.643274+00:00",
+      "category": "Reports/EU",
+      "display_name": ""
+    },
+    {
+      "path": "The future of European competitiveness_ In-depth analysis and recommendations_0.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-06T19:08:12.692819+00:00",
+      "category": "Reports/EU",
+      "display_name": ""
+    },
+    {
+      "path": "The future of European competitiveness _ A competitiveness strategy for Europe.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-06T19:08:13.022006+00:00",
+      "category": "Reports/EU"
+    }
+  ],
+  "arcadedb_database": "reports",
+  "corpus_collection": "reports__corpus",
+  "entity_cache_collection": "reports__gr_entities",
+  "summary_cache_collection": "reports__gr_summaries"
+}

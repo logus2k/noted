@@ -18,14 +18,14 @@
       "mode": "read_store",
       "added_at": "2026-04-30T20:42:48.561054+00:00",
       "category": "Machine Learning",
-      "display_name": ""
+      "display_name": "Fundamentals of Deep Learning"
     },
     {
       "path": "DSML.pdf",
       "mode": "read_store",
       "added_at": "2026-04-30T20:42:50.441797+00:00",
       "category": "Machine Learning",
-      "display_name": ""
+      "display_name": "Data Science and Machine Learning"
     },
     {
       "path": "MLBasicsBook.pdf",
@@ -52,7 +52,8 @@
       "path": "optimization_for_machine_learning.pdf",
       "mode": "read_store",
       "added_at": "2026-05-05T01:09:32.851347+00:00",
-      "category": "Machine Learning"
+      "category": "Machine Learning",
+      "display_name": ""
     }
   ],
   "arcadedb_database": "ml",

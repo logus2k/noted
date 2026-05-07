@@ -166,11 +166,11 @@ export class DomainKnowledgeTab {
                         <i class="fa-solid fa-rotate dm-i-rebuild"></i>
                         <span id="dm-rebuild-label">Rebuild Graph</span>
                     </button>
-                    <button class="rm-btn" id="dm-preflight-btn" title="Run cheap pre-import diagnostics (Gemma JSON, ArcadeDB write, embedding probe, schema indexes). ~3-5 seconds.">
+                    <button class="rm-btn" id="dm-preflight-btn" title="Run cheap pre-import diagnostics (Gemma JSON, ArcadeDB write, embedding probe, schema indexes).">
                         <i class="fa-solid fa-stethoscope"></i>
                         <span>Run Diagnostics</span>
                     </button>
-                    <span class="dm-card-note">Full re-extraction, ~25 minutes.</span>
+                    <span class="dm-card-note">Full re-extraction.</span>
                 </div>
             </div>
         `;
@@ -368,7 +368,7 @@ export class DomainKnowledgeTab {
     async _triggerRebuild() {
         const d = this._ctx.domain;
         const ok = await modalConfirm(
-            `Rebuild the knowledge graph for "${d.name || d.domain_id}"? Full re-extraction takes ~25 minutes.`,
+            `Rebuild the knowledge graph for "${d.name || d.domain_id}"? This is a full re-extraction.`,
             { title: 'Rebuild Graph', confirmText: 'Rebuild', cancelText: 'Cancel' },
         );
         if (!ok) return;

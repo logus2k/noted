@@ -24,6 +24,13 @@
       "path": "training_llm_to_follow_instructions_with_hf.pdf",
       "mode": "read_store",
       "added_at": "2026-05-03T17:08:19.972609+00:00",
+      "category": "Whitepapers/Transformers",
+      "display_name": ""
+    },
+    {
+      "path": "transformers_applications_survey.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-06T19:15:30.924367+00:00",
       "category": "Whitepapers/Transformers"
     }
   ],

@@ -110,3 +110,82 @@
 .grm-fmt-chip[data-fmt="docx"] { background: rgba(82,140,229,0.18); border-color: rgba(82,140,229,0.45); }
 .grm-fmt-chip[data-fmt="pptx"] { background: rgba(229,140,68,0.18); border-color: rgba(229,140,68,0.45); }
 .grm-fmt-chip[data-fmt="html"] { background: rgba(120,120,120,0.18); border-color: rgba(120,120,120,0.45); }
+
+/* ── Phase stepper inside the GraphRAG card ───────────────────────────
+   Horizontal dots-and-lines tracker showing the operation's phase
+   sequence. Hover any dot for the station name; the active station's
+   label (plus sub-phase counter when present) is rendered beneath. */
+.grm-stepper {
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+.grm-stepper-station {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    min-width: 0;
+}
+.grm-stepper-station:last-child { flex: 0 0 auto; }
+.grm-stepper-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    border: 1.5px solid #aaa;
+    background: #fff;
+    flex-shrink: 0;
+    box-sizing: border-box;
+    cursor: default;
+    transition: background 120ms, border-color 120ms, box-shadow 120ms;
+}
+.grm-stepper-dot.done {
+    background: #66bb6a;
+    border-color: #4a8d4d;
+}
+.grm-stepper-dot.current {
+    background: #ffa726;
+    border-color: #c77800;
+    box-shadow: 0 0 0 3px rgba(255, 167, 38, 0.28);
+}
+.grm-stepper-dot.failed {
+    background: #ef5350;
+    border-color: #c62828;
+    box-shadow: 0 0 0 3px rgba(239, 83, 80, 0.28);
+}
+.grm-stepper-line {
+    flex: 1;
+    height: 2px;
+    background: #888;
+    margin: 0 3px;
+    min-width: 6px;
+}
+.grm-stepper-line.done   { background: #66bb6a; }
+.grm-stepper-line.failed { background: #ef5350; }
+
+/* Per-station label below the active dot. The dot-wrap is the
+   positioning context; the label hangs off its bottom and shifts
+   horizontally based on which station owns it so it always points at
+   its own dot. */
+.grm-stepper-dot-wrap {
+    position: relative;
+}
+.grm-stepper-label {
+    position: absolute;
+    top: 100%;
+    margin-top: 6px;
+    white-space: nowrap;
+    font-size: 11px;
+    color: var(--text-secondary);
+    /* Default: centered on the dot (middle stations). */
+    left: 50%;
+    transform: translateX(-50%);
+}
+.grm-stepper-label.align-left {
+    left: 0;
+    transform: none;
+}
+.grm-stepper-label.align-right {
+    right: 0;
+    left: auto;
+    transform: none;
+}

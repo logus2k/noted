@@ -24,7 +24,8 @@
       "path": "digital_decade_2025_country_report.pdf",
       "mode": "read_store",
       "added_at": "2026-04-29T22:08:18.873742+00:00",
-      "category": "Legal/Portugal"
+      "category": "Legal/Portugal",
+      "display_name": "Digital Decade 2025 Country Report"
     }
   ],
   "arcadedb_database": "pt_digital_ai",

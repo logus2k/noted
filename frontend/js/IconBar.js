@@ -117,7 +117,7 @@ export class IconBar {
             // ArcadeDB Studio (knowledge graph DB) - hosted via nginx
             // `/arcadedb/` proxy in prod and the same path locally; opens
             // as an iframe service tab via app-tabs.js.
-            { key: 'arcadedb', title: 'ArcadeDB Studio', img: 'static/images/arcadedb.png' },
+            { key: 'arcadedb', title: 'ArcadeDB', img: 'static/images/arcadedb.png' },
         ];
 
         for (const svc of services) {

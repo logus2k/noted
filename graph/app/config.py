@@ -50,6 +50,13 @@ ENTITY_CONFIDENCE_FLOOR = float(os.environ.get('ENTITY_CONFIDENCE_FLOOR', '0.6')
 # the llama-server slot count for gemma-4 (currently 4). Raising past the
 # slot count just queues at the server side; lower than that wastes slots.
 ENTITY_EXTRACT_PARALLELISM = int(os.environ.get('ENTITY_EXTRACT_PARALLELISM', '4'))
+# Concurrent community-summary workers. Same llama-server slot constraint
+# as entity extraction — raising past the slot count just queues server-
+# side. Defaults to ENTITY_EXTRACT_PARALLELISM so both LLM-bound phases
+# share one knob in practice.
+COMMUNITY_SUMMARY_PARALLELISM = int(
+    os.environ.get('COMMUNITY_SUMMARY_PARALLELISM', str(ENTITY_EXTRACT_PARALLELISM))
+)
 
 # Feature flag: route per-doc graph writes (`add_doc_merge`) through the
 # GraphBatch HTTP endpoint (`POST /api/v1/batch/<db>?lightEdges=false`)

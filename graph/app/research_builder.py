@@ -176,6 +176,7 @@ class ResearchBuilder:
         t0 = _now()
         self.progress = {
             'phase': 'starting',
+            'operation': 'rebuild',
             'started_at': started.isoformat(),
             'md_docs': 0,
             'extraction_chunks_total': 0,
@@ -258,7 +259,10 @@ class ResearchBuilder:
             + summary_rels
         )
         self._storage.ensure_ready()
-        counts = self._storage.replace_project_graph(all_entities, all_rels)
+        counts = self._storage.replace_project_graph(
+            all_entities, all_rels,
+            progress_cb=self._set_sub_phase,
+        )
 
         finished = datetime.now(timezone.utc)
         stats = ResearchBuildStats(
@@ -639,6 +643,8 @@ class ResearchBuilder:
         """
         from app import corpus
         sources_root = corpus.sources_dir(self.kb_id)
+        self.progress['operation'] = 'doc_add'
+        self.progress['started_at'] = datetime.now(timezone.utc).isoformat()
         self._set_phase('adding_doc', current_doc=rel_path)
         abs_path = os.path.join(sources_root, rel_path)
         try:
@@ -668,6 +674,8 @@ class ResearchBuilder:
         from app.scanners.pdf_scanner import scan_pdf
 
         sources_root = corpus.sources_dir(self.kb_id)
+        self.progress['operation'] = 'doc_add'
+        self.progress['started_at'] = datetime.now(timezone.utc).isoformat()
         self._set_phase('adding_doc', current_doc=rel_path)
         abs_path = os.path.join(sources_root, rel_path)
         if not os.path.isfile(abs_path):
@@ -760,8 +768,15 @@ class ResearchBuilder:
         t0 = _now()
         # Reset the progress dict so the Monitor's elapsed timer starts
         # from this op (not whatever stale started_at remained from the
-        # previous build/recluster).
-        self.progress = {'phase': 'starting', 'started_at': started.isoformat()}
+        # previous build/recluster). `operation` is preserved from the
+        # add_doc/add_doc_pdf entry point so the stepper keeps rendering
+        # the doc-add sequence (resetting would lose the marker before
+        # _add_doc_from_chunks transitions through extracting → writing).
+        self.progress = {
+            'phase': 'starting',
+            'operation': 'doc_add',
+            'started_at': started.isoformat(),
+        }
 
         # Build chunk_entities + chunked_into edges (same shape md_scanner
         # would produce for a full scan).
@@ -866,7 +881,11 @@ class ResearchBuilder:
         """
         started = datetime.now(timezone.utc)
         t0 = _now()
-        self.progress = {'phase': 'starting', 'started_at': started.isoformat()}
+        self.progress = {
+            'phase': 'starting',
+            'operation': 'doc_remove',
+            'started_at': started.isoformat(),
+        }
         self._set_phase('removing_doc', current_doc=rel_path)
         self._storage.ensure_ready()
         result = self._storage.remove_doc_cleanup(rel_path)
@@ -932,7 +951,11 @@ class ResearchBuilder:
         """
         started = datetime.now(timezone.utc)
         t0 = _now()
-        self.progress = {'phase': 'starting', 'started_at': started.isoformat()}
+        self.progress = {
+            'phase': 'starting',
+            'operation': 'recluster',
+            'started_at': started.isoformat(),
+        }
         self._set_phase('recluster_loading')
         self._storage.ensure_ready()
 

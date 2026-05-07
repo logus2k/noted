@@ -610,7 +610,14 @@ export class GraphPanel {
                 row.style.cssText = 'padding:6px 8px;cursor:pointer;border-bottom:0.5px solid #f0f0f0';
                 row.addEventListener('mouseenter', () => { row.style.background = '#f5f5f5'; });
                 row.addEventListener('mouseleave', () => { row.style.background = ''; });
-                const types = (c.dominant_entity_types || []).slice(0, 3).join(', ');
+                // dominant_entity_types is a list of {type, count} objects.
+                // Extract the type name (with count) for the line below the
+                // community heading; a bare .join would produce
+                // "[object Object], [object Object], …".
+                const types = (c.dominant_entity_types || [])
+                    .slice(0, 3)
+                    .map((t) => (typeof t === 'string' ? t : `${t.type} (${t.count})`))
+                    .join(', ');
                 row.innerHTML = `<div><strong>Community ${c.community_id}</strong> <span style="color:#999;font-size:10px">(${c.member_count || 0} members)</span></div>`
                     + (types ? `<div style="color:#666;font-size:10px;margin-top:2px">${this._escapeHtml(types)}</div>` : '');
                 row.addEventListener('click', () => this._loadCommunityDetail(c.community_id, list));
