@@ -16,6 +16,7 @@ from __future__ import annotations
 import contextvars
 import logging
 import math
+import time
 from typing import Optional
 
 import chromadb
@@ -499,31 +500,68 @@ class RagService:
         replace: bool = True,
         embed_model: Optional[str] = None,
     ) -> tuple[int, bool]:
-        """Embed `texts` and upsert into `collection`. If replace, delete
-        the entire collection first (atomic-rebuild semantics).
+        """Embed `texts` and upsert into `collection`. If replace, the
+        existing collection is replaced atomically: write to a temp
+        collection first, then drop the old one and rename. The previous
+        version dropped the live collection BEFORE embedding, so any
+        embed failure (timeout, OOM, network) left the collection
+        permanently empty - the failure mode that took down the `ml`
+        domain's entity cache after a build of 28k entities timed out
+        the upstream noted-graph caller.
         `embed_model` overrides the configured default (Phase 12)."""
         if len(ids) != len(texts):
             raise ValueError("ids and texts must be same length")
         client = self._get_client()
         replaced = False
-        if replace:
-            try:
-                client.delete_collection(collection)
-                replaced = True
-            except Exception:
-                pass  # collection didn't exist, that's fine
-        col = client.get_or_create_collection(collection)
-        vectors = self.embed(texts, model=embed_model)
-        # Upsert in batches to keep memory reasonable
-        BATCH = 256
         n = len(ids)
-        for start in range(0, n, BATCH):
-            end = min(start + BATCH, n)
-            col.upsert(
-                ids=ids[start:end],
-                documents=texts[start:end],
-                embeddings=vectors[start:end],
-            )
+        # Embed FIRST. Any failure here leaves the live collection
+        # untouched so the caller's previous successful build is
+        # preserved.
+        vectors = self.embed(texts, model=embed_model)
+        BATCH = 256
+        if replace:
+            tmp_collection = f"__tmp__{collection}__{int(time.time() * 1000)}"
+            # Defensive: clean up any stale temp from a prior crash.
+            try:
+                client.delete_collection(tmp_collection)
+            except Exception:
+                pass
+            tmp_col = client.get_or_create_collection(tmp_collection)
+            try:
+                for start in range(0, n, BATCH):
+                    end = min(start + BATCH, n)
+                    tmp_col.upsert(
+                        ids=ids[start:end],
+                        documents=texts[start:end],
+                        embeddings=vectors[start:end],
+                    )
+                # Swap in the new data: drop the old collection (if any),
+                # then rename the temp into its place. Chroma exposes
+                # collection.modify(name=...) for the rename - cheap
+                # metadata update, no copy.
+                try:
+                    client.delete_collection(collection)
+                    replaced = True
+                except Exception:
+                    pass  # didn't exist, that's fine
+                tmp_col.modify(name=collection)
+            except Exception:
+                # Roll back the temp on any failure during populate or
+                # swap so we don't leave orphan __tmp__ collections.
+                try:
+                    client.delete_collection(tmp_collection)
+                except Exception:
+                    pass
+                raise
+        else:
+            col = client.get_or_create_collection(collection)
+            for start in range(0, n, BATCH):
+                end = min(start + BATCH, n)
+                col.upsert(
+                    ids=ids[start:end],
+                    documents=texts[start:end],
+                    embeddings=vectors[start:end],
+                )
         return n, replaced
 
     def cache_search(self, collection: str, query: str, top_k: int,

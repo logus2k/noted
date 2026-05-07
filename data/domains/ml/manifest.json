@@ -2,79 +2,71 @@
   "domain_id": "ml",
   "name": "Machine Learning",
   "description": "Machine Learning",
-  "created_at": "2026-04-30T16:13:41.004298+00:00",
+  "created_at": "2026-05-07T20:37:38.343537+00:00",
   "embeddings_model": "bge-m3",
   "pinned": false,
   "included_files": [
     {
-      "path": "introduction_to_machine_learning.pdf",
+      "path": "dm.pdf",
       "mode": "read_store",
-      "added_at": "2026-04-30T16:14:15.641512+00:00",
+      "added_at": "2026-05-07T20:56:18.167426+00:00",
       "category": "Machine Learning",
-      "display_name": "Introduction to Machine Learning"
+      "display_name": ""
     },
     {
-      "path": "deep-learning-material-dept-ece-ase-blr-1.pdf",
+      "path": "foundations_of_machine_learning.pdf",
       "mode": "read_store",
-      "added_at": "2026-04-30T20:42:48.561054+00:00",
-      "category": "Machine Learning/Deep Learning",
-      "display_name": "Fundamentals of Deep Learning"
-    },
-    {
-      "path": "DSML.pdf",
-      "mode": "read_store",
-      "added_at": "2026-04-30T20:42:50.441797+00:00",
+      "added_at": "2026-05-07T20:56:18.737342+00:00",
       "category": "Machine Learning",
-      "display_name": "Data Science and Machine Learning"
-    },
-    {
-      "path": "MLBasicsBook.pdf",
-      "mode": "read_store",
-      "added_at": "2026-04-30T20:42:50.855648+00:00",
-      "category": "Machine Learning",
-      "display_name": "Machine Learning - The Basics"
+      "display_name": ""
     },
     {
       "path": "mml-book.pdf",
       "mode": "read_store",
-      "added_at": "2026-04-30T20:42:52.402112+00:00",
+      "added_at": "2026-05-07T20:56:20.435784+00:00",
       "category": "Machine Learning",
-      "display_name": "Mathematics for Machine Learning"
+      "display_name": ""
     },
     {
-      "path": "The Hundred-Page Machine Learning Book PDF.pdf",
+      "path": "ISLP_website.pdf",
       "mode": "read_store",
-      "added_at": "2026-04-30T20:42:52.632176+00:00",
+      "added_at": "2026-05-07T20:56:22.382917+00:00",
       "category": "Machine Learning",
-      "display_name": "The Hundred-Page Machine Learning Book"
+      "display_name": ""
     },
     {
       "path": "optimization_for_machine_learning.pdf",
       "mode": "read_store",
-      "added_at": "2026-05-05T01:09:32.851347+00:00",
+      "added_at": "2026-05-07T20:56:22.690561+00:00",
       "category": "Machine Learning",
-      "display_name": "Optimization for Machine Learning"
+      "display_name": ""
     },
     {
-      "path": "A Visual Introduction to Deep Learning.pdf",
+      "path": "DSML.pdf",
       "mode": "read_store",
-      "added_at": "2026-05-07T02:48:26.743950+00:00",
-      "category": "Machine Learning/Deep Learning",
-      "display_name": "A Visual Introduction to Deep Learning"
+      "added_at": "2026-05-07T20:56:25.053548+00:00",
+      "category": "Machine Learning",
+      "display_name": ""
+    },
+    {
+      "path": "The Hundred-Page Machine Learning Book PDF.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-07T20:56:25.283343+00:00",
+      "category": "Machine Learning",
+      "display_name": ""
     },
     {
       "path": "Deep Learning Book.pdf",
       "mode": "read_store",
-      "added_at": "2026-05-07T02:48:30.101454+00:00",
-      "category": "Machine Learning/Deep Learning",
-      "display_name": "Deep Learning"
+      "added_at": "2026-05-07T20:56:28.762030+00:00",
+      "category": "Machine Learning",
+      "display_name": ""
     },
     {
       "path": "Deep Learning Illustrated.pdf",
       "mode": "read_store",
-      "added_at": "2026-05-07T02:48:32.009467+00:00",
-      "category": "Machine Learning/Deep Learning",
-      "display_name": "Deep Learning Illustrated"
+      "added_at": "2026-05-07T20:56:29.738265+00:00",
+      "category": "Machine Learning"
     }
   ],
   "arcadedb_database": "ml",

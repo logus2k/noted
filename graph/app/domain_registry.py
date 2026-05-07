@@ -262,7 +262,12 @@ class DomainContext:
 
         # Per-Domain lifecycle state
         self.rebuild_lock = threading.Lock()
-        self.last_build = None  # ResearchBuildStats
+        # last_build is persisted to data/domains/<id>/state/last_build.json
+        # so the field survives noted-graph container restarts. Pre-fix
+        # behavior: in-memory only, every restart wiped it and /status
+        # reported `last_build: None` for every domain regardless of
+        # whether a build had ever run.
+        self.last_build = self._load_last_build()
 
         # Per-Domain doc-add queue + worker thread. Sequential uploads land
         # here; the worker drains them one-at-a-time under rebuild_lock and
@@ -299,6 +304,51 @@ class DomainContext:
         if v == '':
             return _convention(self.domain_id, kind)
         return v
+
+    @property
+    def state_dir(self) -> str:
+        return os.path.join(DOMAIN_HOME_DIR, self.domain_id, 'state')
+
+    def _last_build_path(self) -> str:
+        return os.path.join(self.state_dir, 'last_build.json')
+
+    def _load_last_build(self):
+        """Read the persisted last_build stats from disk. Returns a
+        ResearchBuildStats-shaped object via dict mimic, or None when no
+        file exists / parse fails. Defensive: bad JSON should never
+        prevent a Domain from loading."""
+        path = self._last_build_path()
+        if not os.path.isfile(path):
+            return None
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+        except (OSError, ValueError) as e:
+            logger.warning('Domain %s: cannot load last_build.json: %s',
+                           self.domain_id, e)
+            return None
+        # The status endpoint calls .to_dict() on this; expose a tiny
+        # shim so a persisted-from-disk dict round-trips identically.
+        from types import SimpleNamespace
+        ns = SimpleNamespace(**data)
+        ns.to_dict = lambda: dict(data)  # closure over the loaded dict
+        return ns
+
+    def record_last_build(self, stats) -> None:
+        """Persist a ResearchBuildStats to disk + update the in-memory
+        attribute. Called after every successful build / recluster /
+        add_doc cycle that produces fresh stats. Failures here log but
+        don't raise - the build itself already succeeded; persistence
+        is observability, not correctness."""
+        self.last_build = stats
+        try:
+            os.makedirs(self.state_dir, exist_ok=True)
+            payload = stats.to_dict() if hasattr(stats, 'to_dict') else dict(stats)
+            with open(self._last_build_path(), 'w', encoding='utf-8') as f:
+                json.dump(payload, f, indent=2, sort_keys=True)
+        except (OSError, ValueError) as e:
+            logger.warning('Domain %s: failed to persist last_build: %s',
+                           self.domain_id, e)
 
     def has_knowledge(self) -> bool:
         """True when this Domain has the knowledge half (arcadedb_database

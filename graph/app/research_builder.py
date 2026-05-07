@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -185,6 +186,37 @@ class ResearchBuilder:
             'communities_total': 0,
             'communities_summarized': 0,
         }
+        try:
+            return self._build_body(
+                started, t0,
+                dry_run=dry_run,
+                limit_chunks=limit_chunks,
+                skip_analytics=skip_analytics,
+                skip_community_summaries=skip_community_summaries,
+            )
+        except Exception as e:
+            # Surface the failure in the progress dict so /status reflects
+            # it (the next caller of /status sees `phase: 'error'` plus the
+            # specific message). The phase that was active when the error
+            # raised is preserved as `failed_phase` so KB Monitor can show
+            # WHERE the build broke (e.g. failed_phase=caching for the
+            # entity-cache push timeout that took down the `ml` domain).
+            failed_phase = self.progress.get('phase', 'unknown')
+            self._set_phase('error',
+                            error=f'{type(e).__name__}: {e}',
+                            failed_phase=failed_phase)
+            logger.exception('Research build failed at phase %s', failed_phase)
+            raise
+
+    def _build_body(
+        self,
+        started,
+        t0: float,
+        dry_run: bool,
+        limit_chunks: int | None,
+        skip_analytics: bool,
+        skip_community_summaries: bool,
+    ) -> ResearchBuildStats:
 
         # 1. Scan markdown.
         self._set_phase('scanning')
@@ -525,6 +557,65 @@ class ResearchBuilder:
 
     # ── ChromaDB cache push (used by build + recluster + add_doc) ─────
 
+    # Chunk size for the per-batch cache_upsert calls. 5000 strings ×
+    # ~10ms-per-string bge-m3 ≈ 50s of GPU embed plus Chroma upsert -
+    # well inside the 300s noted-rag client timeout, with headroom for
+    # GPU contention. Was 28699 in one shot for the `ml` domain on
+    # 2026-05-07, blew the timeout and silently emptied the cache.
+    _CACHE_PUSH_CHUNK_SIZE = 5000
+    # Per-chunk retry. cache_upsert is now atomic (write-to-temp +
+    # rename inside noted-rag), so retrying after a transient HTTP
+    # blip won't leave partial state - it just writes a fresh temp.
+    _CACHE_PUSH_RETRIES = 3
+
+    def _push_cache_chunked(
+        self,
+        collection: str,
+        ids: list[str],
+        texts: list[str],
+        replace: bool,
+        kind: str,  # 'entities' / 'summaries' - for log labels only
+    ) -> None:
+        """Chunked cache_upsert with retry. The first chunk uses the
+        caller-supplied `replace` flag; subsequent chunks always use
+        replace=False so they append to (rather than wipe) what the
+        first chunk just wrote."""
+        if not ids:
+            return
+        n = len(ids)
+        chunks = max(1, (n + self._CACHE_PUSH_CHUNK_SIZE - 1) // self._CACHE_PUSH_CHUNK_SIZE)
+        t_start = _now()
+        logger.info('caching.%s: cache_upsert %d ids in %d chunk(s) (replace=%s) — start',
+                    kind, n, chunks, replace)
+        for i, start in enumerate(range(0, n, self._CACHE_PUSH_CHUNK_SIZE)):
+            end = min(start + self._CACHE_PUSH_CHUNK_SIZE, n)
+            chunk_ids = ids[start:end]
+            chunk_texts = texts[start:end]
+            chunk_replace = replace and i == 0
+            for attempt in range(1, self._CACHE_PUSH_RETRIES + 1):
+                try:
+                    self._rag.cache_upsert(
+                        collection, chunk_ids, chunk_texts, replace=chunk_replace,
+                    )
+                    break
+                except RagClientError as e:
+                    if attempt == self._CACHE_PUSH_RETRIES:
+                        logger.error(
+                            'caching.%s: chunk %d/%d (rows %d-%d) failed after %d attempts; '
+                            'aborting cache push so the build phase ends in error',
+                            kind, i + 1, chunks, start, end - 1, attempt,
+                        )
+                        raise
+                    backoff = 2 ** (attempt - 1)
+                    logger.warning(
+                        'caching.%s: chunk %d/%d (rows %d-%d) attempt %d failed (%s); '
+                        'retrying in %ds',
+                        kind, i + 1, chunks, start, end - 1, attempt, e, backoff,
+                    )
+                    time.sleep(backoff)
+        logger.info('caching.%s: end (%.2fs, %d chunks)',
+                    kind, _now() - t_start, chunks)
+
     def _push_caches(
         self,
         thematic_entities: list[Entity],
@@ -532,33 +623,33 @@ class ResearchBuilder:
         replace: bool = True,
     ) -> None:
         """Push entity-name and community-summary embeddings to noted-rag's
-        ChromaDB caches. Failures are logged but not raised - queries fall
-        back to per-call embed if the cache is stale."""
-        try:
-            ent_ids = [e.id for e in thematic_entities]
-            ent_texts = [
-                f"{(e.properties.get('canonical_name') or e.label)}. "
-                f"{e.properties.get('description') or ''}".strip()
-                for e in thematic_entities
-            ]
-            if ent_ids:
-                t0 = _now()
-                logger.info('caching.entities: cache_upsert %d ids (replace=%s) — start',
-                            len(ent_ids), replace)
-                self._rag.cache_upsert(self.entity_cache_collection, ent_ids, ent_texts, replace=replace)
-                logger.info('caching.entities: end (%.2fs)', _now() - t0)
-            if summary_entities:
-                sum_ids = [s.id for s in summary_entities]
-                sum_texts = [s.properties.get('text', '') for s in summary_entities]
-                t0 = _now()
-                logger.info('caching.summaries: cache_upsert %d ids (replace=%s) — start',
-                            len(sum_ids), replace)
-                self._rag.cache_upsert(self.summary_cache_collection, sum_ids, sum_texts, replace=replace)
-                logger.info('caching.summaries: end (%.2fs)', _now() - t0)
-            logger.info('Cache push: %d entities, %d summaries (replace=%s)',
-                        len(ent_ids), len(summary_entities), replace)
-        except RagClientError as e:
-            logger.warning('Cache push failed (queries will fall back to per-call embed): %s', e)
+        ChromaDB caches. Chunked (5k per call) and retried (3 attempts
+        with exponential backoff) so a single transient blip can't take
+        down the whole build's cache push.
+
+        Failures (after retries are exhausted) are RAISED. Pre-2026-05-07
+        behavior swallowed them with a misleading "queries will fall
+        back to per-call embed" warning - they don't, the retriever
+        takes the empty-cache branch ("No thematic entities. Trigger a
+        rebuild first.") regardless. The `ml` domain spent 24h in this
+        state with a fully-built graph behind a silently-empty cache."""
+        ent_ids = [e.id for e in thematic_entities]
+        ent_texts = [
+            f"{(e.properties.get('canonical_name') or e.label)}. "
+            f"{e.properties.get('description') or ''}".strip()
+            for e in thematic_entities
+        ]
+        self._push_cache_chunked(
+            self.entity_cache_collection, ent_ids, ent_texts, replace, 'entities',
+        )
+        if summary_entities:
+            sum_ids = [s.id for s in summary_entities]
+            sum_texts = [s.properties.get('text', '') for s in summary_entities]
+            self._push_cache_chunked(
+                self.summary_cache_collection, sum_ids, sum_texts, replace, 'summaries',
+            )
+        logger.info('Cache push: %d entities, %d summaries (replace=%s)',
+                    len(ent_ids), len(summary_entities), replace)
 
     def _push_corpus_chunks_for_docling(self, chunks: list[MdChunk]) -> None:
         """Group Docling-derived chunks (PDF / DOCX / PPTX / HTML) by

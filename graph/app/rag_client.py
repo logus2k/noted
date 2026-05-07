@@ -184,3 +184,23 @@ class RagClient:
             return r.ok and r.json().get('dropped', False)
         except requests.RequestException:
             return False
+
+    def collection_count(self, collection: str) -> int | None:
+        """Return the number of documents in a noted-rag/ChromaDB
+        collection. None when the collection doesn't exist or the call
+        fails. Intended for /status visibility - cheap (metadata read,
+        no embeddings) but defensively soft-fails so a transient
+        noted-rag blip doesn't 500 the status response."""
+        try:
+            r = self._session.get(
+                f'{self._base}/collections',
+                timeout=self._timeout,
+            )
+            if not r.ok:
+                return None
+            for c in (r.json() or {}).get('collections') or []:
+                if c.get('name') == collection:
+                    return c.get('count')
+            return 0  # collection list returned but ours isn't there yet
+        except requests.RequestException:
+            return None

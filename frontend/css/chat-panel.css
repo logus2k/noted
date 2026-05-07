@@ -361,7 +361,11 @@
 }
 
 /* GitHub highlight theme scoped to chat */
-.chat-message-assistant .hljs { color: #24292e; background: #fff; }
+.chat-message-assistant .hljs {
+    color: #24292e;
+    background: #fff;
+    text-wrap-mode: wrap;
+}
 .chat-message-assistant .hljs-doctag,
 .chat-message-assistant .hljs-keyword,
 .chat-message-assistant .hljs-meta .hljs-keyword,

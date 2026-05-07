@@ -129,17 +129,20 @@ def rebuild(
     if not kb.rebuild_lock.acquire(blocking=False):
         raise HTTPException(status_code=409, detail='Rebuild or per-doc op in progress')
     try:
-        kb.last_build = kb.builder.build(
+        stats = kb.builder.build(
             dry_run=dry_run,
             limit_chunks=limit_chunks,
             skip_analytics=skip_analytics,
             skip_community_summaries=skip_community_summaries,
         )
+        # Persist last_build to data/domains/<id>/state/last_build.json
+        # so it survives noted-graph restarts and /status can show it.
+        kb.record_last_build(stats)
         # Successful rebuild = community structure refreshed. Clear the
         # KB's pending-recluster marker.
         if not skip_analytics and not skip_community_summaries:
             domain_state.clear_recluster_pending(kb.domain_id)
-        return kb.last_build.to_dict()
+        return stats.to_dict()
     except ArcadeDBError as e:
         logger.exception('Research rebuild failed: ArcadeDB error')
         raise HTTPException(status_code=500, detail=f'ArcadeDB error: {e}')
@@ -433,6 +436,20 @@ def status(domain_id: str):
         counts = kb.storage.counts()
     except ArcadeDBError as e:
         counts = {'error': str(e)}
+    # Pull noted-rag cache counts so the UI can spot partial-build
+    # states where the graph has data but the entity / summary vector
+    # caches are empty (the failure mode that hid the `ml` domain's
+    # 28k-entity graph behind "rebuild needed" notes for 24h after
+    # the actual build silently failed). Soft-fail: a transient
+    # noted-rag outage returns None, not a 500.
+    cache_counts = {
+        'entity_cache': kb.builder._rag.collection_count(kb.entity_cache_collection)
+            if kb.entity_cache_collection else None,
+        'summary_cache': kb.builder._rag.collection_count(kb.summary_cache_collection)
+            if kb.summary_cache_collection else None,
+        'corpus': kb.builder._rag.collection_count(kb.corpus_collection)
+            if kb.corpus_collection else None,
+    }
     return {
         'domain_id': kb.domain_id,
         'has_knowledge': True,
@@ -440,6 +457,7 @@ def status(domain_id: str):
         'progress': kb.builder.progress,
         'last_build': kb.last_build.to_dict() if kb.last_build else None,
         'global_counts': counts,
+        'cache_counts': cache_counts,
         'pending_recluster': domain_state.list_recluster_pending(),
         'add_queue_depth': kb.add_queue_depth(),
     }

@@ -164,7 +164,13 @@ def resolve_domain_id(value: str | None) -> str | None:
     for d in domains:
         if (d.get("domain_id") or "").lower() == target_lower:
             return d.get("domain_id")
-    return target  # no match - pass through
+    # No match. Return None so callers fail fast with an explicit
+    # "unknown domain" error instead of silently fanning out across all
+    # active domains (the previous pass-through behavior). Hallucinated
+    # domain ids from the model used to surface as confusing "rebuild
+    # needed" notes when the misnamed domain happened to be the only
+    # one active.
+    return None
 
 
 def _domain_collection(domain_id: str) -> str:

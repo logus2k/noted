@@ -2859,8 +2859,23 @@ async def _tool_research_topic(args: dict, managers: dict) -> str:
     # which domain is most relevant; we just need to honor its choice.
     # `resolve_domain_id` accepts either the slug (`sw_arch`) or the
     # human-readable name (`Software Agents`) - the model picks either.
-    from app.routers.kb import resolve_domain_id
-    domain_id = resolve_domain_id(args.get("domain_id"))
+    # Returns None for unknown values; surface that as an explicit error
+    # tool result rather than silently falling through to "first active
+    # domain".
+    from app.routers.kb import resolve_domain_id, get_active_domains
+    raw_domain = args.get("domain_id")
+    if raw_domain:
+        domain_id = resolve_domain_id(raw_domain)
+        if domain_id is None:
+            active = get_active_domains() or []
+            return (
+                f"Error: domain_id={raw_domain!r} is not an active Domain. "
+                f"Pick from the active list shown in the workspace context: "
+                f"{', '.join(active) if active else '(none)'}, or omit the "
+                f"`domain_id` argument to fan out across all active Domains."
+            )
+    else:
+        domain_id = None
 
     envelope = await gm.query(question, mode=mode, kb_id=domain_id)
 
@@ -2979,8 +2994,23 @@ async def _tool_graph_and_vector_search(args: dict, managers: dict) -> str:
     # set, ONLY query that one Domain (focused answer, no cross-domain
     # noise). When omitted, fan out across all active Domains as before.
     # Accept either slug or human-readable name (model picks either).
-    from app.routers.kb import resolve_domain_id
-    requested_domain = resolve_domain_id(args.get("domain_id"))
+    # `resolve_domain_id` now returns None for unknown ids (was: passes
+    # through unchanged) - surface that as an explicit error rather
+    # than silently fanning out and producing misleading results.
+    from app.routers.kb import resolve_domain_id, get_active_domains
+    raw_domain = args.get("domain_id")
+    if raw_domain:
+        requested_domain = resolve_domain_id(raw_domain)
+        if requested_domain is None:
+            active = get_active_domains() or []
+            return (
+                f"Error: domain_id={raw_domain!r} is not an active Domain. "
+                f"Pick from the active list shown in the workspace context: "
+                f"{', '.join(active) if active else '(none)'}, or omit the "
+                f"`domain_id` argument to fan out across all active Domains."
+            )
+    else:
+        requested_domain = None
 
     # ── Step 1: embed ONCE upfront (single GPU call) ───────────────
     query_vector: list[float] = []
@@ -3252,7 +3282,14 @@ async def _tool_graph_and_vector_search(args: dict, managers: dict) -> str:
     elif not graph_result or graph_result.get("status") == "unavailable":
         out_parts.append("_Knowledge graph unavailable._\n")
     elif graph_result.get("note"):
-        out_parts.append(f"_{graph_result['note']}_\n")
+        # Plain text - no markdown italic wrapping. The previous
+        # `f"_{note}_"` form combined with the per-domain prefix
+        # `f"{kb_id}: {note}"` further inside the retriever produced
+        # output like `_ml: No thematic entities..._`, which made the
+        # leading `_` look like part of the domain id when a user
+        # inspected the LLM prompt - "_ml" looked corrupt while the
+        # real domain was `ml`.
+        out_parts.append(f"{graph_result['note']}\n")
     else:
         entry = graph_result.get("entry_entities") or []
         ents = graph_result.get("entities") or []
