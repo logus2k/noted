@@ -223,6 +223,47 @@ def doc_remove(domain_id: str, req: DocPathRequest):
         kb.rebuild_lock.release()
 
 
+@router.post('/{domain_id}/resume')
+def resume_suspended(domain_id: str):
+    """Wake a suspended build. Returns 409 if no build is currently
+    suspended on this Domain. The operator typically fixes the
+    underlying service issue (restart llama-vision so bge-m3 comes
+    back, etc.) before calling this — Resume just signals the worker
+    thread to retry from where it left off; if the underlying issue
+    is not fixed, the next retry will fail again and re-suspend."""
+    kb = _get_domain(domain_id)
+    _require_knowledge(kb)
+    woke = kb.builder.request_resume()
+    if not woke:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f'Domain {domain_id!r} is not in a suspended state '
+                f'(phase={kb.builder.progress.get("phase", "unknown")!r}).'
+            ),
+        )
+    return {'domain_id': domain_id, 'action': 'resume'}
+
+
+@router.post('/{domain_id}/abort')
+def abort_suspended(domain_id: str):
+    """Wake a suspended build with an abort signal. The build phase
+    transitions to `error` (the failed-phase context is preserved in
+    progress.failed_phase) and the worker raises out of build()."""
+    kb = _get_domain(domain_id)
+    _require_knowledge(kb)
+    woke = kb.builder.request_abort()
+    if not woke:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f'Domain {domain_id!r} is not in a suspended state '
+                f'(phase={kb.builder.progress.get("phase", "unknown")!r}).'
+            ),
+        )
+    return {'domain_id': domain_id, 'action': 'abort'}
+
+
 @router.post('/{domain_id}/recluster')
 def recluster(domain_id: str):
     """Re-run analytics + community summaries over the KB's CURRENT graph

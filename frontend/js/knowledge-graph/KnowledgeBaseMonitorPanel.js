@@ -173,6 +173,21 @@ export class KnowledgeBaseMonitorPanel {
                 </div>
             </div>
 
+            <div id="grm-suspended-banner" class="grm-card" style="display:none;background:#fff8e1;border:1px solid #ffb74d;color:#5d3a16">
+                <div style="display:flex;align-items:center;gap:8px">
+                    <i class="fa-solid fa-circle-pause" style="color:#fb8c00"></i>
+                    <div style="flex:1">
+                        <div style="font-weight:500;font-size:12px">Build suspended — operator action required</div>
+                        <div id="grm-suspended-meta" style="font-size:11px;color:#7b4f1d;margin-top:2px"></div>
+                        <div id="grm-suspended-error" style="font-size:11px;color:#7b4f1d;margin-top:2px;font-family:var(--font-mono);word-break:break-word"></div>
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">
+                        <button id="grm-resume-btn" class="rm-btn" style="padding:4px 12px;font-size:11px">Resume</button>
+                        <button id="grm-abort-btn" class="rm-btn" style="padding:4px 12px;font-size:11px;background:#e57373;color:#fff">Abort</button>
+                    </div>
+                </div>
+            </div>
+
             <div id="grm-recluster-banner" class="grm-card" style="display:none;background:#fff8e1;border:1px solid #ffd54f;color:#5d4e1a">
                 <div style="display:flex;align-items:center;gap:8px">
                     <i class="fa-solid fa-triangle-exclamation" style="color:#f9a825"></i>
@@ -242,6 +257,8 @@ export class KnowledgeBaseMonitorPanel {
             'poll-state', 'recluster-banner', 'recluster-reason',
             'recluster-btn',
             'failed-banner', 'failed-meta', 'failed-btn',
+            'suspended-banner', 'suspended-meta', 'suspended-error',
+            'resume-btn', 'abort-btn',
             'vec-chunks', 'vec-sources', 'vec-formats',
             'phase', 'in-progress', 'started-at', 'elapsed',
             'bar-label', 'chunks', 'progress-bar', 'progress-pct', 'rate', 'current-doc',
@@ -259,6 +276,8 @@ export class KnowledgeBaseMonitorPanel {
             const scope = this._els['failed-btn'].dataset.scope || 'rebuild';
             this._triggerRetry(scope);
         });
+        this._els['resume-btn'].addEventListener('click', () => this._triggerResume());
+        this._els['abort-btn'].addEventListener('click', () => this._triggerAbort());
 
         if (this._els['domain-select']) {
             this._els['domain-select'].addEventListener('change', (e) => {
@@ -358,13 +377,45 @@ export class KnowledgeBaseMonitorPanel {
             this._reclusterInFlight = false;
         }
 
-        // Failed banner takes priority. Shown when the most recent op
-        // ended in `failed` AND we're not currently retrying it. The
-        // retry button's scope (recluster vs full rebuild) is derived
-        // from progress.failed_op so the user only re-runs what they
-        // need to: analytics-layer failures retry the analytics layer;
-        // anything else falls back to Full Rebuild.
-        const showFailed = phaseFailed && !inProgress && !this._reclusterInFlight;
+        // Suspended banner takes top priority. Shown when the build
+        // hit retry exhaustion in a recoverable phase (currently
+        // caching) and is blocked on its in-memory suspend event.
+        // Operator fixes the underlying service (typically: restart
+        // llama-vision so bge-m3 comes back) and clicks Resume; the
+        // worker thread retries from the same chunk. Or Abort to give
+        // up.
+        const phaseSuspended = progress.phase === 'suspended';
+        if (phaseSuspended) {
+            this._els['suspended-banner'].style.display = '';
+            const meta = [
+                progress.suspended_phase ? `phase=${progress.suspended_phase}` : null,
+                progress.failed_chunk && progress.total_chunks
+                    ? `chunk ${progress.failed_chunk}/${progress.total_chunks} (rows ${progress.failed_rows || '?'})`
+                    : null,
+                progress.caching_kind ? `${progress.caching_kind}` : null,
+            ].filter(Boolean).join(' · ');
+            this._els['suspended-meta'].textContent = meta;
+            this._els['suspended-error'].textContent = progress.last_error || '';
+            this._els['resume-btn'].disabled = false;
+            this._els['resume-btn'].textContent = 'Resume';
+            this._els['abort-btn'].disabled = false;
+            this._els['abort-btn'].textContent = 'Abort';
+            // Hide the other banners while suspended (only one banner
+            // at a time so the operator focuses on the unblock action).
+            this._els['failed-banner'].style.display = 'none';
+            this._els['recluster-banner'].style.display = 'none';
+        } else {
+            this._els['suspended-banner'].style.display = 'none';
+        }
+
+        // Failed banner takes priority (when not suspended). Shown when
+        // the most recent op ended in `failed` AND we're not currently
+        // retrying it. The retry button's scope (recluster vs full
+        // rebuild) is derived from progress.failed_op so the user only
+        // re-runs what they need to: analytics-layer failures retry
+        // the analytics layer; anything else falls back to Full
+        // Rebuild.
+        const showFailed = !phaseSuspended && phaseFailed && !inProgress && !this._reclusterInFlight;
         if (showFailed) {
             const failedOp = progress.failed_op || 'unknown';
             const failedAt = progress.failed_at;
@@ -382,13 +433,17 @@ export class KnowledgeBaseMonitorPanel {
             this._els['recluster-banner'].style.display = 'none';
         } else {
             this._els['failed-banner'].style.display = 'none';
-            // Recluster banner: three states.
+            // Recluster banner: three states (skipped while suspended,
+            // suspended banner has the floor).
             //   1. We triggered an op and the backend is still running it
             //      -> "Running..." with live phase progress inline
             //   2. The KB has a pending_recluster marker and nothing's
             //      running -> show the action picker + "Run" button
             //   3. Otherwise hide the banner
-            if (this._reclusterInFlight) {
+            if (phaseSuspended) {
+                // suspended-banner already visible above; keep recluster hidden
+                this._els['recluster-banner'].style.display = 'none';
+            } else if (this._reclusterInFlight) {
                 this._els['recluster-banner'].style.display = '';
                 this._els['recluster-reason'].textContent =
                     `${REBUILD_ACTION.running} - ${_runningProgressText(progress)}`;
@@ -703,6 +758,47 @@ export class KnowledgeBaseMonitorPanel {
             .catch((e) => {
                 this._reclusterInFlight = false;
                 this._applyError(`Retry failed to start: ${e.message}`);
+            });
+    }
+
+    _triggerResume() {
+        if (!this._domainId) return;
+        const btn = this._els['resume-btn'];
+        const abortBtn = this._els['abort-btn'];
+        btn.disabled = true;
+        abortBtn.disabled = true;
+        btn.textContent = 'Resuming...';
+        fetch(`api/domains/${this._domainId}/resume`, { method: 'POST' })
+            .then((r) => {
+                if (!r.ok) return r.json().then(d => Promise.reject(d.detail || `HTTP ${r.status}`));
+                // The next /status tick will pick up the phase change
+                // back to whatever phase the build is now retrying.
+            })
+            .catch((e) => {
+                btn.disabled = false;
+                abortBtn.disabled = false;
+                btn.textContent = 'Resume';
+                this._applyError(`Resume failed: ${typeof e === 'string' ? e : (e.message || JSON.stringify(e))}`);
+            });
+    }
+
+    _triggerAbort() {
+        if (!this._domainId) return;
+        if (!confirm('Abort the suspended build? All in-memory progress will be lost.')) return;
+        const btn = this._els['abort-btn'];
+        const resumeBtn = this._els['resume-btn'];
+        btn.disabled = true;
+        resumeBtn.disabled = true;
+        btn.textContent = 'Aborting...';
+        fetch(`api/domains/${this._domainId}/abort`, { method: 'POST' })
+            .then((r) => {
+                if (!r.ok) return r.json().then(d => Promise.reject(d.detail || `HTTP ${r.status}`));
+            })
+            .catch((e) => {
+                btn.disabled = false;
+                resumeBtn.disabled = false;
+                btn.textContent = 'Abort';
+                this._applyError(`Abort failed: ${typeof e === 'string' ? e : (e.message || JSON.stringify(e))}`);
             });
     }
 }

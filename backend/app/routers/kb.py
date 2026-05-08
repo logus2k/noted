@@ -660,6 +660,47 @@ async def preflight(
             raise HTTPException(status_code=502, detail=f"noted-graph unreachable: {e}")
 
 
+@router.post("/{domain_id}/resume")
+async def resume_suspended(domain_id: str):
+    """Wake a suspended build. The build worker thread is blocked on
+    its in-memory suspend event holding all the extracted state in
+    locals; this signals it to retry from the failed step. The
+    operator typically fixes the underlying service issue (e.g.
+    restart llama-vision so bge-m3 comes back) before resuming.
+    Returns 409 if the Domain has no build currently suspended."""
+    async with httpx.AsyncClient(timeout=30) as client:
+        try:
+            r = await client.post(f"{NOTED_GRAPH_BASE}/research/{domain_id}/resume")
+            if r.status_code == 404:
+                raise HTTPException(status_code=404, detail=f"unknown Domain: {domain_id!r}")
+            if r.status_code == 409:
+                raise HTTPException(status_code=409, detail=r.json().get("detail", r.text[:300]))
+            return r.json() if r.status_code == 200 else {
+                "status": "error", "code": r.status_code, "detail": r.text[:300],
+            }
+        except httpx.RequestError as e:
+            raise HTTPException(status_code=502, detail=f"noted-graph unreachable: {e}")
+
+
+@router.post("/{domain_id}/abort")
+async def abort_suspended(domain_id: str):
+    """Abort a suspended build. The worker thread wakes with an abort
+    signal and raises out of build(); progress.failed_phase preserves
+    the context so the operator can see what was running."""
+    async with httpx.AsyncClient(timeout=30) as client:
+        try:
+            r = await client.post(f"{NOTED_GRAPH_BASE}/research/{domain_id}/abort")
+            if r.status_code == 404:
+                raise HTTPException(status_code=404, detail=f"unknown Domain: {domain_id!r}")
+            if r.status_code == 409:
+                raise HTTPException(status_code=409, detail=r.json().get("detail", r.text[:300]))
+            return r.json() if r.status_code == 200 else {
+                "status": "error", "code": r.status_code, "detail": r.text[:300],
+            }
+        except httpx.RequestError as e:
+            raise HTTPException(status_code=502, detail=f"noted-graph unreachable: {e}")
+
+
 @router.post("/{domain_id}/recluster")
 async def recluster(domain_id: str):
     """Re-run analytics + community summaries over the Domain's CURRENT

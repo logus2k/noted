@@ -114,6 +114,109 @@ class ResearchBuilder:
         # needed. Eventual consistency is fine for progress reporting.
         self.progress: dict = {'phase': 'idle'}
 
+        # SUSPEND/RESUME state. When the cache push (or another
+        # recoverable phase) exhausts retries, we don't raise — the
+        # build worker thread blocks on this event with all extracted
+        # state still in local variables. The operator can fix the
+        # underlying issue (e.g. restart llama-vision so bge-m3 comes
+        # back), then hit Resume to set _suspend_action='resume' and
+        # signal the event. Or hit Abort to give up.
+        #
+        # Holding the event in memory means a noted-graph restart loses
+        # the suspended state — the build can't be resumed from a fresh
+        # process. That's an acceptable tradeoff: the operator's window
+        # to fix-and-resume is typically <5 min, and a graph restart
+        # implies bigger problems. Persistence-based suspend is a
+        # separate, larger refactor we explicitly chose to defer.
+        import threading as _threading
+        self._suspend_event = _threading.Event()
+        self._suspend_action: str | None = None  # 'resume' | 'abort' | None
+        # Default suspend timeout: 60 min. Configurable per-call if
+        # needed. After timeout, the wait returns False and the
+        # builder treats it as an abort.
+        self._suspend_timeout_seconds = 3600
+
+    def request_resume(self) -> bool:
+        """Wake a suspended build. Returns True iff the build was
+        actually suspended; False otherwise (call ignored)."""
+        if self.progress.get('phase') != 'suspended':
+            return False
+        self._suspend_action = 'resume'
+        self._suspend_event.set()
+        return True
+
+    def request_abort(self) -> bool:
+        """Wake a suspended build with an abort signal. Returns True
+        iff the build was actually suspended; False otherwise."""
+        if self.progress.get('phase') != 'suspended':
+            return False
+        self._suspend_action = 'abort'
+        self._suspend_event.set()
+        return True
+
+    def _suspend_for(
+        self, suspended_phase: str, payload: dict,
+    ) -> str:
+        """Block the worker thread until the operator resumes or
+        aborts. `payload` describes the failure context for the UI
+        and is merged into self.progress.
+
+        Returns the resume action: 'resume' (caller should retry the
+        failed step) or 'abort' (caller should raise).
+        """
+        # Reset the event + action for this suspension cycle.
+        self._suspend_event.clear()
+        self._suspend_action = None
+
+        # Snapshot the suspend payload to disk so the operator can see
+        # context survived a noted-graph restart, even though the
+        # worker thread itself can't resume across restart.
+        try:
+            from app.config import DOMAIN_HOME_DIR as _DHD
+            state_dir = os.path.join(_DHD, self.kb_id, 'state')
+            os.makedirs(state_dir, exist_ok=True)
+            import json as _json
+            from datetime import datetime as _dt, timezone as _tz
+            with open(os.path.join(state_dir, 'suspended.json'), 'w') as f:
+                _json.dump({
+                    'suspended_phase': suspended_phase,
+                    'suspended_at': _dt.now(_tz.utc).isoformat(),
+                    **payload,
+                }, f, indent=2, sort_keys=True)
+        except Exception as _e:
+            logger.warning('Domain %s: could not persist suspended.json: %s',
+                           self.kb_id, _e)
+
+        prev_phase = self.progress.get('phase', 'unknown')
+        self._set_phase(
+            'suspended',
+            suspended_phase=suspended_phase,
+            suspended_at_phase=prev_phase,
+            **payload,
+        )
+        logger.warning(
+            'Domain %s: SUSPENDED at phase=%s — waiting for resume/abort '
+            '(timeout=%ds). Payload: %s',
+            self.kb_id, suspended_phase, self._suspend_timeout_seconds, payload,
+        )
+
+        # Block. Returns False on timeout.
+        signaled = self._suspend_event.wait(self._suspend_timeout_seconds)
+        action = self._suspend_action or ('abort' if not signaled else 'abort')
+        # Clear the suspended.json marker - we're moving on either way.
+        try:
+            from app.config import DOMAIN_HOME_DIR as _DHD
+            os.remove(os.path.join(_DHD, self.kb_id, 'state', 'suspended.json'))
+        except Exception:
+            pass
+        if not signaled:
+            logger.warning(
+                'Domain %s: suspend timeout (%ds) elapsed without resume; '
+                'treating as abort.',
+                self.kb_id, self._suspend_timeout_seconds,
+            )
+        return action
+
     def _set_sub_phase(self, sub_phase: str, done: int, total: int) -> None:
         """Promote per-chunk progress from `graph_storage`'s long writing
         loops up to `self.progress` so the UI can render it. Without this
@@ -587,32 +690,72 @@ class ResearchBuilder:
         t_start = _now()
         logger.info('caching.%s: cache_upsert %d ids in %d chunk(s) (replace=%s) — start',
                     kind, n, chunks, replace)
-        for i, start in enumerate(range(0, n, self._CACHE_PUSH_CHUNK_SIZE)):
+        i = 0
+        starts = list(range(0, n, self._CACHE_PUSH_CHUNK_SIZE))
+        while i < len(starts):
+            start = starts[i]
             end = min(start + self._CACHE_PUSH_CHUNK_SIZE, n)
             chunk_ids = ids[start:end]
             chunk_texts = texts[start:end]
+            # Only the FIRST chunk respects the caller's `replace` flag
+            # (atomic-replace via temp collection on the noted-rag side).
+            # Subsequent chunks always append (replace=False) so they
+            # don't wipe what the previous chunks just wrote.
             chunk_replace = replace and i == 0
-            for attempt in range(1, self._CACHE_PUSH_RETRIES + 1):
+            attempt = 1
+            chunk_succeeded = False
+            while not chunk_succeeded and attempt <= self._CACHE_PUSH_RETRIES:
                 try:
                     self._rag.cache_upsert(
                         collection, chunk_ids, chunk_texts, replace=chunk_replace,
                     )
-                    break
+                    chunk_succeeded = True
                 except RagClientError as e:
-                    if attempt == self._CACHE_PUSH_RETRIES:
-                        logger.error(
-                            'caching.%s: chunk %d/%d (rows %d-%d) failed after %d attempts; '
-                            'aborting cache push so the build phase ends in error',
-                            kind, i + 1, chunks, start, end - 1, attempt,
+                    if attempt < self._CACHE_PUSH_RETRIES:
+                        backoff = 2 ** (attempt - 1)
+                        logger.warning(
+                            'caching.%s: chunk %d/%d (rows %d-%d) attempt %d failed (%s); '
+                            'retrying in %ds',
+                            kind, i + 1, chunks, start, end - 1, attempt, e, backoff,
                         )
-                        raise
-                    backoff = 2 ** (attempt - 1)
-                    logger.warning(
-                        'caching.%s: chunk %d/%d (rows %d-%d) attempt %d failed (%s); '
-                        'retrying in %ds',
-                        kind, i + 1, chunks, start, end - 1, attempt, e, backoff,
+                        time.sleep(backoff)
+                        attempt += 1
+                        continue
+                    # Retries exhausted. Don't raise — suspend instead.
+                    # All extracted state is still in the caller's
+                    # locals; the operator can fix the underlying
+                    # service (typically: restart llama-vision so
+                    # bge-m3 comes back) and hit Resume to retry from
+                    # this same chunk. Or Abort to give up.
+                    logger.error(
+                        'caching.%s: chunk %d/%d (rows %d-%d) exhausted %d attempts; '
+                        'suspending build so the operator can investigate.',
+                        kind, i + 1, chunks, start, end - 1, attempt,
                     )
-                    time.sleep(backoff)
+                    action = self._suspend_for(
+                        suspended_phase='caching',
+                        payload={
+                            'caching_kind': kind,
+                            'collection': collection,
+                            'failed_chunk': i + 1,
+                            'total_chunks': chunks,
+                            'failed_rows': f'{start}-{end - 1}',
+                            'last_error': str(e)[:500],
+                        },
+                    )
+                    if action == 'abort':
+                        raise
+                    # action == 'resume': reset attempt counter and retry
+                    # the SAME chunk (don't advance `i`).
+                    logger.info(
+                        'caching.%s: resumed; retrying chunk %d/%d from attempt 1.',
+                        kind, i + 1, chunks,
+                    )
+                    # Re-set phase back to caching so /status reflects
+                    # the resumed build.
+                    self._set_phase('caching')
+                    attempt = 1
+            i += 1
         logger.info('caching.%s: end (%.2fs, %d chunks)',
                     kind, _now() - t_start, chunks)
 

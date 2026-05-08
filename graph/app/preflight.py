@@ -180,55 +180,249 @@ def _gemma_json_smoke() -> CheckResult:
     )
 
 
-def _arcadedb_write_probe(database: str) -> CheckResult:
-    """Insert 10 vertices + 20 edges via the same GraphBatch HTTP
-    endpoint we use in production, then delete them. Verifies server
-    reachable, auth correct, schema present, and CREATE EDGE works.
-    Total cost: <100ms in healthy state."""
+def _arcadedb_write_verify(database: str) -> CheckResult:
+    """Read-after-write probe. Insert 10 vertices + 20 edges, then
+    SELECT-verify the vertices are queryable by id, traversal-verify
+    the edges are findable, then DELETE and verify the deletion.
+
+    The previous `_arcadedb_write_probe` only trusted the server's
+    `verticesCreated` / `edgesCreated` response counts. That misses
+    cases where the API reports success but the data isn't actually
+    persisted, indexed, or visible to subsequent queries. The 2026-05-08
+    incident also showed 'all OK' from preflight while the domain's
+    analytics layer was empty - because preflight never read back."""
     t0 = time.perf_counter()
-    name = 'arcadedb.write_probe'
+    name = 'arcadedb.write_verify'
     client = ArcadeDBClient(database=database)
+    PROBE_PREFIX = '__preflight__'
+
+    def _cleanup() -> None:
+        try:
+            client.command_sql(
+                f"DELETE FROM Entity WHERE id LIKE '{PROBE_PREFIX}%'"
+            )
+        except Exception:
+            pass
+
     try:
-        # Build 10 vertex + 20 edge payload
+        # Step 0: ensure clean slate (in case a prior probe crashed).
+        _cleanup()
+
+        # Step 1: write 10 vertices + 20 edges via GraphBatch (the same
+        # endpoint production extraction uses).
         lines = []
         for i in range(10):
             lines.append(json.dumps({
                 '@type': 'vertex', '@class': 'Entity',
-                '@id': f'__preflight__:v{i}', 'id': f'__preflight__:v{i}',
+                '@id': f'{PROBE_PREFIX}:v{i}', 'id': f'{PROBE_PREFIX}:v{i}',
                 'type': 'concept', 'label': f'preflight_v{i}',
             }))
         for i in range(20):
-            a = f'__preflight__:v{i % 10}'
-            b = f'__preflight__:v{(i + 1) % 10}'
+            a = f'{PROBE_PREFIX}:v{i % 10}'
+            b = f'{PROBE_PREFIX}:v{(i + 1) % 10}'
             lines.append(json.dumps({
                 '@type': 'edge', '@class': 'RELATES',
                 '@from': a, '@to': b, 'type': 'preflight',
             }))
         result = client.graphbatch_post(lines, light_edges=False)
+        v_reported = result.get('verticesCreated') or 0
+        e_reported = result.get('edgesCreated') or 0
+        if v_reported < 10 or e_reported < 20:
+            _cleanup()
+            return CheckResult(
+                name=name, status='error',
+                elapsed_ms=int((time.perf_counter() - t0) * 1000),
+                detail=f'GraphBatch reported partial counts: {result}',
+            )
+
+        # Step 2: SELECT-verify vertices are queryable by id (exercises
+        # the Entity.id index path that production retrieval uses).
+        rows = client.command_sql(
+            f"SELECT id FROM Entity WHERE id LIKE '{PROBE_PREFIX}:v%'"
+        )
+        v_seen = len(rows)
+        if v_seen < 10:
+            _cleanup()
+            return CheckResult(
+                name=name, status='error',
+                elapsed_ms=int((time.perf_counter() - t0) * 1000),
+                detail=(
+                    f'GraphBatch said {v_reported} vertices written but SELECT '
+                    f'returns {v_seen}. Index update lag or commit failure.'
+                ),
+            )
+
+        # Step 3: traversal-verify edges. Anchor on Entity.id (UNIQUE
+        # index, always fresh) and filter type in-memory after traversal
+        # — the same pattern production retrieval uses. The naive
+        # `WHERE type = 'preflight'` query would scan the
+        # RELATES.type non-unique index, which goes stale after the
+        # heavy DETACH DELETE pass that recluster runs (see
+        # feedback_arcadedb_type_index_stale.md). Healthy domains with
+        # active recluster history would false-positive on the naive
+        # form even though the edges are correctly persisted.
+        edge_rows = client.command_sql(
+            "SELECT COUNT(*) AS n FROM ( "
+            "  SELECT expand(outE('RELATES')) FROM Entity "
+            f"  WHERE id LIKE '{PROBE_PREFIX}:v%' "
+            ") WHERE type = 'preflight'"
+        )
+        e_seen = (edge_rows[0] or {}).get('n', 0) if edge_rows else 0
+        if e_seen < 20:
+            _cleanup()
+            return CheckResult(
+                name=name, status='error',
+                elapsed_ms=int((time.perf_counter() - t0) * 1000),
+                detail=(
+                    f'GraphBatch said {e_reported} edges written but '
+                    f'Entity.id-anchored traversal returns {e_seen}.'
+                ),
+            )
+
+        # Step 4: DELETE.
+        _cleanup()
+
+        # Step 5: SELECT-verify deletion completed.
+        check_rows = client.command_sql(
+            f"SELECT COUNT(*) AS n FROM Entity WHERE id LIKE '{PROBE_PREFIX}%'"
+        )
+        remaining = (check_rows[0] or {}).get('n', 0) if check_rows else 0
+        if remaining > 0:
+            return CheckResult(
+                name=name, status='error',
+                elapsed_ms=int((time.perf_counter() - t0) * 1000),
+                detail=f'DELETE leaked {remaining} preflight vertices',
+            )
+
+        elapsed_ms = int((time.perf_counter() - t0) * 1000)
+        return CheckResult(
+            name=name, status='ok', elapsed_ms=elapsed_ms,
+            detail=(
+                f'10v + 20e written, read-back verified, deleted, '
+                f'cleanup verified ({result.get("elapsedMs")}ms server insert)'
+            ),
+        )
+    except ArcadeDBError as e:
+        _cleanup()
+        return CheckResult(
+            name=name, status='error',
+            elapsed_ms=int((time.perf_counter() - t0) * 1000),
+            detail=f'write_verify failed: {e}',
+        )
+
+
+def _arcadedb_content_completeness(database: str) -> CheckResult:
+    """Verify the analytics layer (communities, sameAs, similar_to) has
+    been computed when there are extracted entities to cluster. The
+    structural checks above tell you the schema and write path are
+    healthy; this one tells you whether the CONTENT is actually
+    complete.
+
+    States:
+      - 0 thematic entities → OK (nothing to cluster yet)
+      - thematic > 0 + communities > 0 → OK
+      - thematic > 0 + communities = 0 + pending_recluster set → WARN
+      - thematic > 0 + communities = 0 + no pending marker → ERROR
+        (analytics never ran; trigger Recluster).
+
+    The 2026-05-08 ml domain incident: 19,509 thematic entities in
+    ArcadeDB with 0 communities, 0 sameAs, 0 similar_to, and the
+    pending_recluster marker set - and the existing preflight reported
+    'all good' because it never looked at content."""
+    t0 = time.perf_counter()
+    name = 'arcadedb.content_complete'
+    client = ArcadeDBClient(database=database)
+    try:
+        thematic_rows = client.command_sql(
+            "SELECT COUNT(*) AS n FROM Entity "
+            "WHERE id NOT LIKE 'markdown_chunk:%' "
+            "AND id NOT LIKE 'markdown_doc:%' "
+            "AND id NOT LIKE 'community:%' "
+            "AND id NOT LIKE 'community_summary:%'"
+        )
+        thematic = (thematic_rows[0] or {}).get('n', 0) if thematic_rows else 0
+
+        community_rows = client.command_sql(
+            "SELECT COUNT(*) AS n FROM Entity WHERE id LIKE 'community:%'"
+        )
+        communities = (community_rows[0] or {}).get('n', 0) if community_rows else 0
+
+        summary_rows = client.command_sql(
+            "SELECT COUNT(*) AS n FROM Entity WHERE id LIKE 'community_summary:%'"
+        )
+        summaries = (summary_rows[0] or {}).get('n', 0) if summary_rows else 0
+
+        sameas_rows = client.command_sql(
+            "SELECT COUNT(*) AS n FROM RELATES WHERE type = 'sameAs'"
+        )
+        sameas = (sameas_rows[0] or {}).get('n', 0) if sameas_rows else 0
+
+        similar_rows = client.command_sql(
+            "SELECT COUNT(*) AS n FROM RELATES WHERE type = 'similar_to'"
+        )
+        similar = (similar_rows[0] or {}).get('n', 0) if similar_rows else 0
     except ArcadeDBError as e:
         return CheckResult(
             name=name, status='error',
             elapsed_ms=int((time.perf_counter() - t0) * 1000),
-            detail=f'GraphBatch probe failed: {e}',
+            detail=f'content count query failed: {e}',
         )
-    finally:
-        # Always attempt cleanup, even on partial failure.
-        try:
-            client.command_sql(
-                "DELETE FROM Entity WHERE id LIKE '__preflight__%'",
-            )
-        except Exception:
-            pass
 
     elapsed_ms = int((time.perf_counter() - t0) * 1000)
-    if (result.get('verticesCreated') or 0) < 10 or (result.get('edgesCreated') or 0) < 20:
+    extra = {
+        'thematic_entities': thematic,
+        'communities': communities,
+        'community_summaries': summaries,
+        'sameAs_edges': sameas,
+        'similar_to_edges': similar,
+    }
+
+    if thematic == 0:
+        return CheckResult(
+            name=name, status='ok', elapsed_ms=elapsed_ms,
+            detail='no thematic entities yet (empty Domain or pre-extraction)',
+            extra=extra,
+        )
+
+    # Check pending_recluster state to differentiate "scheduled" from
+    # "broken".
+    try:
+        from app import state as domain_state_mod
+        pending_map = domain_state_mod.list_recluster_pending()
+        is_pending = database in pending_map
+        pending_reason = pending_map.get(database, {}).get('reason', '') if is_pending else ''
+    except Exception:
+        is_pending = False
+        pending_reason = ''
+    extra['pending_recluster'] = is_pending
+
+    if communities == 0:
+        if is_pending:
+            return CheckResult(
+                name=name, status='warn', elapsed_ms=elapsed_ms,
+                detail=(
+                    f'recluster pending ({pending_reason!r}); '
+                    f'{thematic} thematic entities, 0 communities, 0 summaries, '
+                    f'0 sameAs, 0 similar_to. Trigger Recluster to compute analytics.'
+                ),
+                extra=extra,
+            )
         return CheckResult(
             name=name, status='error', elapsed_ms=elapsed_ms,
-            detail=f'GraphBatch returned partial counts: {result}',
+            detail=(
+                f'analytics never ran: {thematic} thematic entities but '
+                f'0 communities, 0 sameAs, 0 similar_to, no pending marker. '
+                f'Trigger Recluster.'
+            ),
+            extra=extra,
         )
     return CheckResult(
         name=name, status='ok', elapsed_ms=elapsed_ms,
-        detail=f'10v + 20e in {result.get("elapsedMs")}ms server time',
+        detail=(
+            f'{communities} communities, {summaries} summaries, '
+            f'{sameas} sameAs, {similar} similar_to over {thematic} thematic'
+        ),
+        extra=extra,
     )
 
 
@@ -270,6 +464,182 @@ def _schema_indexes_check(database: str) -> CheckResult:
     return CheckResult(
         name=name, status='ok', elapsed_ms=elapsed_ms,
         detail=f'{len(rows)} indexes; required indexes present',
+    )
+
+
+def _arcadedb_count(database: str, where: str) -> int | None:
+    """Cheap scalar count helper used by the ChromaDB sync checks.
+    Returns None on ArcadeDB error (so the caller can decide whether
+    to escalate)."""
+    try:
+        client = ArcadeDBClient(database=database)
+        rows = client.command_sql(f'SELECT COUNT(*) AS n FROM Entity WHERE {where}')
+        return (rows[0] or {}).get('n', 0) if rows else 0
+    except ArcadeDBError:
+        return None
+
+
+def _chromadb_collection_sync(
+    name: str,
+    label: str,
+    collection: str | None,
+    arcadedb_count: int | None,
+    rag: RagClient,
+) -> CheckResult:
+    """Compare a noted-rag/ChromaDB collection's count to the matching
+    ArcadeDB-side count. Common shape used by corpus / entity_cache /
+    summary_cache. Status:
+      - collection name not configured (capability-only Domain) → OK
+      - ArcadeDB count unknown → ERROR (couldn't query the source of truth)
+      - ArcadeDB count = 0 + ChromaDB empty/missing → OK (nothing to push yet)
+      - ArcadeDB count > 0 + ChromaDB missing → ERROR
+      - ArcadeDB count > 0 + ChromaDB = 0 → ERROR
+      - ChromaDB count < 50% of ArcadeDB → WARN (under-populated)
+      - ChromaDB count >= 50% of ArcadeDB → OK
+    """
+    t0 = time.perf_counter()
+    if not collection:
+        return CheckResult(
+            name=name, status='ok',
+            elapsed_ms=int((time.perf_counter() - t0) * 1000),
+            detail=f'no {label} collection expected (capability-only Domain)',
+        )
+    if arcadedb_count is None:
+        return CheckResult(
+            name=name, status='error',
+            elapsed_ms=int((time.perf_counter() - t0) * 1000),
+            detail=f'cannot read ArcadeDB count for {label}; comparison impossible',
+        )
+
+    chroma_count = rag.collection_count(collection)
+    elapsed_ms = int((time.perf_counter() - t0) * 1000)
+    extra = {
+        'collection': collection,
+        'chroma_count': chroma_count,
+        'arcadedb_count': arcadedb_count,
+    }
+
+    if arcadedb_count == 0:
+        if chroma_count is None or chroma_count == 0:
+            return CheckResult(
+                name=name, status='ok', elapsed_ms=elapsed_ms,
+                detail=f'no {label} yet (empty Domain or pre-build)',
+                extra=extra,
+            )
+        return CheckResult(
+            name=name, status='warn', elapsed_ms=elapsed_ms,
+            detail=(
+                f'ChromaDB {collection} has {chroma_count} entries but '
+                f'ArcadeDB has 0 — orphaned cache from a previous build.'
+            ),
+            extra=extra,
+        )
+
+    # ArcadeDB has data; ChromaDB should mirror it.
+    if chroma_count is None:
+        return CheckResult(
+            name=name, status='error', elapsed_ms=elapsed_ms,
+            detail=(
+                f'ChromaDB collection {collection!r} unreachable in noted-rag '
+                f'(expected {arcadedb_count} {label}).'
+            ),
+            extra=extra,
+        )
+    if chroma_count == 0:
+        return CheckResult(
+            name=name, status='error', elapsed_ms=elapsed_ms,
+            detail=(
+                f'ChromaDB {collection} is empty but ArcadeDB has '
+                f'{arcadedb_count} {label}. Vector search returns nothing for '
+                f'this Domain — cache push never succeeded.'
+            ),
+            extra=extra,
+        )
+    ratio = chroma_count / arcadedb_count
+    if ratio < 0.5:
+        return CheckResult(
+            name=name, status='warn', elapsed_ms=elapsed_ms,
+            detail=(
+                f'{label} under-populated: {chroma_count} in ChromaDB vs '
+                f'{arcadedb_count} expected ({ratio:.0%}). Partial cache push.'
+            ),
+            extra=extra,
+        )
+    return CheckResult(
+        name=name, status='ok', elapsed_ms=elapsed_ms,
+        detail=f'{label}: {chroma_count} in ChromaDB / {arcadedb_count} in ArcadeDB',
+        extra=extra,
+    )
+
+
+def _chromadb_corpus_present(domain_id: str) -> CheckResult:
+    """ChromaDB <domain>__corpus collection vs ArcadeDB markdown_chunk
+    count. Empty/missing corpus means vector search returns nothing
+    for this Domain even when the graph is fully populated."""
+    from app.domain_registry import registry
+    try:
+        ctx = registry().get(domain_id)
+    except KeyError:
+        return CheckResult(
+            name='chromadb.corpus_present', status='error', elapsed_ms=0,
+            detail=f'unknown Domain: {domain_id!r}',
+        )
+    arcadedb_count = _arcadedb_count(domain_id, "id LIKE 'markdown_chunk:%'")
+    return _chromadb_collection_sync(
+        name='chromadb.corpus_present',
+        label='chunks',
+        collection=ctx.corpus_collection,
+        arcadedb_count=arcadedb_count,
+        rag=RagClient(),
+    )
+
+
+def _chromadb_entity_cache_present(domain_id: str) -> CheckResult:
+    """ChromaDB <domain>__gr_entities collection vs ArcadeDB thematic
+    entity count. Empty cache means graph retrieval entry-point lookup
+    fails, surfacing as 'No thematic entities. Trigger a rebuild.' even
+    when the graph itself is full of data."""
+    from app.domain_registry import registry
+    try:
+        ctx = registry().get(domain_id)
+    except KeyError:
+        return CheckResult(
+            name='chromadb.entity_cache_present', status='error', elapsed_ms=0,
+            detail=f'unknown Domain: {domain_id!r}',
+        )
+    arcadedb_count = _arcadedb_count(
+        domain_id,
+        "id NOT LIKE 'markdown_chunk:%' AND id NOT LIKE 'markdown_doc:%' "
+        "AND id NOT LIKE 'community:%' AND id NOT LIKE 'community_summary:%'",
+    )
+    return _chromadb_collection_sync(
+        name='chromadb.entity_cache_present',
+        label='thematic entities',
+        collection=ctx.entity_cache_collection,
+        arcadedb_count=arcadedb_count,
+        rag=RagClient(),
+    )
+
+
+def _chromadb_summary_cache_present(domain_id: str) -> CheckResult:
+    """ChromaDB <domain>__gr_summaries collection vs ArcadeDB
+    community_summary count. Used by the global retrieval mode (theme
+    queries). When 0 communities exist this check is OK by design."""
+    from app.domain_registry import registry
+    try:
+        ctx = registry().get(domain_id)
+    except KeyError:
+        return CheckResult(
+            name='chromadb.summary_cache_present', status='error', elapsed_ms=0,
+            detail=f'unknown Domain: {domain_id!r}',
+        )
+    arcadedb_count = _arcadedb_count(domain_id, "id LIKE 'community_summary:%'")
+    return _chromadb_collection_sync(
+        name='chromadb.summary_cache_present',
+        label='community summaries',
+        collection=ctx.summary_cache_collection,
+        arcadedb_count=arcadedb_count,
+        rag=RagClient(),
     )
 
 
@@ -455,9 +825,25 @@ def run_preflight_for_doc(
     if checks[-1].status == 'error':
         return PreflightReport(ok=False, checks=checks)
 
-    checks.append(_arcadedb_write_probe(database=domain_id))
+    # write_verify replaces the old write_probe: now reads back what it
+    # writes so a "succeeded but didn't actually persist" failure is
+    # caught instead of papered over.
+    checks.append(_arcadedb_write_verify(database=domain_id))
     if checks[-1].status == 'error':
         return PreflightReport(ok=False, checks=checks)
+
+    # Content completeness + ChromaDB sync are NEW. They expose
+    # partial-build state (analytics not run, caches empty against a
+    # populated graph) that the structural checks above never see.
+    # They're informational for doc/add (we can still add a doc to a
+    # Domain whose analytics are pending - the doc add just sets the
+    # pending_recluster marker) but ERROR-level for system-health view.
+    # Keep them as warn/error per the check itself; don't short-circuit
+    # the whole preflight on them.
+    checks.append(_arcadedb_content_completeness(database=domain_id))
+    checks.append(_chromadb_corpus_present(domain_id=domain_id))
+    checks.append(_chromadb_entity_cache_present(domain_id=domain_id))
+    checks.append(_chromadb_summary_cache_present(domain_id=domain_id))
 
     checks.append(_rag_embedding_probe())
     if checks[-1].status == 'error':
@@ -524,7 +910,7 @@ def run_preflight_for_notedoc(
     if checks[-1].status == 'error':
         return PreflightReport(ok=False, checks=checks)
 
-    checks.append(_arcadedb_write_probe(database=domain_id))
+    checks.append(_arcadedb_write_verify(database=domain_id))
     if checks[-1].status == 'error':
         return PreflightReport(ok=False, checks=checks)
 
