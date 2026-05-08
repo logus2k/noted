@@ -12,6 +12,7 @@
  */
 
 import { domainState } from '../domain-state.js';
+import { ServiceHealthStrip } from '../ServiceHealthStrip.js';
 
 const POLL_MS = 2000;
 
@@ -95,12 +96,14 @@ function _pickDefaultDomain() {
 }
 
 export class KnowledgeBaseMonitorPanel {
-    constructor() {
+    constructor(client = null) {
         this._panel = null;
         this._timer = null;
         this._els = {};
         this._reclusterInFlight = false;
         this._domainId = null;
+        this._client = client;
+        this._healthStrip = null;
     }
 
     /** Open the Monitor. Optional `domainId` pre-selects the Domain in
@@ -162,6 +165,8 @@ export class KnowledgeBaseMonitorPanel {
                 <span id="grm-poll-state" class="grm-pill grm-pill-on">live</span>
             </div>
 
+            <div id="grm-svc-health-mount" style="margin-bottom:8px"></div>
+
             <div id="grm-failed-banner" class="grm-card" style="display:none;background:#ffeaea;border:1px solid #ef9a9a;color:#8e3a3a">
                 <div style="display:flex;align-items:center;gap:8px">
                     <i class="fa-solid fa-circle-exclamation" style="color:#e53935"></i>
@@ -209,6 +214,10 @@ export class KnowledgeBaseMonitorPanel {
                 <div class="grm-row" style="margin-top:10px">
                     <span class="grm-k">current source</span>
                     <span id="grm-current-doc" class="grm-v grm-mono" style="text-align:right;overflow:hidden;text-overflow:ellipsis;max-width:55%">-</span>
+                </div>
+                <div id="grm-doc-counter-row" class="grm-row" style="display:none">
+                    <span class="grm-k">document</span>
+                    <span id="grm-doc-counter" class="grm-v">-</span>
                 </div>
                 <div id="grm-sub-row" class="grm-row" style="display:none">
                     <span class="grm-k">step</span>
@@ -267,8 +276,23 @@ export class KnowledgeBaseMonitorPanel {
             'pictures-row', 'pictures', 'tables-row', 'tables',
             'entities', 'md-docs', 'communities', 'db-entities', 'db-rels',
             'last-build', 'last-build-json', 'error-card', 'error-msg',
+            'svc-health-mount',
+            'doc-counter-row', 'doc-counter',
         ]) {
             this._els[id] = document.getElementById('grm-' + id);
+        }
+
+        // Mount the LED strip if we have a Socket.IO client. Live-pushed
+        // service-health updates show up here; a kill of bge-m3 turns
+        // the bge_m3 LED red within ~30s without polling.
+        if (this._client && this._els['svc-health-mount']) {
+            try {
+                this._healthStrip = new ServiceHealthStrip({ client: this._client });
+                this._els['svc-health-mount'].appendChild(this._healthStrip.element);
+            } catch (e) {
+                // Don't break the panel if the strip fails to mount.
+                console.warn('ServiceHealthStrip failed to mount:', e);
+            }
         }
 
         this._els['recluster-btn'].addEventListener('click', () => this._triggerAction());
@@ -554,6 +578,19 @@ export class KnowledgeBaseMonitorPanel {
         this._els['current-doc'].textContent = curDoc
             ? (curIdx !== undefined ? `${curDoc}  #${curIdx}` : curDoc)
             : '-';
+
+        // Doc counter row — only shown during a doc-add drain when the
+        // worker has populated `progress.doc_index` and `progress.doc_total`.
+        // Auto-hides during recluster / writing / idle / failed phases
+        // because per-doc iteration isn't happening there.
+        const docIdx = progress.doc_index;
+        const docTotal = progress.doc_total;
+        if (typeof docIdx === 'number' && typeof docTotal === 'number' && docTotal > 0) {
+            this._els['doc-counter-row'].style.display = '';
+            this._els['doc-counter'].textContent = `${docIdx} / ${docTotal}`;
+        } else {
+            this._els['doc-counter-row'].style.display = 'none';
+        }
 
         // Sub-phase line — fills the gap between phase changes during long
         // silent steps. The builder emits `sub_phase` / `sub_done` /

@@ -1319,10 +1319,16 @@ export function createContextMenu(ctx) {
         }
         const filename = (path || '').split('/').pop();
         const { modalForm } = await import('../../modal.js');
+        // Pre-fill with the current display_name if set, otherwise with
+        // the filename. This way the user edits in place rather than
+        // typing from scratch. Saving with the filename still effectively
+        // means "use filename" (the tree renders the same string either
+        // way), and clearing the field still routes through the
+        // empty-string clear path on the backend.
         const result = await modalForm(
             [
                 { key: 'display_name', label: 'Display name (empty = use filename)',
-                  defaultValue: data.display_name || '',
+                  defaultValue: data.display_name || filename,
                   placeholder: filename,
                   required: false },
             ],
@@ -1343,11 +1349,19 @@ export function createContextMenu(ctx) {
             notify.success(name
                 ? `"${filename}" renamed to "${name}"`
                 : `"${filename}" display name cleared`);
-            const tree = ctx.tree;
-            const docsNode = tree?.findKey?.('kb-documents');
-            if (docsNode && docsNode.lazy) {
-                try { docsNode.resetLazy(); } catch {}
-            }
+            // Update the node in place instead of resetLazy() on the
+            // parent (which would collapse the whole `kb-documents`
+            // subtree and lose the user's expansion state). Keep
+            // node.data in sync so subsequent renames pre-fill from
+            // the new display_name. The mode badge convention is
+            // preserved — see corpus-doc node construction in
+            // ExplorerPanel.js (kb-documents:doc:* leaves).
+            const baseTitle = (name || filename);
+            const modeBadge = (node.data && node.data.mode === 'read_only')
+                ? ' [read-only]' : '';
+            node.title = baseTitle + modeBadge;
+            if (node.data) node.data.display_name = name;
+            try { node.update(); } catch {}
         } catch (e) {
             modalError(`Rename failed: ${e.message}`);
         }

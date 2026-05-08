@@ -129,12 +129,28 @@ def _doc_add_worker(ctx: 'DomainContext') -> None:
         # clears the marker on success).
         any_failure = False
         any_success = False
+        # Doc counter for the Monitor's "Document N / M" indicator.
+        # Updated per-doc; cleared at end of drain. doc_total grows
+        # dynamically as new uploads land in the queue mid-drain
+        # (current + remaining_queue), so the user sees a live
+        # picture of what's left.
+        doc_done_in_drain = 0
         while True:
             try:
                 rel_path = ctx.add_queue.get(timeout=_QUEUE_SETTLE_SECONDS)
             except Empty:
                 break
+            doc_done_in_drain += 1
             try:
+                # Surface the doc counter on the builder's progress
+                # before extraction starts so the Monitor renders it
+                # alongside `current_source`. Total = the doc we're
+                # about to process + everything still queued behind it.
+                try:
+                    ctx.builder.progress['doc_index'] = doc_done_in_drain
+                    ctx.builder.progress['doc_total'] = doc_done_in_drain + ctx.add_queue.qsize()
+                except Exception:
+                    pass
                 with ctx.rebuild_lock:
                     ext = os.path.splitext(rel_path)[1].lower()
                     if ext in _PDF_LIKE_EXTS:
@@ -142,8 +158,8 @@ def _doc_add_worker(ctx: 'DomainContext') -> None:
                     else:
                         ctx.builder.add_doc(rel_path)
                 any_success = True
-                logger.info('doc-add-worker[%s]: extracted %s',
-                            ctx.domain_id, rel_path)
+                logger.info('doc-add-worker[%s]: extracted %s (doc %d, %d remaining)',
+                            ctx.domain_id, rel_path, doc_done_in_drain, ctx.add_queue.qsize())
             except Exception as e:
                 any_failure = True
                 logger.exception('doc-add-worker[%s]: extraction failed for %s',
@@ -164,6 +180,15 @@ def _doc_add_worker(ctx: 'DomainContext') -> None:
                     pass
             finally:
                 ctx.add_queue.task_done()
+
+        # Drain just finished — clear the doc counter so the Monitor
+        # doesn't show stale "Document N / N" during the recluster /
+        # idle phases that follow.
+        try:
+            ctx.builder.progress.pop('doc_index', None)
+            ctx.builder.progress.pop('doc_total', None)
+        except Exception:
+            pass
 
         # Settle phase: queue has been empty for the idle timeout.
         # Auto-recluster only if (a) at least one doc actually succeeded

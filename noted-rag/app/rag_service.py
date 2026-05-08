@@ -520,7 +520,11 @@ class RagService:
         vectors = self.embed(texts, model=embed_model)
         BATCH = 256
         if replace:
-            tmp_collection = f"__tmp__{collection}__{int(time.time() * 1000)}"
+            # ChromaDB collection names: 3-63 chars, MUST start with an
+            # alphanumeric. Earlier `__tmp__{collection}__{ts}` failed the
+            # leading-alphanumeric rule and broke every replace=True call
+            # with HTTP 500 (caught the hard way 2026-05-08).
+            tmp_collection = f"t{int(time.time() * 1000)}_{collection}"
             # Defensive: clean up any stale temp from a prior crash.
             try:
                 client.delete_collection(tmp_collection)

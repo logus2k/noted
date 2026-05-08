@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse
 
 import os
 from app.config import FRONTEND_DIR, PROJECTS_DIR, MOUNTS_DIR
-from app.routers import notebooks, venvs, documents, git, files, dvc, minio, projects, mlflow, export, hydra, airflow, snapshots, registry, serving, reports, graph_proxy, llm, lsp, dap, evidently, rag, kb, citations, models as models_router, buffers
+from app.routers import notebooks, venvs, documents, git, files, dvc, minio, projects, mlflow, export, hydra, airflow, snapshots, registry, serving, reports, graph_proxy, llm, lsp, dap, evidently, rag, kb, citations, models as models_router, buffers, health
 from app.managers.kernel_manager import KernelManagerService
 from app.managers.execution_bridge import ExecutionBridge
 from app.managers.auto_instrumentation import AutoInstrumentation
@@ -89,6 +89,16 @@ async def lifespan(app: FastAPI):
     await kernel_mgr.start()
     # Pre-warm MLflow client to avoid slow first request
     mlflow.mlflow_mgr.warm_up()
+    # Service-health monitor — probes hard dependencies (noted-graph,
+    # noted-rag, llama-vision proxy, bge-m3, ArcadeDB, agent_server) on
+    # a 30s cadence and pushes state changes to clients via Socket.IO
+    # `services:health`. Surfaces upstream failures (bge-m3 zombie,
+    # services down) on the LED strip in the KB Monitor instead of
+    # waiting for a multi-hour build to fail with a cryptic message.
+    from app.services.health_monitor import HealthMonitor, set_monitor
+    _health_monitor = HealthMonitor(sio)
+    set_monitor(_health_monitor)
+    await _health_monitor.start()
     # Generate compose mounts file on startup
     from app.managers import config_manager
     try:
@@ -112,6 +122,12 @@ async def lifespan(app: FastAPI):
             await _mcp_cm.__aexit__(None, None, None)
         except Exception:
             pass
+    # Stop health monitor before tearing the rest down
+    try:
+        if _health_monitor is not None:
+            await _health_monitor.stop()
+    except Exception:
+        pass
     await lsp_mgr.stop_all()
     await dap_mgr.disconnect_all()
     await terminal_mgr.kill_all()
@@ -155,6 +171,7 @@ app.include_router(rag.router)
 app.include_router(kb.router)
 app.include_router(citations.router)
 app.include_router(models_router.router)
+app.include_router(health.router)
 from app.routers import file_debug
 app.include_router(file_debug.router)
 
@@ -192,6 +209,16 @@ except Exception as e:
 @sio.event
 async def connect(sid, environ):
     logger.info(f"Client connected: {sid}")
+    # Push the current service-health snapshot so the LED strip paints
+    # immediately on first frame. Subsequent updates arrive on state-
+    # change via the HealthMonitor's emit.
+    try:
+        from app.services.health_monitor import get_monitor
+        m = get_monitor()
+        if m is not None:
+            await sio.emit('services:health', m.get_state(), to=sid)
+    except Exception as e:
+        logger.warning(f"failed to send initial services:health to {sid}: {e}")
 
 
 @sio.event

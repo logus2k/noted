@@ -77,6 +77,11 @@ export class KernelClient {
 
         // Errors
         this._socket.on('error', (data) => this._emit('error', data));
+
+        // Service-health LED strip — backend HealthMonitor pushes
+        // {services: {<id>: {status, latency_ms, last_error, ...}}}
+        // on state change. Subscribers are responsible for rendering.
+        this._socket.on('services:health', (data) => this._emit('services:health', data));
     }
 
     get connected() { return this._connected; }

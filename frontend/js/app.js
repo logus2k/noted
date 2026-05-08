@@ -710,7 +710,7 @@ class App {
     async showKnowledgeBaseMonitor(domainId = null) {
         if (!this._kbMonitor) {
             const { KnowledgeBaseMonitorPanel } = await import('./knowledge-graph/KnowledgeBaseMonitorPanel.js');
-            this._kbMonitor = new KnowledgeBaseMonitorPanel();
+            this._kbMonitor = new KnowledgeBaseMonitorPanel(this._client);
         }
         this._kbMonitor.open(domainId);
     }
