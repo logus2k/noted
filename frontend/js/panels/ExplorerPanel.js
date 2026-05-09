@@ -921,6 +921,21 @@ export class ExplorerPanel {
             if (iconEl) iconEl.className = 'wb-icon ' + node.icon;
         }
 
+        // F6.1 / F6.4: provenance pill for self-authored tools and skills.
+        // Wunderbaum escapes node titles, so the pill must be injected as a
+        // sibling element after the .wb-title rather than embedded in title.
+        const isUserAuthored = (node.data && (node.data.isUserTool || node.data.isUserSkill));
+        const titleEl = row.querySelector('.wb-title');
+        const existingPill = row.querySelector(':scope > .explorer-prov-pill');
+        if (isUserAuthored && titleEl && !existingPill) {
+            const pill = document.createElement('span');
+            pill.className = 'explorer-prov-pill';
+            pill.textContent = 'user';
+            titleEl.insertAdjacentElement('afterend', pill);
+        } else if (!isUserAuthored && existingPill) {
+            existingPill.remove();
+        }
+
         // Active-Domain indicator: green check appended after the title for
         // any per-Domain row whose domain_id is in the active set. Affects
         // both `kb-domain:<id>` and `asst-domain:<id>` (the leaf-level
@@ -2797,18 +2812,18 @@ export class ExplorerPanel {
                 return [{ title: 'No skills bound to this Domain', key: `asst-domain:${domainId}:skills:empty`, icon: 'fa-solid fa-info-circle' }];
             }
             return skills.map(s => {
-                // F6.4: provenance pill on user-authored skills, mirrors the
-                // tools-tree treatment. Native skills render unchanged.
+                // F6.4: pill is injected post-render via _onTreeRender (see
+                // tool-tree comment for why HTML can't sit in `title`).
                 const isUser = s.provenance === 'user';
-                const titleSuffix = isUser ? ' <span class="explorer-prov-pill">user</span>' : '';
                 return {
-                    title: s.name + titleSuffix,
+                    title: s.name,
                     key: `skill:${s.name}`,
                     icon: 'fa-solid fa-scroll',
                     folder: s.has_references,
                     lazy: s.has_references,
                     children: s.has_references ? undefined : undefined,
                     tooltip: (isUser ? '[self-authored] ' : '') + (s.description || ''),
+                    data: { isUserSkill: isUser },
                 };
             });
         } catch (e) {
@@ -3356,16 +3371,15 @@ export class ExplorerPanel {
             // Tree node key shape: mcptool:<tier>:<name>
             return tools.map(t => {
                 const isUser = t.provenance === 'user';
-                // F6.1: visible USER suffix on the tree title for self-authored tools.
-                // Native tools render unchanged so the LLM-facing payload byte-identity
-                // invariant (preserved by Phase A.5) is mirrored visually.
-                const titleSuffix = isUser ? ' <span class="explorer-prov-pill">user</span>' : '';
+                // F6.1: pill is injected post-render via _onTreeRender (Wunderbaum
+                // escapes title strings, so HTML in title literally renders as text).
                 const provTip = isUser ? ' [self-authored]' : '';
                 return {
-                    title: t.name + titleSuffix,
+                    title: t.name,
                     key: `mcptool:${t.tier}:${t.name}`,
                     icon: 'fa-solid fa-wrench',
                     tooltip: `${t.tier === 'write' ? 'WRITE' : 'READ'}${provTip} - ${t.description || ''}`,
+                    data: { isUserTool: isUser },
                 };
             });
         } catch (e) {

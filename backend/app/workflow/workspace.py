@@ -60,6 +60,13 @@ class WorkspaceState:
     inputs: dict[str, Any] = field(default_factory=dict)
     suspend_reason: str | None = None
     finished_at: float | None = None
+    # A2: regenerate-on-smoke-failure. When run_smoke_tests fails, the
+    # loop rewinds to api_tester (max 2 rewinds) and re-invokes it with
+    # `last_smoke_error` injected as feedback. This converts most "Gemma
+    # produced slightly-broken Python" outcomes from "suspended" into
+    # eventually-completed runs without prompt-level whack-a-mole.
+    smoke_rewinds: int = 0
+    last_smoke_error: str | None = None
 
     def to_serializable(self) -> dict[str, Any]:
         return {
@@ -76,6 +83,8 @@ class WorkspaceState:
             "inputs": self.inputs,
             "suspend_reason": self.suspend_reason,
             "finished_at": self.finished_at,
+            "smoke_rewinds": self.smoke_rewinds,
+            "last_smoke_error": self.last_smoke_error,
         }
 
     @classmethod
@@ -95,6 +104,8 @@ class WorkspaceState:
             inputs=data.get("inputs", {}),
             suspend_reason=data.get("suspend_reason"),
             finished_at=data.get("finished_at"),
+            smoke_rewinds=data.get("smoke_rewinds", 0),
+            last_smoke_error=data.get("last_smoke_error"),
         )
 
     def serialized_size(self) -> int:

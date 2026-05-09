@@ -597,7 +597,22 @@ async def publish_skill(
     if not skill_data:
         raise ValueError("publish_skill: no upstream skill_author output found in workspace")
 
-    skill_name = skill_data.get("skill_name") or (skill_data.get("frontmatter") or {}).get("name")
+    # Tool name from the workflow inputs is the source of truth — the skill
+    # is the tool's companion and they MUST share one identity. If
+    # skill_author drifted (renamed it, paraphrased, abbreviated), override
+    # silently rather than publishing the skill at a different path than
+    # the user expects. The prompt also forbids drift; this is the safety
+    # net. Without this, tool=foo + skill=bar can ship and the user
+    # cannot find the skill in the Skills tree under the tool's name.
+    canonical_name = (state.inputs or {}).get("tool_name") or skill_data.get("skill_name")
+    skill_authored_name = skill_data.get("skill_name") or (skill_data.get("frontmatter") or {}).get("name")
+    if canonical_name and skill_authored_name and canonical_name != skill_authored_name:
+        import logging as _logging
+        _logging.getLogger(__name__).warning(
+            "publish_skill: skill_author named the skill %r but the tool is %r — overriding to keep tool/skill paired",
+            skill_authored_name, canonical_name,
+        )
+    skill_name = canonical_name or skill_authored_name
     if not skill_name:
         raise ValueError("publish_skill: skill_name missing from skill_author output")
 
@@ -608,6 +623,11 @@ async def publish_skill(
     from datetime import datetime, timezone
     skill_data = dict(skill_data)
     fm = dict(skill_data.get("frontmatter") or {})
+    # Force frontmatter name to match the canonical skill_name. SkillRegistry
+    # keys the registry by frontmatter.name, so a mismatch between folder
+    # and frontmatter would have the skill load under the wrong name even
+    # though the folder is correct.
+    fm["name"] = skill_name
     fm["provenance"] = "user"
     fm["created_at"] = datetime.now(timezone.utc).isoformat(
         timespec="seconds"
@@ -617,6 +637,9 @@ async def publish_skill(
     fm["source_workflow_type"] = state.workflow_type
     fm["source_workflow_tenant"] = state.tenant_id
     skill_data["frontmatter"] = fm
+    # Also mirror the canonical name in skill_data.skill_name so any
+    # downstream consumer reading either field gets the same answer.
+    skill_data["skill_name"] = skill_name
 
     md_text = _assemble_skill_markdown(skill_data)
     skills_root = _skills_dir()

@@ -129,6 +129,15 @@ async def _run_step(
                 }
             if attempt > 0 and last_error:
                 inputs["validator_complaint"] = last_error
+            # A2: when api_tester (or tool_author) is re-invoked after a
+            # smoke-test failure, surface the failure tail as feedback so
+            # the LLM can target the actual problem instead of producing
+            # the same broken output again.
+            if (
+                state.last_smoke_error
+                and step_type.name in ("api_tester", "tool_author")
+            ):
+                inputs["previous_smoke_failure"] = state.last_smoke_error
             output = await _dispatch_step(step_type, state, inputs)
         except NotImplementedError as e:
             # LLM dispatch not wired yet; surface clearly without consuming a retry.
@@ -329,12 +338,63 @@ async def _execute_plan(
 ) -> WorkspaceState:
     state.status = "running"
 
-    for index in range(start_index, len(definition.plan_template)):
+    # A2: cap on smoke-test-driven rewinds within a single workflow run.
+    # 2 means: original attempt + 2 regenerate cycles = up to 3 attempts at
+    # api_tester before the workflow gives up and suspends for HITL.
+    SMOKE_REWIND_CAP = 2
+
+    index = start_index
+    while index < len(definition.plan_template):
         step = definition.plan_template[index]
         ok = await _run_step(state, step, index, definition)
 
         if not ok:
-            # Suspend with HITL approval. If operator resumes, retry the step.
+            # A2: when run_smoke_tests fails AND we still have rewinds left,
+            # rewind to api_tester instead of suspending. The api_tester step
+            # gets re-invoked with the smoke-test failure as feedback so it
+            # can author a corrected smoke.py + tool source. Tool gets re-
+            # published in the same cycle; smoke tests run again.
+            if step.name == "run_smoke_tests" and state.smoke_rewinds < SMOKE_REWIND_CAP:
+                api_tester_idx = next(
+                    (i for i, s in enumerate(definition.plan_template) if s.name == "api_tester"),
+                    None,
+                )
+                if api_tester_idx is not None:
+                    state.smoke_rewinds += 1
+                    state.last_smoke_error = state.steps[index].error
+                    # Reset the records for steps we're about to re-run so
+                    # the inspector clearly shows them as in-flight again.
+                    for j in range(api_tester_idx, index + 1):
+                        rec = state.steps[j]
+                        rec.status = "pending"
+                        rec.started_at = None
+                        rec.finished_at = None
+                        rec.output = {}
+                        rec.error = None
+                        rec.retries = 0
+                    audit.record(
+                        state.tenant_id, state.workflow_id, "smoke_rewind",
+                        {
+                            "rewind_index": state.smoke_rewinds,
+                            "rewind_cap": SMOKE_REWIND_CAP,
+                            "rewinding_to": "api_tester",
+                            "reason": (state.last_smoke_error or "")[:300],
+                        },
+                        actor_id=state.actor_id,
+                    )
+                    logger.info(
+                        "smoke rewind %d/%d for %s/%s: rewinding to api_tester",
+                        state.smoke_rewinds, SMOKE_REWIND_CAP,
+                        state.tenant_id, state.workflow_id,
+                    )
+                    index = api_tester_idx
+                    await telemetry.workspace_sync(
+                        state.tenant_id, state.workflow_id, state.to_serializable(),
+                    )
+                    continue
+
+            # Otherwise: suspend with HITL approval. If operator resumes,
+            # retry the step.
             while not ok:
                 resumed = await _suspend_for_hitl(
                     state, f"step_failed:{step.name}", definition,
@@ -359,6 +419,7 @@ async def _execute_plan(
             state.tenant_id, state.workflow_id, state.to_serializable(),
         )
         get_workspace_store().prune_if_needed(state)
+        index += 1
 
     state.status = "completed"
     state.outcomes = [o.name for o in definition.outcomes]

@@ -257,6 +257,47 @@ async def abort(workflow_id: str, request: Request) -> dict[str, Any]:
     return {"aborted": True, "workflow_id": workflow_id}
 
 
+@router.delete("/{workflow_id}")
+async def delete_workflow(workflow_id: str, request: Request) -> dict[str, Any]:
+    """Drop a workflow's runtime state — both the in-memory workspace
+    entry (if any) and the on-disk snapshot directory under
+    `data/tenants/<tenant>/workflows/<workflow_id>/`.
+
+    Refuses to delete a workflow that's currently running; the caller
+    should /abort first. Suspended / completed / failed / aborted
+    workflows are deletable. Side-effects of the workflow (a published
+    tool, a paired skill) are NOT undone — use the corresponding
+    remove_tool workflow for that.
+    """
+    import shutil
+
+    identity = extract_identity(request.headers)
+    state = _resolve_state_or_404(identity.tenant_id, workflow_id)
+
+    if state.status == "running":
+        raise HTTPException(
+            status_code=409,
+            detail="workflow is running; abort it first via /abort",
+        )
+
+    store = get_workspace_store()
+    store.remove(identity.tenant_id, workflow_id)
+
+    snapshot_dir = (
+        Path(DATA_DIR) / "tenants" / identity.tenant_id /
+        "workflows" / workflow_id
+    )
+    on_disk_existed = snapshot_dir.is_dir()
+    if on_disk_existed:
+        shutil.rmtree(snapshot_dir, ignore_errors=True)
+
+    return {
+        "deleted": True,
+        "workflow_id": workflow_id,
+        "had_disk_snapshot": on_disk_existed,
+    }
+
+
 @router.post("/{workflow_id}/rerun")
 async def rerun(workflow_id: str, request: Request) -> dict[str, Any]:
     """Trigger a NEW workflow with the same type + inputs as a prior one.

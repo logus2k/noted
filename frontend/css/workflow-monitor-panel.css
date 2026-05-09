@@ -66,6 +66,9 @@
 .wfm-btn-abort { border-color: #d28a8a; color: #8a3838; }
 .wfm-btn-abort:hover:not([disabled]) { background: #fbecec; }
 
+.wfm-btn-delete { border-color: #c99; color: #883333; }
+.wfm-btn-delete:hover:not([disabled]) { background: #fdecec; }
+
 .wfm-body {
     display: flex;
     flex: 1;
@@ -124,6 +127,13 @@
 .wfm-row-type {
     font-weight: 500;
     font-size: 13px;
+}
+
+.wfm-row-time {
+    color: #555;
+    font-size: 11px;
+    margin-bottom: 2px;
+    font-variant-numeric: tabular-nums;
 }
 
 .wfm-row-meta {

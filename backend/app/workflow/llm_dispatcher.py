@@ -90,6 +90,23 @@ def _build_user_message(step_inputs: dict[str, Any]) -> str:
         parts.append("")
         parts.append(f"previous_iteration_diagnostics: {complaint}")
 
+    # A2: when a smoke-test failure caused a rewind, the loop injects the
+    # failure tail here so the worker can target the actual problem
+    # instead of reproducing the same broken output. Truncated for
+    # context-window hygiene; the worker doesn't need the full pytest
+    # noise, just the specific assertion / error.
+    smoke_failure = step_inputs.get("previous_smoke_failure")
+    if smoke_failure:
+        tail = str(smoke_failure)[-2000:]
+        parts.append("")
+        parts.append(
+            "previous_smoke_failure: smoke tests failed in the prior "
+            "iteration. Read the failure carefully and fix the specific "
+            "issue (e.g. SyntaxError from a multi-line assert, mock "
+            "shape divergence, wrong expected output key). Failure "
+            f"tail:\n{tail}"
+        )
+
     return "\n".join(parts)
 
 

@@ -36,6 +36,17 @@ function _fmtTimestamp(ts) {
     } catch { return String(ts); }
 }
 
+function _fmtDateTime(ts) {
+    if (!ts) return '-';
+    try {
+        const d = new Date(ts * 1000);
+        return d.toLocaleString(undefined, {
+            year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', second: '2-digit',
+        });
+    } catch { return String(ts); }
+}
+
 function _fmtElapsed(start, finish) {
     if (!start) return '-';
     const end = finish || (Date.now() / 1000);
@@ -72,14 +83,15 @@ export class WorkflowMonitorPanel {
         }
         this._panel = jsPanel.create({
             id: 'workflow-monitor-panel',
-            headerTitle: '<i class="fa-solid fa-diagram-project" style="margin-right:6px"></i>Workflows',
+            headerTitle: '<i class="fa-solid fa-diagram-project" style="font-size:12px;margin-right:6px;color:#666"></i> Workflow Monitor',
             theme: 'none',
             borderRadius: '5px',
             border: '1px solid var(--border-color)',
             boxShadow: 3,
             position: 'center',
-            panelSize: { width: 880, height: 640 },
+            contentSize: { width: 880, height: 640 },
             headerControls: { minimize: 'remove', smallify: 'remove', normalize: 'remove', maximize: 'remove' },
+            addCloseControl: 1,
             onclosed: () => {
                 this._tearDown();
                 this._panel = null;
@@ -144,7 +156,7 @@ export class WorkflowMonitorPanel {
 
     async _loadTypes() {
         try {
-            const r = await fetch('/api/workflows/types');
+            const r = await fetch('api/workflows/types');
             if (!r.ok) return;
             const data = await r.json();
             const opts = (data.types || []).map((t) =>
@@ -156,7 +168,7 @@ export class WorkflowMonitorPanel {
 
     async _refresh() {
         try {
-            const r = await fetch('/api/workflows');
+            const r = await fetch('api/workflows');
             if (!r.ok) {
                 this._els.list.innerHTML = `<div class="wfm-empty">List failed: HTTP ${r.status}</div>`;
                 return;
@@ -179,7 +191,7 @@ export class WorkflowMonitorPanel {
             if (statusFilter && w.status !== statusFilter) return false;
             if (typeFilter && w.workflow_type !== typeFilter) return false;
             return true;
-        });
+        }).sort((a, b) => (b.started_at || 0) - (a.started_at || 0));
         if (filtered.length === 0) {
             this._els.list.innerHTML = '<div class="wfm-empty">No workflows match the current filter.</div>';
             return;
@@ -199,6 +211,7 @@ export class WorkflowMonitorPanel {
     _renderRow(w) {
         const color = STATUS_COLORS[w.status] || '#666';
         const elapsed = _fmtElapsed(w.started_at, w.finished_at);
+        const startedAt = _fmtDateTime(w.started_at);
         const stepsDone = (w.steps || []).filter((s) => s.status === 'completed').length;
         const stepsTotal = (w.steps || []).length;
         return `
@@ -207,6 +220,7 @@ export class WorkflowMonitorPanel {
                     <span class="wfm-status-pill" style="background:${color}">${w.status}</span>
                     <span class="wfm-row-type">${w.workflow_type}</span>
                 </div>
+                <div class="wfm-row-time">${startedAt}</div>
                 <div class="wfm-row-meta">
                     <span>${stepsDone}/${stepsTotal} steps</span>
                     <span>${elapsed}</span>
@@ -218,7 +232,7 @@ export class WorkflowMonitorPanel {
 
     async _loadDetail(workflowId) {
         try {
-            const r = await fetch(`/api/workflows/${encodeURIComponent(workflowId)}`);
+            const r = await fetch(`api/workflows/${encodeURIComponent(workflowId)}`);
             if (!r.ok) {
                 this._els.detail.innerHTML = `<div class="wfm-detail-empty">Detail failed: HTTP ${r.status}</div>`;
                 return;
@@ -268,6 +282,7 @@ export class WorkflowMonitorPanel {
         }).join('');
 
         const isSuspended = s.status === 'suspended';
+        const isRunning = s.status === 'running';
 
         const buttons = `
             <button class="wfm-btn wfm-btn-rerun" id="wfm-action-rerun">
@@ -278,6 +293,9 @@ export class WorkflowMonitorPanel {
             </button>
             <button class="wfm-btn wfm-btn-abort ${isSuspended ? '' : 'wfm-btn-disabled'}" id="wfm-action-abort" ${isSuspended ? '' : 'disabled'}>
                 <i class="fa-solid fa-stop"></i> Abort
+            </button>
+            <button class="wfm-btn wfm-btn-delete ${isRunning ? 'wfm-btn-disabled' : ''}" id="wfm-action-delete" ${isRunning ? 'disabled' : ''} title="${isRunning ? 'Abort the workflow first' : 'Delete this workflow record (does not undo published tools/skills)'}">
+                <i class="fa-solid fa-trash"></i> Delete
             </button>
         `;
 
@@ -305,11 +323,34 @@ export class WorkflowMonitorPanel {
         if (rb && !rb.disabled) rb.addEventListener('click', () => this._action('resume', workflowId));
         const ab = this._els.detail.querySelector('#wfm-action-abort');
         if (ab && !ab.disabled) ab.addEventListener('click', () => this._action('abort', workflowId));
+        const db = this._els.detail.querySelector('#wfm-action-delete');
+        if (db && !db.disabled) db.addEventListener('click', () => this._deleteWorkflow(workflowId));
+    }
+
+    async _deleteWorkflow(workflowId) {
+        if (!confirm(`Delete workflow ${workflowId}?\n\nThis removes the workflow record only — any tool or skill it published stays in place. Use the corresponding remove_tool to undo those.`)) return;
+        try {
+            const r = await fetch(`api/workflows/${encodeURIComponent(workflowId)}`, { method: 'DELETE' });
+            const data = await r.json().catch(() => ({}));
+            if (!r.ok) {
+                alert(`Delete failed: HTTP ${r.status} ${data.detail || ''}`);
+                return;
+            }
+            // Drop from local cache + clear selection if it was the active row
+            this._workflows = this._workflows.filter((w) => w.workflow_id !== workflowId);
+            if (this._selected === workflowId) {
+                this._selected = null;
+                this._els.detail.innerHTML = '<div class="wfm-detail-empty">Select a workflow to inspect.</div>';
+            }
+            this._renderList();
+        } catch (e) {
+            alert(`Delete error: ${e.message}`);
+        }
     }
 
     async _action(name, workflowId) {
         try {
-            const r = await fetch(`/api/workflows/${encodeURIComponent(workflowId)}/${name}`, { method: 'POST' });
+            const r = await fetch(`api/workflows/${encodeURIComponent(workflowId)}/${name}`, { method: 'POST' });
             const data = await r.json().catch(() => ({}));
             if (!r.ok) {
                 alert(`${name} failed: HTTP ${r.status} ${data.detail || ''}`);
@@ -365,9 +406,11 @@ export class WorkflowMonitorPanel {
         const msg = data.prompt || 'Workflow needs approval.';
         const known = this._workflows.find((w) => w.workflow_id === data.workflow_id);
         const ctx = known ? `${known.workflow_type} (${data.workflow_id})` : data.workflow_id;
-        // Use jsPanel.modal for a non-blocking notice rather than alert();
-        // user's existing notify pattern would also work but jsPanel is
-        // already on the page.
+        // Match the project's modal pattern (frontend/js/modal.js): centered,
+        // contentSize so the title bar gets its own height, and an explicit
+        // backdrop cleanup on close. Without the cleanup, jsPanel sometimes
+        // leaves the .jsPanel-modal-backdrop element behind, which renders
+        // the page faded + unclickable.
         try {
             jsPanel.modal.create({
                 id: `wfm-hitl-${data.workflow_id}`,
@@ -376,10 +419,17 @@ export class WorkflowMonitorPanel {
                 content: `<div style="padding:14px">
                     <div style="margin-bottom:8px"><strong>${this._escape(ctx)}</strong></div>
                     <div>${this._escape(msg)}</div>
-                    <div style="margin-top:10px;color:#777;font-size:12px">Open the Workflows panel to Resume or Abort.</div>
+                    <div style="margin-top:10px;color:#777;font-size:12px">Open the Workflow Monitor to Resume or Abort.</div>
                 </div>`,
-                panelSize: '380 180',
-                position: 'center-top',
+                contentSize: { width: 420, height: 'auto' },
+                position: 'center',
+                dragit: false,
+                resizeit: false,
+                headerControls: 'closeonly',
+                onclosed: [() => {
+                    document.querySelectorAll('.jsPanel-modal-backdrop').forEach(el => el.remove());
+                    return true;
+                }],
             });
         } catch { /* jsPanel.modal optional */ }
     }
