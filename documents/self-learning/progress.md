@@ -107,26 +107,31 @@ Format:
 - [x] F5.4 Backend `POST /api/workflows/{workflow_id}/abort`. Live-verified 2026-05-09: workflow status went `suspended -> aborted` with `finished_at` set.
 - [x] F5.5 Backend `POST /api/workflows/{workflow_id}/rerun`. Returns new workflow_id; same inputs preserved; original unchanged. Live-verified 2026-05-09.
 - [x] F5-extra: workflow loop now writes a final state.json snapshot at completion / failure (was suspend-only). Inspector reads disk + live store. Without this, prior workflows vanished on noted restart - real gap caught by the F5.2 probe and fixed in flight.
-- [ ] F5.6 Frontend: new tab in Explorer's Assistant section ("Workflows" / "Activities")
-- [ ] F5.7 Frontend: workflow list view (status, outcomes, started_at, finished_at)
-- [ ] F5.8 Frontend: workflow detail page (step list + audit trail + workspace snapshot)
-- [ ] F5.9 Frontend: HITL approval modal triggered by `system_request` event with timeout
-- [ ] F5.10 Live-verify F5 frontend: workflow appears in inspector within 1 second of starting (Socket.io push)
-- [ ] F5.11 Live-verify F5 frontend: click-through from list to detail shows full state
-- [ ] F5.12 Live-verify F5 frontend: re-run produces a new workflow_id with same inputs
-- [ ] F5.13 Live-verify F5 frontend: HITL modal approval resumes; abort fails the workflow cleanly
+- [/] F5.6 Frontend: shipped as a top-level View menu item (`Workflow Monitor`) opening a floating jsPanel, since the existing pattern for KB Monitor is jsPanel-based. Tighter than a tree-tab and reuses the same affordance pattern users already know. Files: `frontend/js/WorkflowMonitorPanel.js` (~430 LOC), `frontend/css/workflow-monitor-panel.css`, menu wiring in `frontend/menu.json` + `app-menu.js` + `app.js`. Asset-served verified 2026-05-09 (HTTP 200 on .js + .css; `view.workflowMonitor` present in shipped menu.json). Browser-pixel verification: pending user's click-through.
+- [/] F5.7 Frontend list view: shipped. Two-column layout (320px list + flex detail). Each row renders status pill, type, started timestamp, step-count progress, workflow_id. Top bar has status + type filters + refresh button + counts (live / from_disk / returned).
+- [/] F5.8 Frontend detail view: shipped. Header (status pill + type + actions), workflow_id + suspend_reason, per-step list (status icon + name + retries + elapsed + error block + output keys), outcomes pills, audit timeline (last 500 events from /api/workflows/{id}'s audit field).
+- [/] F5.9 HITL approval modal: minimal jsPanel.modal triggered when a `system_request` event fires with `type: approve_resume`. The framework already suspends with this event on retry exhaustion. The modal surfaces the prompt; user resumes / aborts via the inspector panel itself (the modal is informational since the action surface lives in the detail pane).
+- [x] F5-extra Socket.io listeners: 9 workflow events wired in `KernelClient.js` (workflow_started / step_started / step_completed / step_failed / workspace_sync / workflow_completed / workflow_failed / workflow_suspended / workflow_resumed / system_request). Panel subscribes via `client.on(...)` and triggers a refresh on every event.
+- [ ] F5.10 Live-verify Socket.io push refresh - PENDING USER BROWSER TEST. Backend emits the events (verified by F1.13 audit-emit symmetry: every audit line corresponds to a telemetry.emit call); frontend listens via the new KernelClient subscriptions; refresh triggers on every event. Browser-pixel test pending.
+- [ ] F5.11 Live-verify click-through list -> detail - PENDING USER BROWSER TEST.
+- [ ] F5.12 Live-verify re-run from inspector - PENDING USER BROWSER TEST. Backend rerun endpoint live-verified 2026-05-09; frontend wiring is `_action('rerun', wf_id)` which switches selection to the new workflow_id.
+- [ ] F5.13 Live-verify HITL modal - PENDING USER BROWSER TEST.
 
 ---
 
 ## F6: UI badges + provenance polish (target ~2 days)
 
-- [ ] F6.1 Frontend: provenance badge on tool listings (Explorer)
-- [ ] F6.2 Frontend: provenance badge on tool listings (chat panel)
-- [ ] F6.3 Frontend: provenance badge on tool listings (settings)
-- [ ] F6.4 Frontend: provenance badge on skill listings (all three surfaces)
-- [ ] F6.5 Frontend: click-through link from user-tool detail to source workflow in inspector
-- [ ] F6.6 Live-verify F6: byte-compare LLM tool-list payload (native vs user) - preserve Phase A.5 invariant
-- [ ] F6.7 Live-verify F6: badges render in all three surfaces in browser
+- [/] F6.1 Explorer tools tree provenance pill: `<span class="explorer-prov-pill">user</span>` appended to user-authored tool titles in `_loadToolsTree`. Tool detail header (`_showToolDetail`) renders a `USER` pill next to the WRITE/READ tier badge. Source-tree shipped 2026-05-09; browser-pixel verification pending user click-through.
+- [ ] F6.2 Chat-panel badge - DEFERRED. `appendToolBadge` would need to look up the cached mcp-tools list to know per-tool provenance. Independent surface; defer until requested.
+- [ ] F6.3 Settings badge - DEFERRED. Same reasoning; independent surface.
+- [ ] F6.4 Skill provenance badge - DEFERRED. Requires `SkillRegistry` parser to extract a `provenance` frontmatter field (currently doesn't), and the `/api/llm/skills` endpoint to surface it. Backend extension; would land in a follow-on.
+- [x] F6.5 Source-workflow click-through: `publish_tool` now injects `_meta.source_workflow = {type, workflow_id, tenant_id}` + `created_by` + `created_at` at write time (LLM doesn't know its own workflow id; the publish step does). Live-verified 2026-05-09: f6_greet's `_meta.source_workflow.workflow_id` matches the create_tool workflow that produced it. Explorer tool detail renders a Provenance card with an `open in Workflow Monitor` link that calls `app.showWorkflowMonitor(workflow_id)`. WorkflowMonitorPanel.open() accepts a select-id and applies pending selection on next refresh.
+- [x] F6.6 LLM tool-list byte-identity invariant LIVE-VERIFIED 2026-05-09: `/mcp/` tools/list returns identical key sets `{description, inputSchema, name}` for native (`list_files`) and user-authored (`f6_greet`) tools. `_meta` correctly stripped at the LLM layer; preserved on the UI endpoint (`/api/llm/mcp-tools`) for inspector use. Phase A.5 invariant preserved through the full F3 publish + F6 lineage-injection path.
+- [ ] F6.7 Browser-pixel verification - PENDING USER CLICK-THROUGH on the Explorer tool detail card.
+
+**F6 follow-ups shipped during the phase:**
+- `step_handlers.publish_tool` injects source-workflow lineage + created_by + created_at into tool.json's `_meta` at publish time. Without this, F6.5's click-through link would never appear because Gemma's tool_author can't know its own workflow id.
+- F3's tool_author prompt strengthening (require `if __name__ == "__main__"`) caught a real edge case during F6 cycles: Gemma sometimes embeds unescaped dict literals like `{"name": "string"}` inside double-quoted Python strings, causing SyntaxError. The framework's `validate_tool_structure` step caught it (ast.parse fails), retried 2x, then suspended with the validator's complaint. Tool_author prompt could be hardened further to dodge this, but the framework already handles it correctly.
 
 ---
 

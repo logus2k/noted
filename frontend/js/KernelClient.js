@@ -82,6 +82,18 @@ export class KernelClient {
         // {services: {<id>: {status, latency_ms, last_error, ...}}}
         // on state change. Subscribers are responsible for rendering.
         this._socket.on('services:health', (data) => this._emit('services:health', data));
+
+        // F5 Workflow framework events. Pushed by app.workflow.telemetry
+        // on every workflow lifecycle transition. WorkflowMonitorPanel
+        // subscribes; other code generally doesn't need them.
+        const _wfEvents = [
+            'workflow_started', 'step_started', 'step_completed', 'step_failed',
+            'workspace_sync', 'workflow_completed', 'workflow_failed',
+            'workflow_suspended', 'workflow_resumed', 'system_request',
+        ];
+        for (const ev of _wfEvents) {
+            this._socket.on(ev, (data) => this._emit(ev, data));
+        }
     }
 
     get connected() { return this._connected; }

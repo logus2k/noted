@@ -245,6 +245,35 @@ async def publish_tool(
         logger.info("publish_tool: archived prior version to %s", archived)
 
     tool_dir.mkdir(parents=True, exist_ok=False)
+
+    # F6.5: inject source-workflow lineage + created_by + created_at into
+    # tool.json's `_meta` so the Explorer's tool detail can render the
+    # provenance card with a click-through to the WorkflowMonitor. The LLM
+    # (tool_author) shouldn't know its own workflow id; this step does.
+    from datetime import datetime, timezone
+    files = dict(files)
+    if "tool.json" in files:
+        try:
+            tool_json = json.loads(files["tool.json"])
+        except json.JSONDecodeError:
+            tool_json = None
+        if isinstance(tool_json, dict):
+            meta = dict(tool_json.get("_meta") or {})
+            meta.setdefault("provenance", "user")
+            meta.setdefault("language", language)
+            meta.setdefault("version", 1)
+            meta["created_by"] = state.actor_id
+            meta["created_at"] = datetime.now(timezone.utc).isoformat(
+                timespec="seconds"
+            ).replace("+00:00", "Z")
+            meta["source_workflow"] = {
+                "type": state.workflow_type,
+                "workflow_id": state.workflow_id,
+                "tenant_id": state.tenant_id,
+            }
+            tool_json["_meta"] = meta
+            files["tool.json"] = json.dumps(tool_json, indent=2)
+
     for fname, content in files.items():
         (tool_dir / fname).write_text(content)
     # Hand ownership to noted-tools so its UID-1000 executor can build the venv.

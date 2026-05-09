@@ -715,6 +715,20 @@ class App {
         this._kbMonitor.open(domainId);
     }
 
+    /**
+     * Open the Workflow Monitor jsPanel inspector. Lists tenant-scoped
+     * workflows (live + on-disk snapshots) with step-by-step state, audit
+     * timeline, and resume / abort / rerun actions. Subscribes to the
+     * workflow Socket.io events so the list refreshes live.
+     */
+    async showWorkflowMonitor() {
+        if (!this._workflowMonitor) {
+            const { WorkflowMonitorPanel } = await import('./WorkflowMonitorPanel.js');
+            this._workflowMonitor = new WorkflowMonitorPanel(this._client);
+        }
+        this._workflowMonitor.open();
+    }
+
     /** Open a chat artifact (image / file content) in a floating
      * jsPanel viewer. Triggered by double-clicking an image thumbnail
      * or file chip in the chat (user-uploaded OR assistant-rendered).

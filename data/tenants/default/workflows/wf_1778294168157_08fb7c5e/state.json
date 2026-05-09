@@ -1,0 +1,64 @@
+{
+  "tenant_id": "default",
+  "workflow_id": "wf_1778294168157_08fb7c5e",
+  "workflow_type": "remove_tool",
+  "actor_id": "default",
+  "started_at": 1778294168.1578858,
+  "status": "completed",
+  "plan": [
+    {
+      "name": "archive_tool",
+      "worker": "deterministic",
+      "description": "Move tool dir to _archive/<name>_<ts>/."
+    },
+    {
+      "name": "archive_skill",
+      "worker": "deterministic",
+      "description": "Move skill md to data/skills/_archive/."
+    }
+  ],
+  "steps": [
+    {
+      "name": "archive_tool",
+      "index": 0,
+      "status": "completed",
+      "started_at": 1778294168.1584609,
+      "finished_at": 1778294168.5684123,
+      "retries": 0,
+      "output": {
+        "tool_name": "f6_greet",
+        "archive_path": "/app/data/tenants/default/user_tools/_archive/f6_greet_1778294168159",
+        "federation_refreshed": true,
+        "archived": true
+      },
+      "error": null,
+      "detail": {}
+    },
+    {
+      "name": "archive_skill",
+      "index": 1,
+      "status": "completed",
+      "started_at": 1778294168.5689464,
+      "finished_at": 1778294168.5698814,
+      "retries": 0,
+      "output": {
+        "skill_name": "f6_greet",
+        "archive_path": "/app/data/skills/_archive/f6_greet_1778294168569",
+        "archived": true
+      },
+      "error": null,
+      "detail": {}
+    }
+  ],
+  "current_step": 1,
+  "outcomes": [
+    "tool_archived",
+    "skill_archived"
+  ],
+  "inputs": {
+    "tool_name": "f6_greet",
+    "skill_name": "f6_greet"
+  },
+  "suspend_reason": null,
+  "finished_at": 1778294168.5702307
+}

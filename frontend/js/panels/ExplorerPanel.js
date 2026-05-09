@@ -3314,12 +3314,20 @@ export class ExplorerPanel {
                 return [{ title: 'No tools available', key: `asst-domain:${domainId}:tools:empty`, icon: 'fa-solid fa-info-circle' }];
             }
             // Tree node key shape: mcptool:<tier>:<name>
-            return tools.map(t => ({
-                title: t.name,
-                key: `mcptool:${t.tier}:${t.name}`,
-                icon: 'fa-solid fa-wrench',
-                tooltip: `${t.tier === 'write' ? 'WRITE' : 'READ'} - ${t.description || ''}`,
-            }));
+            return tools.map(t => {
+                const isUser = t.provenance === 'user';
+                // F6.1: visible USER suffix on the tree title for self-authored tools.
+                // Native tools render unchanged so the LLM-facing payload byte-identity
+                // invariant (preserved by Phase A.5) is mirrored visually.
+                const titleSuffix = isUser ? ' <span class="explorer-prov-pill">user</span>' : '';
+                const provTip = isUser ? ' [self-authored]' : '';
+                return {
+                    title: t.name + titleSuffix,
+                    key: `mcptool:${t.tier}:${t.name}`,
+                    icon: 'fa-solid fa-wrench',
+                    tooltip: `${t.tier === 'write' ? 'WRITE' : 'READ'}${provTip} - ${t.description || ''}`,
+                };
+            });
         } catch (e) {
             return [{ title: `Error: ${e.message}`, key: 'mcptool-error', icon: 'fa-solid fa-exclamation-triangle' }];
         }
@@ -3373,8 +3381,13 @@ export class ExplorerPanel {
             : 'Read-only. Auto-executed when the assistant invokes it.';
         const headerRow = document.createElement('div');
         headerRow.style.cssText = 'display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid #eee;font-weight:600;color:#333';
+        const isUser = tool.provenance === 'user';
+        const provBadge = isUser
+            ? `<span title="Self-authored via the workflow framework" style="display:inline-block;font-family:var(--font-mono,monospace);font-weight:700;font-size:10px;color:#fff;background:#7e57c2;padding:2px 8px;border-radius:3px">USER</span>`
+            : '';
         headerRow.innerHTML =
             `<span title="${tierTooltip}" style="display:inline-block;font-family:var(--font-mono,monospace);font-weight:700;font-size:10px;color:#fff;background:${tierColor};padding:2px 8px;border-radius:3px">${tierLabel}</span>` +
+            provBadge +
             `<span style="font-family:var(--font-mono,monospace);color:#1a7f9b">${tool.name}</span>`;
         headerCard.appendChild(headerRow);
         if (tool.description) {
@@ -3384,6 +3397,50 @@ export class ExplorerPanel {
             headerCard.appendChild(descRow);
         }
         container.appendChild(headerCard);
+
+        // ── F6.5: source-workflow click-through (user-authored tools only) ──
+        const meta = tool._meta || {};
+        const srcWf = meta.source_workflow || null;
+        if (isUser && srcWf && srcWf.workflow_id) {
+            const provCard = document.createElement('div');
+            provCard.className = 's3-object-card';
+            provCard.style.marginBottom = '12px';
+            const provHeader = document.createElement('div');
+            provHeader.style.cssText = 'padding:10px 12px;border-bottom:1px solid #eee;font-weight:600;color:#333;font-size:12px';
+            provHeader.textContent = 'Provenance';
+            provCard.appendChild(provHeader);
+            const created = meta.created_at || '';
+            const createdBy = meta.created_by || 'system';
+            const version = meta.version != null ? meta.version : '?';
+            const language = meta.language || '?';
+            const wfId = String(srcWf.workflow_id);
+            const wfType = String(srcWf.type || 'workflow');
+            const linkId = `prov-wf-link-${wfId}`;
+            const provBody = document.createElement('div');
+            provBody.style.cssText = 'padding:10px 12px;font-size:12px;color:#555;line-height:1.7';
+            provBody.innerHTML =
+                `<div><span style="color:#888">Created by</span> <code>${this._escapeHtmlSafe(createdBy)}</code> ` +
+                `<span style="color:#888">at</span> <code>${this._escapeHtmlSafe(created)}</code></div>` +
+                `<div><span style="color:#888">Version</span> ${version} ` +
+                `&middot; <span style="color:#888">Language</span> ${this._escapeHtmlSafe(language)}</div>` +
+                `<div style="margin-top:6px"><span style="color:#888">Source workflow</span> ` +
+                `<code>${this._escapeHtmlSafe(wfType)}</code> ` +
+                `<a href="#" id="${linkId}" style="color:#1a7f9b;margin-left:8px">` +
+                `<i class="fa-solid fa-diagram-project" style="margin-right:4px"></i>open in Workflow Monitor</a></div>`;
+            provCard.appendChild(provBody);
+            container.appendChild(provCard);
+            // Click handler — open WorkflowMonitor and select this workflow.
+            const link = provBody.querySelector(`#${linkId}`);
+            if (link) {
+                link.addEventListener('click', (ev) => {
+                    ev.preventDefault();
+                    const app = this._ctx?.app || window.app;
+                    if (app && typeof app.showWorkflowMonitor === 'function') {
+                        app.showWorkflowMonitor(wfId);
+                    }
+                });
+            }
+        }
 
         // ── MCP server card (mirrors APIs "Serving" status card) ──
         const serverCard = document.createElement('div');

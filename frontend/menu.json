@@ -55,6 +55,7 @@
             { "label": "Evidently", "command": "view.evidently" },
             { "type": "separator" },
             { "label": "Knowledge Base Monitor", "command": "view.knowledgeBaseMonitor" },
+            { "label": "Workflow Monitor", "command": "view.workflowMonitor" },
             { "type": "separator" },
             { "label": "Minimap", "command": "view.minimap", "type": "checkbox", "checked": "minimapEnabled" },
             { "type": "separator" },

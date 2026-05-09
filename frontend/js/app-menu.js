@@ -226,6 +226,9 @@ export function initMenuCommands(app) {
         mb.registerCommand('view.knowledgeBaseMonitor', () => {
             app.showKnowledgeBaseMonitor();
         });
+        mb.registerCommand('view.workflowMonitor', () => {
+            app.showWorkflowMonitor();
+        });
 
         // Tools
         mb.registerCommand('tools.terminal', () => {
