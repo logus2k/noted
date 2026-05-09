@@ -186,176 +186,32 @@ async def run_new(request: Request, body: RunWorkflowRequest) -> dict[str, Any]:
     }
 
 
-def _planner_user_message(free_text: str) -> str:
-    """Render the user message the planner preset expects: a `mission` line
-    plus the available_workflows JSON (type, description, outcomes,
-    input_schema)."""
-    import json as _json
-
-    registry = get_workflow_registry()
-    available = [
-        {
-            "type": d.type,
-            "description": d.description,
-            "outcomes": [o.name for o in d.outcomes],
-            "input_schema": d.input_schema,
-        }
-        for d in registry.list_definitions()
-        # Synthetic / dev-only workflows shouldn't be planner candidates
-        if d.input_schema is not None
-    ]
-    return (
-        f"mission: {free_text.strip()}\n\n"
-        f"available_workflows:\n{_json.dumps(available, indent=2)}"
-    )
-
-
 @router.post("/from-request")
 async def run_from_request(request: Request, body: FromRequestBody) -> dict[str, Any]:
     """Free-text capability request → planner-decided workflow.
 
-    1. Build the planner's user-message (mission + available_workflows with
-       input_schemas).
-    2. Call the `planner` agent_server preset.
-    3. Validate planner output (workflow_type registered + inputs conform to
-       the chosen workflow's input_schema).
-    4. On valid: dispatch the workflow asynchronously (same code path as
-       /api/workflows/run); return the new workflow_id + the planner's
-       reasoning so the operator can audit the choice.
-    5. On invalid: return 422 with the planner's raw output and the
-       validator complaint.
+    Thin wrapper over `app.workflow.from_request.dispatch_from_request`;
+    the heavy lifting (planner call, validation, dispatch) lives there so
+    the same logic backs the `request_new_tool` MCP tool.
     """
-    from app.workflow.loop import _new_workflow_id, _validate_output
-
-    identity = extract_identity(request.headers)
-
-    step_inputs = {
-        "workflow_inputs": {"mission": body.request},
-        # The planner prompt expects a literal `available_workflows` field;
-        # we fold that into the user message via _planner_user_message
-        # rather than via dispatch_gemma's renderer (which would format it
-        # as a generic key/value pair). Override the rendered message
-        # below.
-    }
-    user_message = _planner_user_message(body.request)
-    if body.backend == "claude":
-        step_inputs["_backend"] = "claude"
-    # Stash the rendered message so dispatch_gemma uses it verbatim instead
-    # of going through _build_user_message. We do this by passing it as a
-    # synthetic `previous_step` whose JSON-rendered output IS the message.
-    # Simpler: just call the preset directly here, mirroring dispatch_gemma
-    # but with a custom user_message.
-    import httpx as _httpx
-    import json as _json
-    from app.workflow.llm_dispatcher import (
-        AGENT_SERVER_URL,
-        DEFAULT_TIMEOUT_S,
-        _strip_code_fence,
-        _strip_thinking,
+    from app.workflow.from_request import (
+        FromRequestError,
+        dispatch_from_request,
     )
 
-    payload = {
-        "model": "planner",
-        "messages": [{"role": "user", "content": user_message}],
-        "stream": False,
-    }
+    identity = extract_identity(request.headers)
     try:
-        async with _httpx.AsyncClient(timeout=DEFAULT_TIMEOUT_S) as client:
-            resp = await client.post(
-                f"{AGENT_SERVER_URL}/v1/chat/completions",
-                json=payload,
-                headers={"Content-Type": "application/json"},
-            )
-            resp.raise_for_status()
-            data = resp.json()
-    except _httpx.RequestError as e:
-        raise HTTPException(status_code=502, detail=f"agent_server unreachable: {e}") from e
-    except _httpx.HTTPStatusError as e:
-        raise HTTPException(
-            status_code=502,
-            detail=f"agent_server HTTP {e.response.status_code}: {e.response.text[:300]}",
-        ) from e
-
-    choices = data.get("choices") or []
-    if not choices:
-        raise HTTPException(status_code=502, detail="planner returned no choices")
-    raw = (choices[0].get("message") or {}).get("content") or ""
-    cleaned = _strip_code_fence(_strip_thinking(raw))
-    try:
-        plan = _json.loads(cleaned)
-    except _json.JSONDecodeError as e:
-        raise HTTPException(
-            status_code=422,
-            detail={
-                "stage": "planner_parse",
-                "error": f"planner output not valid JSON: {e.msg}",
-                "raw": cleaned[:1500],
-            },
-        ) from e
-
-    workflow_type = plan.get("workflow_type") or ""
-    inputs = plan.get("inputs") or {}
-    reasoning = plan.get("reasoning") or ""
-
-    if not workflow_type:
-        raise HTTPException(
-            status_code=422,
-            detail={
-                "stage": "planner_no_match",
-                "error": "planner returned an empty workflow_type (no workflow matched)",
-                "reasoning": reasoning,
-            },
+        return await dispatch_from_request(
+            body.request,
+            tenant_id=identity.tenant_id,
+            actor_id=identity.actor_id,
         )
-
-    definition = get_workflow_registry().get(workflow_type)
-    if definition is None:
-        raise HTTPException(
-            status_code=422,
-            detail={
-                "stage": "planner_unknown_workflow",
-                "error": f"planner picked unregistered workflow: {workflow_type!r}",
-                "reasoning": reasoning,
-            },
-        )
-
-    validator_complaint = _validate_output(inputs, definition.input_schema)
-    if validator_complaint is not None:
-        raise HTTPException(
-            status_code=422,
-            detail={
-                "stage": "input_schema_validation",
-                "error": validator_complaint,
-                "workflow_type": workflow_type,
-                "planner_inputs": inputs,
-                "reasoning": reasoning,
-            },
-        )
-
-    workflow_id = _new_workflow_id()
-
-    async def _run() -> None:
-        try:
-            await wf_run_workflow(
-                tenant_id=identity.tenant_id,
-                workflow_type=workflow_type,
-                inputs=inputs,
-                actor_id=identity.actor_id,
-                workflow_id=workflow_id,
-            )
-        except Exception:
-            logger.exception("from-request spawned task failed for %s", workflow_id)
-
-    asyncio.create_task(_run())
-    return {
-        "workflow_id": workflow_id,
-        "workflow_type": workflow_type,
-        "tenant_id": identity.tenant_id,
-        "status": "pending",
-        "planner": {
-            "reasoning": reasoning,
-            "inputs": inputs,
-        },
-    }
+    except FromRequestError as e:
+        # planner_call → 502 (upstream unreachable). Everything else is a
+        # structured planner-output problem → 422 so the caller can route
+        # the validator complaint back into a retry / new ask.
+        status = 502 if e.stage == "planner_call" else 422
+        raise HTTPException(status_code=status, detail={"stage": e.stage, **e.detail}) from e
 
 
 def _resolve_state_or_404(tenant_id: str, workflow_id: str):

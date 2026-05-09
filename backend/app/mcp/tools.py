@@ -554,6 +554,41 @@ _READ_TOOLS: list[types.Tool] = [
             "required": ["question"],
         },
     ),
+    types.Tool(
+        name="request_new_tool",
+        description=(
+            "Request that a NEW MCP tool be authored from the user's "
+            "natural-language description and (when supplied) the URLs of "
+            "the API documentation. Use this when the user asks the "
+            "assistant to extend its own capabilities — e.g. 'figure out "
+            "how to use these endpoints', 'build me a tool that wraps X', "
+            "'I want a skill that reports on Y'. The orchestrator runs a "
+            "create_tool workflow: it fetches the docs, an LLM authors the "
+            "client + smoke tests, the framework publishes the tool and "
+            "pairs it with a skill. The new tool will be callable on a "
+            "follow-up turn once the workflow completes; this call returns "
+            "immediately with the workflow_id. Do NOT call this tool to "
+            "answer the user's question directly — call it to BUILD the "
+            "capability they're asking for. Pass the user's full request "
+            "(including any URLs they mentioned) verbatim in `request`."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "request": {
+                    "type": "string",
+                    "description": (
+                        "The user's full natural-language capability "
+                        "request, verbatim. Include any API URLs, example "
+                        "inputs, and clues about the expected output. The "
+                        "planner LLM reads this verbatim to pick the "
+                        "right workflow and synthesise its inputs."
+                    ),
+                },
+            },
+            "required": ["request"],
+        },
+    ),
 ]
 
 # ── Write-tier tools (require user confirmation) ────────────────
@@ -796,6 +831,7 @@ _GENERAL_TOOL_NAMES: set[str] = {
     'query_knowledge_graph',
     'research_topic',
     'run_agent',
+    'request_new_tool',
 }
 
 

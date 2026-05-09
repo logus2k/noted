@@ -975,6 +975,8 @@ async def execute_tool(tool_call: dict, managers: dict, ctx: dict = None) -> str
                     match_ratio, spec_q[:100], actual_q[:100],
                 )
             return await _tool_graph_and_vector_search(args, managers)
+        elif name == "request_new_tool":
+            return await _tool_request_new_tool(args)
         else:
             # Phase A.5: federation fallback — if the tool isn't native,
             # check the noted-tools sidecar's registry. Self-authored
@@ -3402,3 +3404,62 @@ async def _tool_graph_and_vector_search(args: dict, managers: dict) -> str:
         _per_task_str,
     )
     return "\n".join(out_parts).strip()
+
+
+async def _tool_request_new_tool(args: dict) -> str:
+    """Free-text capability request → planner → create_tool workflow.
+
+    Mirrors POST /api/workflows/from-request. The handler returns
+    immediately with the workflow_id; the workflow runs asynchronously.
+    The model can describe what's being built to the user, and the new
+    tool will federate into the MCP namespace once the workflow finishes.
+
+    Identity: tenant_id and actor_id come from the chat request's
+    X-Forwarded-User threading when available; for now we default to
+    "default" since chat→MCP identity threading isn't wired through the
+    execute_tool signature yet.
+    """
+    request_text = (args.get("request") or "").strip()
+    if not request_text or len(request_text) < 4:
+        return (
+            "Error: 'request' must be a non-empty natural-language "
+            "description of the capability you want built."
+        )
+
+    from app.workflow.from_request import (
+        FromRequestError,
+        dispatch_from_request,
+    )
+    try:
+        result = await dispatch_from_request(
+            request_text,
+            tenant_id="default",
+            actor_id="default",
+        )
+    except FromRequestError as e:
+        return (
+            f"Error: capability request rejected at stage {e.stage!r}. "
+            f"{e.detail.get('error', '')} "
+            f"(reasoning: {e.detail.get('reasoning', '')})"
+        )
+
+    planner = result.get("planner") or {}
+    inputs = planner.get("inputs") or {}
+    return json.dumps(
+        {
+            "workflow_id": result.get("workflow_id"),
+            "workflow_type": result.get("workflow_type"),
+            "status": result.get("status"),
+            "planner_reasoning": planner.get("reasoning"),
+            "planned_tool_name": inputs.get("tool_name"),
+            "planned_language": inputs.get("language"),
+            "planned_acceptance_criteria": inputs.get("acceptance_criteria") or [],
+            "next_step": (
+                "The capability-extension workflow is now running in the "
+                "background. Tell the user what is being built (use "
+                "planned_tool_name + planned_acceptance_criteria), and "
+                "let them know the new tool will be callable on the "
+                "next turn once the workflow completes."
+            ),
+        }
+    )
