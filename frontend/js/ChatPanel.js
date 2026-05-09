@@ -1117,21 +1117,26 @@ export class ChatPanel {
         const wfId = info.workflow_id || '';
         const wfType = info.workflow_type || info.type || 'workflow';
 
+        // System-notice copy is FACTUAL ONLY — what happened, with what
+        // outcomes / reason. Any "try asking again", "resume via the
+        // Workflow Monitor", or other user-facing call to action belongs
+        // to the assistant's reaction (the synthetic chat turn fired
+        // through onSystemNotice handles that), not to the system bubble.
         let icon, label, body;
         if (kind === 'completed') {
             icon = '✓'; label = 'Capability ready';
             const outcomes = (info.outcomes || []).join(', ');
             body = outcomes
-                ? `${wfType} ${wfId} completed (${outcomes}). The new tool/skill is callable now — try asking again.`
-                : `${wfType} ${wfId} completed. The new tool/skill is callable now — try asking again.`;
+                ? `${wfType} ${wfId} completed (${outcomes}).`
+                : `${wfType} ${wfId} completed.`;
         } else if (kind === 'failed') {
             icon = '✗'; label = 'Workflow failed';
             const reason = info.error || info.reason || 'unknown error';
-            body = `${wfType} ${wfId} ended in failure: ${reason}. See Workflow Monitor for details.`;
+            body = `${wfType} ${wfId} ended in failure: ${reason}`;
         } else if (kind === 'suspended') {
             icon = '⚠'; label = 'Workflow paused';
             const reason = info.suspend_reason || info.reason || 'awaiting decision';
-            body = `${wfType} ${wfId} is suspended: ${reason}. Resume or abort via Workflow Monitor.`;
+            body = `${wfType} ${wfId} is suspended: ${reason}`;
         } else {
             return;
         }

@@ -181,28 +181,37 @@ export function initChat(app) {
             app._client.on('workflow_failed', route('failed'));
             app._client.on('workflow_suspended', route('suspended'));
         }
-        // Persist each rendered notice into chat history so the LLM sees
-        // the workflow's outcome on the next user turn (no proactive
-        // notification mechanism — this is the closest substitute that
-        // actually works through the existing reply-only chat model).
-        app._chatPanel.onSystemNotice(async ({ content, workflow_id }) => {
+        // When a workflow terminal event is rendered as a system bubble,
+        // ALSO trigger a synthetic chat turn so the assistant generates a
+        // real response (streaming + TTS) and the user gets a natural
+        // acknowledgement — not just a silent notice. The synthetic user
+        // message is hidden (showUserMessage:false), thinking + RAG are
+        // disabled (the assistant just acknowledges; no retrieval needed),
+        // and tool-calls are suppressed by the prompt itself.
+        app._chatPanel.onSystemNotice(async ({ kind, content, workflow_id }) => {
+            if (!app._chatService) return;
+            const synthetic = (
+                `[system notice] ${content} `
+                + `Briefly acknowledge this to the user in 1–2 short sentences `
+                + `as if the system just informed you. `
+                + (kind === 'completed'
+                    ? `Mention the new capability is now ready to use, and invite them to ask for it.`
+                    : kind === 'failed'
+                        ? `State the failure plainly and point them to the Workflow Monitor.`
+                        : `Note it is paused and tell them they can resume or abort via the Workflow Monitor.`)
+                + ` Do NOT call any tools — just speak.`
+            );
             try {
-                const ctx = (app._buildLLMContext && app._buildLLMContext()) || {};
-                const projectId = ctx.project_id || 'default';
-                const clientId = app._chatService?.clientId;
-                if (!clientId) return;
-                await fetch('api/llm/system-notice', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        client_id: clientId,
-                        project_id: projectId,
-                        workflow_id,
-                        content,
-                    }),
+                await app._chatService.sendMessage(synthetic, {
+                    showUserMessage: false,
+                    overrides: {
+                        thinkEnabled: false,
+                        vectorRagEnabled: false,
+                        graphRagEnabled: false,
+                    },
                 });
             } catch (e) {
-                console.warn('[chat-nudge] persist failed:', e);
+                console.warn('[chat-nudge] proactive turn failed:', e);
             }
         });
         // Per-answer KG trace: clicking the trace button on an assistant
