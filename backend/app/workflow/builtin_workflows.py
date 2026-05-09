@@ -57,6 +57,83 @@ _API_TESTER_OUTPUT_SCHEMA = {
     },
 }
 
+_CREATE_TOOL_INPUT_SCHEMA = {
+    "type": "object",
+    "required": ["tool_name", "mission", "language", "acceptance_criteria"],
+    "properties": {
+        "tool_name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$",
+            "maxLength": 40,
+            "description": (
+                "Snake_case name for the new MCP tool. "
+                "Must start with a lowercase letter; only lowercase, digits, "
+                "and underscores allowed."
+            ),
+        },
+        "mission": {
+            "type": "string",
+            "minLength": 8,
+            "description": (
+                "One- or two-sentence description of what the tool should "
+                "do, including the expected input shape and the expected "
+                "output shape."
+            ),
+        },
+        "language": {
+            "type": "string",
+            "enum": ["python", "javascript"],
+            "description": "Implementation language for the tool.",
+        },
+        "api_docs_urls": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": (
+                "URLs of API documentation pages relevant to the tool. "
+                "Multiple endpoints from the same service belong here."
+            ),
+        },
+        "api_docs_url": {
+            "type": "string",
+            "description": (
+                "DEPRECATED single-URL form. Prefer api_docs_urls. Kept "
+                "for backward-compat with hand-crafted callers."
+            ),
+        },
+        "acceptance_criteria": {
+            "type": "array",
+            "items": {"type": "string"},
+            "minItems": 1,
+            "description": (
+                "Concrete, smoke-testable behaviours the published tool "
+                "must satisfy. Each criterion should be checkable by a "
+                "single pytest assertion (e.g. \"missing input exits "
+                "non-zero\", \"output JSON contains key X\")."
+            ),
+        },
+        "verify_inputs": {
+            "type": "object",
+            "description": (
+                "Sample input dict the framework will pass to the "
+                "freshly-published tool to verify round-trip callability."
+            ),
+        },
+    },
+}
+
+
+_REMOVE_TOOL_INPUT_SCHEMA = {
+    "type": "object",
+    "required": ["tool_name"],
+    "properties": {
+        "tool_name": {
+            "type": "string",
+            "description": "Name of the tool to archive (snake_case).",
+        },
+    },
+}
+
+
 _SKILL_AUTHOR_OUTPUT_SCHEMA = {
     "type": "object",
     "required": ["skill_name", "frontmatter", "body"],
@@ -109,11 +186,16 @@ def _register_create_tool() -> None:
             WorkflowOutcome(name="tool_published", description="tool registered with noted-tools"),
             WorkflowOutcome(name="skill_published", description="paired skill written to data/skills/"),
         ],
+        input_schema=_CREATE_TOOL_INPUT_SCHEMA,
         plan_template=[
             StepType(
                 name="fetch_docs",
                 worker="deterministic",
-                description="GET the api_docs_url; cap to 60 KB.",
+                description=(
+                    "GET each URL in api_docs_urls (or the legacy "
+                    "api_docs_url); concatenate under per-URL headers; "
+                    "cap to ~60 KB total."
+                ),
                 handler=step_handlers.fetch_docs,
                 output_schema={
                     "type": "object",
@@ -121,6 +203,10 @@ def _register_create_tool() -> None:
                     "properties": {
                         "api_docs": {"type": "string"},
                         "fetched_url": {"type": ["string", "null"]},
+                        "fetched_urls": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                        },
                         "skipped": {"type": "boolean"},
                         "truncated": {"type": "boolean"},
                     },
@@ -252,6 +338,7 @@ def _register_remove_tool() -> None:
             WorkflowOutcome(name="tool_archived", description="tool moved to user_tools/_archive/"),
             WorkflowOutcome(name="skill_archived", description="skill moved to data/skills/_archive/"),
         ],
+        input_schema=_REMOVE_TOOL_INPUT_SCHEMA,
         plan_template=[
             StepType(
                 name="archive_tool",

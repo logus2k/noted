@@ -59,6 +59,11 @@ class WorkflowDefinition:
     description: str
     outcomes: list[WorkflowOutcome] = field(default_factory=list)
     plan_template: list[StepType] = field(default_factory=list)
+    # JSON Schema describing the `inputs` dict the workflow expects from
+    # callers. Surfaced via GET /api/workflows/types so the planner preset
+    # (and any future caller) can produce conforming inputs from a free-text
+    # request. None means inputs are unstructured / contract-by-convention.
+    input_schema: Optional[dict[str, Any]] = None
     # Wall-clock cap on the entire workflow. Beyond this, the loop suspends
     # with reason=wallclock_exceeded. Operator decides resume or abort.
     max_wallclock_seconds: int = 3600

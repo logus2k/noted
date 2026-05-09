@@ -92,38 +92,64 @@ def _previous(inputs: dict[str, Any], step_name: str | None = None) -> dict[str,
 
 
 async def fetch_docs(state: WorkspaceState, inputs: dict[str, Any]) -> dict[str, Any]:
-    """Fetch the API documentation URL declared in workflow_inputs.
+    """Fetch the API documentation URL(s) declared in workflow_inputs.
 
-    Returns a dict with the fetched text (truncated). Workflow inputs may
-    set `api_docs_url` to "" or null, in which case this step returns an
-    empty doc and lets tool_author work from the mission alone.
+    Accepts either `api_docs_urls` (array, preferred) or `api_docs_url`
+    (string, backward-compat). When neither is set or every URL is empty
+    / "N/A", returns an empty doc and lets tool_author work from the
+    mission alone. Multiple URLs are concatenated under `--- url: <url>
+    ---` headers so the worker can reason across endpoints.
     """
     wf_in = state.inputs or {}
-    url = (wf_in.get("api_docs_url") or "").strip()
-    if not url or url.upper() == "N/A":
-        return {"api_docs": "", "fetched_url": None, "skipped": True}
 
+    raw_urls: list[str] = []
+    arr = wf_in.get("api_docs_urls")
+    if isinstance(arr, list):
+        raw_urls.extend(str(u).strip() for u in arr if isinstance(u, str))
+    single = wf_in.get("api_docs_url")
+    if isinstance(single, str) and not raw_urls:
+        raw_urls.append(single.strip())
+
+    urls = [u for u in raw_urls if u and u.upper() != "N/A"]
+    if not urls:
+        return {
+            "api_docs": "",
+            "fetched_url": None,
+            "fetched_urls": [],
+            "skipped": True,
+        }
+
+    cap_total = 60_000
+    per_url_cap = max(2_000, cap_total // len(urls))
     timeout = httpx.Timeout(connect=5.0, read=20.0, write=5.0, pool=5.0)
-    try:
-        async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
-            resp = await client.get(url, headers={"User-Agent": "noted-workflow/1.0"})
-            resp.raise_for_status()
-            text = resp.text
-    except httpx.HTTPError as e:
-        raise ValueError(f"fetch_docs: {type(e).__name__} fetching {url}: {e}") from e
 
-    # Hard cap so we don't blow the worker's context. Real API docs are
-    # huge; the worker preset re-uses what's relevant. 60 KB is a balanced
-    # default for Gemma's 131k window with room for the rest.
-    cap = 60_000
-    truncated = len(text) > cap
-    if truncated:
-        text = text[:cap] + "\n\n[... truncated by fetch_docs ...]"
+    sections: list[str] = []
+    fetched: list[str] = []
+    any_truncated = False
+    async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+        for url in urls:
+            try:
+                resp = await client.get(url, headers={"User-Agent": "noted-workflow/1.0"})
+                resp.raise_for_status()
+                text = resp.text
+            except httpx.HTTPError as e:
+                raise ValueError(
+                    f"fetch_docs: {type(e).__name__} fetching {url}: {e}"
+                ) from e
+            truncated = len(text) > per_url_cap
+            if truncated:
+                text = text[:per_url_cap] + "\n\n[... truncated by fetch_docs ...]"
+                any_truncated = True
+            sections.append(f"--- url: {url} ---\n{text}")
+            fetched.append(url)
+
+    combined = "\n\n".join(sections)
     return {
-        "api_docs": text,
-        "fetched_url": url,
+        "api_docs": combined,
+        "fetched_url": fetched[0] if len(fetched) == 1 else None,
+        "fetched_urls": fetched,
         "skipped": False,
-        "truncated": truncated,
+        "truncated": any_truncated,
     }
 
 
