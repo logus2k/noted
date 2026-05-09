@@ -276,9 +276,39 @@ async def publish_tool(
 
     for fname, content in files.items():
         (tool_dir / fname).write_text(content)
+
+    # F3.5: also write api_tester's smoke.py + merge additional_requirements
+    # into requirements.txt so the run_smoke_tests step can `pytest smoke.py`
+    # against the published tool's venv.
+    api_tester_out: dict[str, Any] | None = None
+    for step in reversed(state.steps):
+        if step.status != "completed":
+            continue
+        out = step.output or {}
+        if "smoke.py" in (out.get("files") or {}) or "smoke.js" in (out.get("files") or {}):
+            api_tester_out = out
+            break
+    if api_tester_out:
+        smoke_files = api_tester_out.get("files") or {}
+        for fname, content in smoke_files.items():
+            (tool_dir / fname).write_text(content)
+        # Merge additional_requirements (pytest etc.) into requirements.txt.
+        extras = api_tester_out.get("additional_requirements") or []
+        if extras and isinstance(extras, list):
+            req_path = tool_dir / "requirements.txt"
+            existing = req_path.read_text() if req_path.is_file() else ""
+            existing_lines = {ln.strip() for ln in existing.splitlines() if ln.strip()}
+            additions = [r for r in extras if isinstance(r, str) and r.strip() and r.strip() not in existing_lines]
+            if additions:
+                merged = existing.rstrip() + ("\n" if existing.strip() else "") + "\n".join(additions) + "\n"
+                req_path.write_text(merged)
+
     # Hand ownership to noted-tools so its UID-1000 executor can build the venv.
     _chown_tree_to_noted_tools(tool_dir)
 
+    # Same debounce-window settle as archive_tool: noted-tools' watcher
+    # needs ~50-200ms to register the new dir; refresh BEFORE that races.
+    await asyncio.sleep(0.4)
     refreshed = await _refresh_user_tools_federation()
 
     return {
@@ -307,6 +337,71 @@ async def _refresh_user_tools_federation() -> bool:
 
 
 # ─── verify_tool_round_trip ───────────────────────────────────────
+
+
+async def run_smoke_tests(state: WorkspaceState, inputs: dict[str, Any]) -> dict[str, Any]:
+    """F3.5: invoke noted-tools' /admin/run-smoke-tests/<tool_name> after the
+    tool is published. Failure (non-zero exit) raises ValueError with the
+    pytest tail; the loop's bounded-retry path feeds the failure back to
+    the next iteration via inputs["validator_complaint"].
+
+    Skipped (returns ok=True with skipped=True) if no smoke.py was authored
+    upstream - keeps the framework forwards-compatible with workflows that
+    don't pair an api_tester.
+    """
+    prev_publish = _previous(inputs, "publish_tool")
+    if not prev_publish:
+        for step in reversed(state.steps):
+            if step.name == "publish_tool" and step.status == "completed":
+                prev_publish = step.output or {}
+                break
+    if not prev_publish:
+        raise ValueError("run_smoke_tests: no upstream publish_tool output found")
+
+    tool_name = prev_publish.get("tool_name")
+    if not tool_name:
+        raise ValueError("run_smoke_tests: publish_tool did not record tool_name")
+
+    tool_dir = Path(prev_publish.get("tool_dir") or "")
+    if not (tool_dir / "smoke.py").is_file():
+        return {
+            "tool_name": tool_name,
+            "ok": True,
+            "skipped": True,
+            "note": "no smoke.py present (api_tester step omitted from this workflow)",
+        }
+
+    # F3.5: HTTP to noted-tools admin endpoint. AsyncClient because the
+    # underlying pytest run can take 10-60s; never block the event loop.
+    import os
+    base = os.environ.get("NOTED_TOOLS_URL", "http://noted-tools:7702")
+    timeout = httpx.Timeout(connect=5.0, read=180.0, write=5.0, pool=5.0)
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            resp = await client.post(f"{base}/admin/run-smoke-tests/{tool_name}")
+            resp.raise_for_status()
+            verdict = resp.json()
+    except httpx.HTTPError as e:
+        raise ValueError(f"run_smoke_tests: noted-tools call failed: {type(e).__name__}: {e}") from e
+
+    if not verdict.get("ok"):
+        # Pytest's stdout has the actual failure messages; stderr typically
+        # carries the warning summary. Truncate both for the validator
+        # complaint while keeping enough signal for the next iteration.
+        stdout_tail = (verdict.get("stdout") or "")[-2000:]
+        stderr_tail = (verdict.get("stderr") or "")[-500:]
+        raise ValueError(
+            f"smoke tests failed (exit={verdict.get('exit_code')}). "
+            f"pytest output tail: {stdout_tail} | stderr: {stderr_tail}"
+        )
+
+    return {
+        "tool_name": tool_name,
+        "ok": True,
+        "skipped": False,
+        "exit_code": verdict.get("exit_code", 0),
+        "stdout_tail": (verdict.get("stdout") or "")[-1000:],
+    }
 
 
 async def verify_tool_round_trip(
@@ -391,29 +486,20 @@ async def verify_tool_round_trip(
 
 
 # Skills follow the folder convention: data/skills/<skill_name>/SKILL.md.
-# Frontmatter MUST use inline YAML list syntax for `triggers` because the
-# noted SkillRegistry parser only handles `key: [a, b]` style, not the
-# multi-line `key:\n  - a\n  - b` form. Same for `references` etc.
-_SKILL_TEMPLATE = """---
-name: {name}
-description: {description}
-type: {skill_type}
-priority: {priority}
-max_tokens: {max_tokens}
-triggers: [{triggers_inline}]
----
-**Purpose**
-{purpose}
+# Frontmatter uses inline YAML list syntax for `triggers` (the noted
+# SkillRegistry parser only handles `key: [a, b]` style, not the multi-line
+# form). Other fields are simple key:value lines.
+#
+# F6.4: provenance + source_workflow lineage flat-keyed (provenance,
+# created_at, created_by, source_workflow_id, source_workflow_type,
+# source_workflow_tenant) so the registry parser captures them via its
+# generic key:value loop. The inspector reconstructs the source_workflow
+# dict from those keys.
 
-**Inputs**
-{inputs_md}
-
-**Output shape**
-{output_shape_md}
-
-**Examples**
-{examples_md}
-{when_not_block}"""
+_FIXED_FM_ORDER = ["name", "description", "type", "priority", "max_tokens",
+                   "provenance", "created_at", "created_by",
+                   "source_workflow_id", "source_workflow_type",
+                   "source_workflow_tenant"]
 
 
 def _quote_yaml_inline(value: str) -> str:
@@ -421,28 +507,50 @@ def _quote_yaml_inline(value: str) -> str:
     return f'"{safe}"'
 
 
-def _assemble_skill_markdown(skill_data: dict[str, Any]) -> str:
-    fm = skill_data.get("frontmatter") or {}
-    body = skill_data.get("body") or {}
+def _render_yaml_frontmatter(fm: dict[str, Any]) -> str:
+    """Render a flat dict as YAML frontmatter. Lists become inline
+    `[a, b]` form (compatible with noted's SkillRegistry parser); other
+    values render as `key: value`. Stable ordering for known keys
+    (per _FIXED_FM_ORDER) so diffs stay readable."""
+    out: list[str] = []
+    seen: set[str] = set()
+    keys = [k for k in _FIXED_FM_ORDER if k in fm] + [k for k in fm if k not in _FIXED_FM_ORDER and k != "triggers"]
+    for k in keys:
+        if k in seen:
+            continue
+        seen.add(k)
+        v = fm[k]
+        if v is None or v == "":
+            continue
+        out.append(f"{k}: {v}")
     triggers = fm.get("triggers") or []
-    triggers_inline = ", ".join(_quote_yaml_inline(t) for t in triggers)
+    if triggers:
+        triggers_inline = ", ".join(_quote_yaml_inline(t) for t in triggers)
+        out.append(f"triggers: [{triggers_inline}]")
+    return "\n".join(out)
+
+
+def _assemble_skill_markdown(skill_data: dict[str, Any]) -> str:
+    fm = dict(skill_data.get("frontmatter") or {})
+    body = skill_data.get("body") or {}
+    fm.setdefault("name", skill_data.get("skill_name") or "")
+    fm.setdefault("type", "tool_skill")
+    fm.setdefault("priority", 2)
+    fm.setdefault("max_tokens", 500)
     inputs_md = "\n".join(f"- {x}" for x in (body.get("inputs") or []))
     output_md = "\n".join(f"- {x}" for x in (body.get("output_shape") or []))
     examples_md = "\n".join(f"- {x}" for x in (body.get("examples") or []))
     when_not = body.get("when_not_to_use") or ""
     when_block = f"\n**When NOT to use**\n{when_not}\n" if when_not else ""
-    return _SKILL_TEMPLATE.format(
-        name=fm.get("name") or skill_data.get("skill_name") or "",
-        description=fm.get("description") or "",
-        skill_type=fm.get("type") or "tool_skill",
-        priority=fm.get("priority") if fm.get("priority") is not None else 2,
-        max_tokens=fm.get("max_tokens") if fm.get("max_tokens") is not None else 500,
-        triggers_inline=triggers_inline,
-        purpose=body.get("purpose") or "",
-        inputs_md=inputs_md,
-        output_shape_md=output_md,
-        examples_md=examples_md,
-        when_not_block=when_block,
+    return (
+        "---\n"
+        + _render_yaml_frontmatter(fm)
+        + "\n---\n"
+        + f"**Purpose**\n{body.get('purpose') or ''}\n\n"
+        + f"**Inputs**\n{inputs_md}\n\n"
+        + f"**Output shape**\n{output_md}\n\n"
+        + f"**Examples**\n{examples_md}\n"
+        + when_block
     )
 
 
@@ -466,6 +574,23 @@ async def publish_skill(
     skill_name = skill_data.get("skill_name") or (skill_data.get("frontmatter") or {}).get("name")
     if not skill_name:
         raise ValueError("publish_skill: skill_name missing from skill_author output")
+
+    # F6.4: inject provenance + source_workflow lineage into frontmatter so
+    # the SkillRegistry parser captures them and the inspector can link
+    # back to the source workflow. Mirrors publish_tool's _meta lineage
+    # injection.
+    from datetime import datetime, timezone
+    skill_data = dict(skill_data)
+    fm = dict(skill_data.get("frontmatter") or {})
+    fm["provenance"] = "user"
+    fm["created_at"] = datetime.now(timezone.utc).isoformat(
+        timespec="seconds"
+    ).replace("+00:00", "Z")
+    fm["created_by"] = state.actor_id
+    fm["source_workflow_id"] = state.workflow_id
+    fm["source_workflow_type"] = state.workflow_type
+    fm["source_workflow_tenant"] = state.tenant_id
+    skill_data["frontmatter"] = fm
 
     md_text = _assemble_skill_markdown(skill_data)
     skills_root = _skills_dir()

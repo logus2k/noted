@@ -61,6 +61,27 @@
       "added_at": "2026-05-08T18:08:20.349354+00:00",
       "category": "Job Market",
       "display_name": "Implications of AI for Work, Employment and Social Dialogue"
+    },
+    {
+      "path": "Acemoglu, D. (2024). The Simple Macroeconomics of AI.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-09T02:51:02.749753+00:00",
+      "category": "Job Market",
+      "display_name": "The Simple Macroeconomics of AI"
+    },
+    {
+      "path": "Acemoglu, D.,  Restrepo, P. (2018). Artificial Intelligence, Automation and Work.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-09T02:51:02.820166+00:00",
+      "category": "Job Market",
+      "display_name": "Artificial Intelligence, Automation and Work"
+    },
+    {
+      "path": "Acemoglu, D., Autor, D.,  Johnson, S. (2026).\u00a0Building Pro-Worker Artificial Intelligence.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-09T02:51:03.079608+00:00",
+      "category": "Job Market",
+      "display_name": "Building Pro-Worker Artificial Intelligence"
     }
   ],
   "arcadedb_database": "ai_and_jobs",

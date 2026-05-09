@@ -2796,14 +2796,21 @@ export class ExplorerPanel {
             if (!skills.length) {
                 return [{ title: 'No skills bound to this Domain', key: `asst-domain:${domainId}:skills:empty`, icon: 'fa-solid fa-info-circle' }];
             }
-            return skills.map(s => ({
-                title: s.name,
-                key: `skill:${s.name}`,
-                icon: 'fa-solid fa-scroll',
-                folder: s.has_references,
-                lazy: s.has_references,
-                children: s.has_references ? undefined : undefined,
-            }));
+            return skills.map(s => {
+                // F6.4: provenance pill on user-authored skills, mirrors the
+                // tools-tree treatment. Native skills render unchanged.
+                const isUser = s.provenance === 'user';
+                const titleSuffix = isUser ? ' <span class="explorer-prov-pill">user</span>' : '';
+                return {
+                    title: s.name + titleSuffix,
+                    key: `skill:${s.name}`,
+                    icon: 'fa-solid fa-scroll',
+                    folder: s.has_references,
+                    lazy: s.has_references,
+                    children: s.has_references ? undefined : undefined,
+                    tooltip: (isUser ? '[self-authored] ' : '') + (s.description || ''),
+                };
+            });
         } catch (e) {
             return [{ title: `Error: ${e.message}`, key: 'skill-error', icon: 'fa-solid fa-exclamation-triangle' }];
         }
@@ -3266,13 +3273,46 @@ export class ExplorerPanel {
             // Metadata
             const meta = document.createElement('div');
             meta.style.cssText = 'padding:8px 12px;font-size:11px;color:#555';
+            const isUser = data.provenance === 'user';
             const fields = [];
+            if (isUser) {
+                fields.push('<span title="Self-authored via the workflow framework" style="display:inline-block;font-family:var(--font-mono,monospace);font-weight:700;font-size:10px;color:#fff;background:#7e57c2;padding:1px 6px;border-radius:3px;margin-bottom:4px">USER</span>');
+            }
             if (data.description) fields.push(`<b>Description:</b> ${data.description}`);
-            if (data.triggers) fields.push(`<b>Triggers:</b> ${data.triggers.join(', ')}`);
+            if (data.triggers) fields.push(`<b>Triggers:</b> ${(data.triggers || []).join(', ')}`);
             if (data.priority) fields.push(`<b>Priority:</b> ${data.priority}`);
             if (data.max_tokens) fields.push(`<b>Max tokens:</b> ${data.max_tokens}`);
             meta.innerHTML = fields.join('<br>');
             this._detailEl.appendChild(meta);
+
+            // F6.4: provenance card with click-through to source workflow.
+            const sw = data.source_workflow;
+            if (isUser && sw && sw.workflow_id) {
+                const provCard = document.createElement('div');
+                provCard.style.cssText = 'margin:12px;padding:10px 12px;border:1px solid #e0d4f5;background:#f7f3fc;border-radius:4px;font-size:11px;color:#444;line-height:1.7';
+                const wfId = String(sw.workflow_id);
+                const wfType = String(sw.type || 'workflow');
+                const linkId = `skill-prov-wf-${wfId}`;
+                provCard.innerHTML =
+                    `<div style="font-weight:600;color:#5b3a99;margin-bottom:4px">Provenance</div>` +
+                    `<div><span style="color:#888">Created by</span> <code>${this._escapeHtmlSafe(data.created_by || '')}</code> ` +
+                    `<span style="color:#888">at</span> <code>${this._escapeHtmlSafe(data.created_at || '')}</code></div>` +
+                    `<div style="margin-top:4px"><span style="color:#888">Source workflow</span> ` +
+                    `<code>${this._escapeHtmlSafe(wfType)}</code> ` +
+                    `<a href="#" id="${linkId}" style="color:#1a7f9b;margin-left:8px">` +
+                    `<i class="fa-solid fa-diagram-project" style="margin-right:4px"></i>open in Workflow Monitor</a></div>`;
+                this._detailEl.appendChild(provCard);
+                const link = provCard.querySelector(`#${linkId}`);
+                if (link) {
+                    link.addEventListener('click', (ev) => {
+                        ev.preventDefault();
+                        const app = this._ctx?.app || window.app;
+                        if (app && typeof app.showWorkflowMonitor === 'function') {
+                            app.showWorkflowMonitor(wfId);
+                        }
+                    });
+                }
+            }
 
             // Content
             if (data.content) {

@@ -37,3 +37,11 @@ data/experiments/**/*.json
 # crosses the 100 MB hard limit) and have no business in version control.
 data/vectordb/
 data/arcadedb/
+
+# Workflow framework runtime state (per-tenant, per-run). The framework
+# regenerates everything from workflow inputs; on-disk files here are
+# caches, not canonical sources. Keep .gitkeep markers so directory
+# anchors survive a fresh clone.
+data/tenants/*/workflows/
+data/tenants/*/user_tools/
+!data/tenants/*/user_tools/.gitkeep

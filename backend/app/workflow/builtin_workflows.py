@@ -38,6 +38,25 @@ _TOOL_AUTHOR_OUTPUT_SCHEMA = {
     },
 }
 
+_API_TESTER_OUTPUT_SCHEMA = {
+    "type": "object",
+    "required": ["language", "files"],
+    "properties": {
+        "language": {"type": "string", "enum": ["python", "javascript"]},
+        "test_count": {"type": "integer"},
+        "summary": {"type": "string"},
+        "files": {
+            "type": "object",
+            "minProperties": 1,
+            "additionalProperties": {"type": "string"},
+        },
+        "additional_requirements": {
+            "type": ["array", "null"],
+            "items": {"type": "string"},
+        },
+    },
+}
+
 _SKILL_AUTHOR_OUTPUT_SCHEMA = {
     "type": "object",
     "required": ["skill_name", "frontmatter", "body"],
@@ -131,6 +150,12 @@ def _register_create_tool() -> None:
                 },
             ),
             StepType(
+                name="api_tester",
+                worker="api_tester",
+                description="LLM-author smoke tests covering the acceptance criteria.",
+                output_schema=_API_TESTER_OUTPUT_SCHEMA,
+            ),
+            StepType(
                 name="publish_tool",
                 worker="deterministic",
                 description="Write files to data/tenants/<tenant>/user_tools/<name>/ + refresh federation.",
@@ -144,6 +169,22 @@ def _register_create_tool() -> None:
                         "language": {"type": ["string", "null"]},
                         "files_written": {"type": "array"},
                         "federation_refreshed": {"type": "boolean"},
+                    },
+                },
+            ),
+            StepType(
+                name="run_smoke_tests",
+                worker="deterministic",
+                description="F3.5: pytest smoke.py inside the tool's venv via noted-tools admin endpoint.",
+                handler=step_handlers.run_smoke_tests,
+                output_schema={
+                    "type": "object",
+                    "required": ["ok", "tool_name"],
+                    "properties": {
+                        "ok": {"const": True},
+                        "tool_name": {"type": "string"},
+                        "skipped": {"type": "boolean"},
+                        "exit_code": {"type": "integer"},
                     },
                 },
             ),

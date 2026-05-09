@@ -1145,11 +1145,49 @@ export class ChatPanel {
         badge.className = 'chat-tool-badge';
         const name = toolInfo?.name || 'tool';
         const args = toolInfo?.args ? JSON.stringify(toolInfo.args, null, 2) : '';
+        // F6.2: provenance pill on user-authored tools. Source is the
+        // mcp-tools cache populated lazily on first call - cheap because
+        // it lands once per page load and stays for the session.
+        const isUser = ChatPanel._isUserTool(name);
+        const provHtml = isUser ? ' <span class="chat-tool-prov-pill">user</span>' : '';
         // Icon matches Explorer's Tools folder (fa-wrench).
-        badge.innerHTML = `<i class="fa-solid fa-wrench"></i> ${name}`;
-        badge.title = args ? `${name}(${args})` : name;
+        badge.innerHTML = `<i class="fa-solid fa-wrench"></i> ${name}${provHtml}`;
+        const provNote = isUser ? ' [self-authored]' : '';
+        badge.title = (args ? `${name}(${args})` : name) + provNote;
         this._streamingToolBar.appendChild(badge);
         this._messagesArea.scrollTop = this._messagesArea.scrollHeight;
+    }
+
+    /** F6.2: lazy lookup of tool provenance (returns true for user tools).
+     * Caches the mcp-tools list per page load; refreshes once on first call.
+     * Misses (name not in list) are treated as native (the safe default).
+     * `notify_invalidate()` from outside (e.g., when a workflow publishes a
+     * new tool) re-fetches on next call. */
+    static _isUserTool(name) {
+        const cache = ChatPanel._provCache;
+        if (cache && cache.byName && cache.byName.has(name)) {
+            return cache.byName.get(name) === 'user';
+        }
+        if (!ChatPanel._provFetchInFlight) {
+            ChatPanel._provFetchInFlight = true;
+            fetch('api/llm/mcp-tools')
+                .then(r => r.ok ? r.json() : null)
+                .then(d => {
+                    if (!d || !Array.isArray(d.tools)) return;
+                    const byName = new Map();
+                    for (const t of d.tools) {
+                        if (t && t.name) byName.set(t.name, t.provenance || 'native');
+                    }
+                    ChatPanel._provCache = { byName, ts: Date.now() };
+                })
+                .catch(() => { /* silent */ })
+                .finally(() => { ChatPanel._provFetchInFlight = false; });
+        }
+        return false;  // first-call answer: assume native; subsequent calls hit cache
+    }
+
+    static notifyToolListChanged() {
+        ChatPanel._provCache = null;
     }
 
     /** Append a token to the current streaming message. */

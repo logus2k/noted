@@ -105,6 +105,87 @@ def _format_field(key: str, value: Any) -> str:
     return f"{key}: {value}"
 
 
+async def _fetch_preset_config(preset_name: str, base_url: str, timeout_s: float) -> dict[str, Any]:
+    """F2.6: pull a preset's system_prompt + sampling from agent_server.
+    Used by the Claude dispatch path so noted backend doesn't need a
+    bind mount on agent_server's data dir."""
+    async with httpx.AsyncClient(timeout=timeout_s) as client:
+        resp = await client.get(f"{base_url}/v1/agents/{preset_name}")
+        resp.raise_for_status()
+        return resp.json()
+
+
+async def dispatch_claude(
+    preset_name: str,
+    step_inputs: dict[str, Any],
+    *,
+    base_url: str = AGENT_SERVER_URL,
+    timeout_s: float = DEFAULT_TIMEOUT_S,
+) -> dict[str, Any]:
+    """F2.6 / F3.11: Claude cross-backend path. Fetches the preset's
+    system prompt + sampling from agent_server, then calls Anthropic via
+    noted's existing AnthropicLLMManager. Same JSON-output contract as
+    the Gemma path; the loop's bounded retry / validator complaint
+    feedback works identically.
+
+    Cost: every call burns Anthropic tokens. Caller is responsible for
+    deciding when to use this vs the local Gemma path. See
+    `feedback_check_active_model_first.md` for context.
+    """
+    try:
+        preset = await _fetch_preset_config(preset_name, base_url, timeout_s)
+    except httpx.HTTPError as e:
+        raise ValueError(f"agent_server preset fetch failed: {e}") from e
+
+    system_prompt = preset.get("system_prompt") or ""
+    params = preset.get("params_override") or {}
+    user_message = _build_user_message(step_inputs)
+
+    # noted's AnthropicLLMManager handles the system prompt either via
+    # an explicit /system header or via a pseudo "system" message - delegate
+    # to it. Lazy import keeps noted's startup time unaffected when nobody
+    # uses the Claude path.
+    from app.managers.anthropic_llm_manager import AnthropicLLMManager
+    mgr = AnthropicLLMManager()
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_message},
+    ]
+    try:
+        result = await mgr.chat(
+            messages,
+            temperature=float(params.get("temperature") or 0.2),
+            max_tokens=int(params.get("max_tokens") or 2048),
+        )
+    except Exception as e:  # noqa: BLE001
+        raise ValueError(f"anthropic call failed: {type(e).__name__}: {e}") from e
+    finally:
+        try:
+            await mgr.close()
+        except Exception:
+            pass
+
+    content = ""
+    try:
+        content = result["choices"][0]["message"]["content"] or ""
+    except (KeyError, IndexError, TypeError):
+        raise ValueError(f"anthropic response shape unexpected: {result!r}")
+    cleaned = _strip_code_fence(_strip_thinking(content))
+    if not cleaned:
+        raise ValueError("anthropic returned empty content (after stripping <think> + fences)")
+    try:
+        parsed = json.loads(cleaned)
+    except json.JSONDecodeError as e:
+        head = cleaned[:300].replace("\n", "\\n")
+        raise ValueError(
+            f"anthropic output is not valid JSON ({e.msg} at line {e.lineno} col {e.colno}); "
+            f"head: {head}"
+        ) from e
+    if not isinstance(parsed, dict):
+        raise ValueError(f"anthropic output is JSON but not an object: {type(parsed).__name__}")
+    return parsed
+
+
 async def dispatch(
     preset_name: str,
     step_inputs: dict[str, Any],
@@ -117,6 +198,14 @@ async def dispatch(
     Raises ValueError on transport / parse failure. The loop catches this
     and feeds it into the validator-complaint retry path.
     """
+    # F2.6: backend hint via the inputs dict (any plan template can opt in
+    # by passing `_backend: "claude"` in the workflow's inputs). Default
+    # is the local Gemma path; explicit "claude" routes through Anthropic.
+    backend = (step_inputs.get("_backend") or "gemma").lower()
+    if backend == "claude":
+        return await dispatch_claude(preset_name, step_inputs,
+                                     base_url=base_url, timeout_s=timeout_s)
+
     user_message = _build_user_message(step_inputs)
     payload = {
         "model": preset_name,

@@ -40,18 +40,34 @@ LEGACY_DOMAIN_ID = 'noted'  # bucket pre-Domain-migration skills under 'noted'
 class Skill:
     """A single skill loaded from a SKILL.md file."""
     __slots__ = ('name', 'description', 'triggers', 'priority', 'max_tokens',
-                 'content', 'folder_path', 'domain_id')
+                 'content', 'folder_path', 'domain_id',
+                 # F6.4: provenance lineage. Native skills omit these (parser
+                 # leaves them None); skills published by create_tool's
+                 # publish_skill carry full lineage so the inspector can
+                 # link back to the source workflow.
+                 'provenance', 'created_at', 'created_by',
+                 'source_workflow_id', 'source_workflow_type',
+                 'source_workflow_tenant')
 
     def __init__(self, name, description, triggers, priority, max_tokens,
-                 content, folder_path, domain_id):
+                 content, folder_path, domain_id,
+                 provenance=None, created_at=None, created_by=None,
+                 source_workflow_id=None, source_workflow_type=None,
+                 source_workflow_tenant=None):
         self.name = name
         self.description = description
         self.triggers = triggers
         self.priority = priority
         self.max_tokens = max_tokens
         self.content = content
-        self.folder_path = folder_path  # path to the skill folder
+        self.folder_path = folder_path
         self.domain_id = domain_id
+        self.provenance = provenance
+        self.created_at = created_at
+        self.created_by = created_by
+        self.source_workflow_id = source_workflow_id
+        self.source_workflow_type = source_workflow_type
+        self.source_workflow_tenant = source_workflow_tenant
 
 
 class SkillRegistry:
@@ -168,8 +184,19 @@ class SkillRegistry:
         priority = fm.get('priority', 3)
         max_tokens = fm.get('max_tokens', 500)
 
-        return Skill(name, description, triggers, priority, max_tokens,
-                     content, folder_path, domain_id)
+        # F6.4: provenance lineage from frontmatter (publish_skill writes
+        # these flat keys; native skills don't). All optional - missing fields
+        # land as None and the inspector treats them as "native".
+        return Skill(
+            name, description, triggers, priority, max_tokens,
+            content, folder_path, domain_id,
+            provenance=fm.get('provenance'),
+            created_at=fm.get('created_at'),
+            created_by=fm.get('created_by'),
+            source_workflow_id=fm.get('source_workflow_id'),
+            source_workflow_type=fm.get('source_workflow_type'),
+            source_workflow_tenant=fm.get('source_workflow_tenant'),
+        )
 
     # ── F4: hot-reload helpers ──────────────────────────────────
 
@@ -343,28 +370,41 @@ class SkillRegistry:
         """Get full skill object by name."""
         return self._skills.get(name)
 
-    def list_skills(self):
-        """Return list of (name, metadata_dict) tuples for all skills."""
-        return [(s.name, {
+    def _meta_dict(self, s):
+        """Shared metadata serialization used by list_skills + get_skill_meta.
+        Provenance fields are merged in only when present (native skills
+        leave them None and the dict carries provenance='native')."""
+        out = {
             "description": s.description,
             "triggers": s.triggers,
             "priority": s.priority,
             "max_tokens": s.max_tokens,
             "domain_id": s.domain_id,
-        }) for s in sorted(self._skills.values(), key=lambda s: s.name)]
+            "provenance": s.provenance or "native",
+        }
+        if s.source_workflow_id:
+            out["source_workflow"] = {
+                "workflow_id": s.source_workflow_id,
+                "type": s.source_workflow_type,
+                "tenant_id": s.source_workflow_tenant,
+            }
+        if s.created_at:
+            out["created_at"] = s.created_at
+        if s.created_by:
+            out["created_by"] = s.created_by
+        return out
+
+    def list_skills(self):
+        """Return list of (name, metadata_dict) tuples for all skills."""
+        return [(s.name, self._meta_dict(s))
+                for s in sorted(self._skills.values(), key=lambda s: s.name)]
 
     def get_skill_meta(self, name):
         """Get metadata dict for a skill by name."""
         s = self._skills.get(name)
         if not s:
             return None
-        return {
-            "description": s.description,
-            "triggers": s.triggers,
-            "priority": s.priority,
-            "max_tokens": s.max_tokens,
-            "domain_id": s.domain_id,
-        }
+        return self._meta_dict(s)
 
     def has_references(self, name):
         """Check if a skill has a references/ subfolder with files."""

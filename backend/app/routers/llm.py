@@ -2221,7 +2221,7 @@ async def list_skills():
     skills = []
     for name, meta in registry.list_skills():
         has_refs = registry.has_references(name)
-        skills.append({
+        item = {
             "name": name,
             "description": meta.get("description", ""),
             "triggers": meta.get("triggers", []),
@@ -2229,7 +2229,16 @@ async def list_skills():
             "max_tokens": meta.get("max_tokens", 500),
             "has_references": has_refs,
             "domain_id": meta.get("domain_id"),
-        })
+            # F6.4: provenance + source_workflow lineage when present.
+            "provenance": meta.get("provenance", "native"),
+        }
+        if meta.get("source_workflow"):
+            item["source_workflow"] = meta["source_workflow"]
+        if meta.get("created_at"):
+            item["created_at"] = meta["created_at"]
+        if meta.get("created_by"):
+            item["created_by"] = meta["created_by"]
+        skills.append(item)
     return {"skills": skills}
 
 
@@ -2242,7 +2251,7 @@ async def get_skill_detail(skill_name: str):
     if not meta:
         raise HTTPException(status_code=404, detail=f"Skill '{skill_name}' not found")
     content = registry.get_skill(skill_name)
-    return {
+    out = {
         "name": skill_name,
         "description": meta.get("description", ""),
         "triggers": meta.get("triggers", []),
@@ -2250,7 +2259,15 @@ async def get_skill_detail(skill_name: str):
         "max_tokens": meta.get("max_tokens", 500),
         "domain_id": meta.get("domain_id"),
         "content": content,
+        "provenance": meta.get("provenance", "native"),
     }
+    if meta.get("source_workflow"):
+        out["source_workflow"] = meta["source_workflow"]
+    if meta.get("created_at"):
+        out["created_at"] = meta["created_at"]
+    if meta.get("created_by"):
+        out["created_by"] = meta["created_by"]
+    return out
 
 
 @router.get("/mcp-tools")
