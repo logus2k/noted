@@ -1,8 +1,0 @@
-{"at": "2026-05-09T01:00:46.413Z", "tenant_id": "alice", "workflow_id": "wf_1778288446412_bee00f52", "actor_id": "alice", "event": "workflow_started", "payload": {"type": "synthetic_probe", "outcomes": ["probe_completed"]}}
-{"at": "2026-05-09T01:00:46.414Z", "tenant_id": "alice", "workflow_id": "wf_1778288446412_bee00f52", "actor_id": "alice", "event": "step_started", "payload": {"step_index": 0, "step_name": "echo"}}
-{"at": "2026-05-09T01:00:46.415Z", "tenant_id": "alice", "workflow_id": "wf_1778288446412_bee00f52", "actor_id": "alice", "event": "step_completed", "payload": {"step_index": 0, "step_name": "echo", "retries": 0, "output_keys": ["echoed"]}}
-{"at": "2026-05-09T01:00:46.416Z", "tenant_id": "alice", "workflow_id": "wf_1778288446412_bee00f52", "actor_id": "alice", "event": "step_started", "payload": {"step_index": 1, "step_name": "transform"}}
-{"at": "2026-05-09T01:00:46.418Z", "tenant_id": "alice", "workflow_id": "wf_1778288446412_bee00f52", "actor_id": "alice", "event": "step_completed", "payload": {"step_index": 1, "step_name": "transform", "retries": 1, "output_keys": ["upper"]}}
-{"at": "2026-05-09T01:00:46.418Z", "tenant_id": "alice", "workflow_id": "wf_1778288446412_bee00f52", "actor_id": "alice", "event": "step_started", "payload": {"step_index": 2, "step_name": "finalize"}}
-{"at": "2026-05-09T01:00:46.419Z", "tenant_id": "alice", "workflow_id": "wf_1778288446412_bee00f52", "actor_id": "alice", "event": "step_completed", "payload": {"step_index": 2, "step_name": "finalize", "retries": 0, "output_keys": ["final", "transformed"]}}
-{"at": "2026-05-09T01:00:46.420Z", "tenant_id": "alice", "workflow_id": "wf_1778288446412_bee00f52", "actor_id": "alice", "event": "workflow_completed", "payload": {"outcomes": ["probe_completed"]}}
