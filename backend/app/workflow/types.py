@@ -44,6 +44,14 @@ class StepType:
     # Architect picks per-tool implementation at design time; the LLM only
     # sees task tools, never implementation-named ones.
     tools_available: list[str] = field(default_factory=list)
+    # Per-step retry override. None means inherit from
+    # WorkflowDefinition.max_retries_per_step. Deterministic steps whose
+    # handler raises on real failure (smoke tests, ast.parse validation)
+    # should set this to 0 — retrying with the same input produces the
+    # same failure and just burns wall-clock. LLM steps benefit from
+    # >0 retries because validator_complaint feedback can flip a
+    # JSON-parse failure into success on the next attempt.
+    max_retries: Optional[int] = None
 
 
 @dataclass

@@ -200,6 +200,49 @@
     font-size: 11px;
 }
 
+/* Banner that surfaces the A2 smoke-rewind cycle so the user can see
+   exactly why api_tester / publish_tool / run_smoke_tests are running
+   again after a failure. Without this, the workflow appears to loop
+   for no apparent reason. */
+.wfm-rewind-banner {
+    background: #fff7ec;
+    border: 1px solid #f0c389;
+    border-left: 3px solid #e69138;
+    border-radius: 4px;
+    padding: 8px 10px;
+    margin: 0 0 10px 0;
+    font-size: 11px;
+}
+.wfm-rewind-banner .wfm-rewind-label {
+    font-weight: 600;
+    color: #8a4a10;
+    margin-bottom: 4px;
+}
+.wfm-rewind-banner .wfm-rewind-label i { margin-right: 4px; }
+.wfm-rewind-banner .wfm-rewind-reason {
+    color: #6c3a0d;
+    font-family: var(--font-mono, monospace);
+    font-size: 10px;
+    line-height: 1.4;
+    word-break: break-word;
+}
+
+/* Step retried more than once: highlight the attempts counter so the
+   eye lands on it. */
+.wfm-step-meta-retried {
+    color: #b35d00 !important;
+    font-weight: 600;
+}
+
+/* Audit event: smoke_rewind shown with the same warning hue as the
+   banner above so they're correlatable. */
+.wfm-audit-event-rewind {
+    color: #b35d00 !important;
+    background: #fff7ec;
+    padding: 0 4px;
+    border-radius: 2px;
+}
+
 .wfm-detail-section-title {
     font-size: 11px;
     font-weight: 600;

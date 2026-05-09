@@ -249,6 +249,38 @@ export class WorkflowMonitorPanel {
         this._loadDetail(workflowId);
     }
 
+    /**
+     * Render the rewind banner above the steps list when A2 has rewound
+     * to api_tester after a smoke-test failure. Without this, the workflow
+     * appears to "loop" through api_tester / publish_tool / run_smoke_tests
+     * with no visible reason — A2 silently resets each step's retries
+     * counter on rewind.
+     */
+    _renderRewindBanner(s) {
+        const rewinds = s.smoke_rewinds || 0;
+        if (rewinds === 0) return '';
+        const cap = 2;
+        const lastErr = s.last_smoke_error || '';
+        // Pull just the assertion / error line from the pytest tail.
+        const summary = (() => {
+            const m = lastErr.match(/(SyntaxError|AssertionError|ImportError|NameError|TypeError|ValueError):.*/);
+            if (m) return m[0].slice(0, 240);
+            return lastErr.slice(-240).trim();
+        })();
+        const inProgress = (s.status === 'running');
+        const label = inProgress
+            ? `Smoke rewind ${rewinds}/${cap} in progress — regenerating api_tester after smoke-test failure`
+            : `Smoke rewind ${rewinds}/${cap} — last attempt failed`;
+        return `
+            <div class="wfm-rewind-banner">
+                <div class="wfm-rewind-label">
+                    <i class="fa-solid fa-rotate-right"></i> ${this._escape(label)}
+                </div>
+                ${summary ? `<div class="wfm-rewind-reason">${this._escape(summary)}</div>` : ''}
+            </div>
+        `;
+    }
+
     _renderDetailData(workflowId, data) {
         const s = data.state || {};
         const audit = data.audit || [];
@@ -264,11 +296,14 @@ export class WorkflowMonitorPanel {
             const outputBlock = outputKeys.length
                 ? `<div class="wfm-step-output">output keys: ${outputKeys.join(', ')}</div>`
                 : '';
+            // Highlight the retries counter when the step is on attempt 2+
+            // so the user can see it's been retried.
+            const retriesCls = (st.retries || 0) > 0 ? ' wfm-step-meta-retried' : '';
             return `
                 <div class="wfm-step" data-step="${i}">
                     <i class="${icon}" style="color:${stepColor};margin-right:6px"></i>
                     <span class="wfm-step-name">${this._escape(st.name)}</span>
-                    <span class="wfm-step-meta">retries=${st.retries} ${elapsed}</span>
+                    <span class="wfm-step-meta${retriesCls}">attempts=${(st.retries || 0) + 1} · ${elapsed}</span>
                     ${errBlock}
                     ${outputBlock}
                 </div>
@@ -277,8 +312,18 @@ export class WorkflowMonitorPanel {
 
         const auditHtml = audit.map((e) => {
             const t = e.at ? new Date(e.at).toLocaleTimeString() : '';
-            const stepName = e.payload && e.payload.step_name ? `: ${e.payload.step_name}` : '';
-            return `<div class="wfm-audit-line"><span class="wfm-audit-time">${t}</span> <span class="wfm-audit-event">${e.event}</span><span class="wfm-audit-meta">${this._escape(stepName)}</span></div>`;
+            const p = e.payload || {};
+            let meta = p.step_name ? `: ${p.step_name}` : '';
+            // smoke_rewind events carry rewind_index/cap + the failure
+            // reason; render them distinctively so the user can see
+            // why the workflow looped.
+            if (e.event === 'smoke_rewind') {
+                const idx = p.rewind_index || 0;
+                const cap = p.rewind_cap || 0;
+                meta = ` (${idx}/${cap}) → ${p.rewinding_to || 'api_tester'}`;
+            }
+            const eventCls = e.event === 'smoke_rewind' ? ' wfm-audit-event-rewind' : '';
+            return `<div class="wfm-audit-line"><span class="wfm-audit-time">${t}</span> <span class="wfm-audit-event${eventCls}">${e.event}</span><span class="wfm-audit-meta">${this._escape(meta)}</span></div>`;
         }).join('');
 
         const isSuspended = s.status === 'suspended';
@@ -311,6 +356,7 @@ export class WorkflowMonitorPanel {
                 <code>${s.workflow_id}</code>
                 ${s.suspend_reason ? `<span class="wfm-suspend-reason"><i class="fa-solid fa-circle-exclamation"></i> ${this._escape(s.suspend_reason)}</span>` : ''}
             </div>
+            ${this._renderRewindBanner(s)}
             <div class="wfm-detail-section-title">Steps</div>
             <div class="wfm-steps">${stepsHtml || '<i>no steps</i>'}</div>
             <div class="wfm-detail-section-title">Outcomes</div>

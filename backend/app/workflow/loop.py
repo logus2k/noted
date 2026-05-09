@@ -117,7 +117,15 @@ async def _run_step(
     )
 
     last_error: str | None = None
-    for attempt in range(definition.max_retries_per_step + 1):
+    # Per-step retry override (StepType.max_retries) wins over the workflow
+    # default; this lets deterministic steps opt out of the retry loop
+    # since retrying with the same input is pointless.
+    step_max_retries = (
+        step_type.max_retries
+        if step_type.max_retries is not None
+        else definition.max_retries_per_step
+    )
+    for attempt in range(step_max_retries + 1):
         record.retries = attempt
         try:
             inputs: dict[str, Any] = {"workflow_inputs": state.inputs}

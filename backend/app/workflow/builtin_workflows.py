@@ -197,6 +197,9 @@ def _register_create_tool() -> None:
                     "cap to ~60 KB total."
                 ),
                 handler=step_handlers.fetch_docs,
+                # Network HTTP fetch — one retry covers a transient blip without
+                # turning a real failure into a 3x wait.
+                max_retries=1,
                 output_schema={
                     "type": "object",
                     "required": ["api_docs"],
@@ -223,6 +226,8 @@ def _register_create_tool() -> None:
                 worker="deterministic",
                 description="Static checks: required files, JSON shape, ast.parse.",
                 handler=step_handlers.validate_tool_structure,
+                # Deterministic — same input → same failure. Skip retries.
+                max_retries=0,
                 output_schema={
                     "type": "object",
                     "required": ["ok", "tool_name"],
@@ -246,6 +251,9 @@ def _register_create_tool() -> None:
                 worker="deterministic",
                 description="Write files to data/tenants/<tenant>/user_tools/<name>/ + refresh federation.",
                 handler=step_handlers.publish_tool,
+                # Deterministic file-writes; if they fail it's an env issue (perms,
+                # disk full) — retrying immediately won't help.
+                max_retries=0,
                 output_schema={
                     "type": "object",
                     "required": ["tool_name", "tool_dir", "federation_refreshed"],
@@ -263,6 +271,10 @@ def _register_create_tool() -> None:
                 worker="deterministic",
                 description="F3.5: pytest smoke.py inside the tool's venv via noted-tools admin endpoint.",
                 handler=step_handlers.run_smoke_tests,
+                # Deterministic — pytest on identical files yields identical
+                # failure. Bounded improvement comes from A2's regenerate-on-
+                # smoke-failure rewind, not from re-running the same script.
+                max_retries=0,
                 output_schema={
                     "type": "object",
                     "required": ["ok", "tool_name"],
@@ -279,6 +291,10 @@ def _register_create_tool() -> None:
                 worker="deterministic",
                 description="Call the just-published tool with sample args.",
                 handler=step_handlers.verify_tool_round_trip,
+                # Deterministic — calls the published tool with sample args.
+                # Network blips are the only retry-recoverable case; rare
+                # enough that one extra retry doesn't pay for itself.
+                max_retries=0,
                 output_schema={
                     "type": "object",
                     "required": ["ok", "tool_name"],
@@ -301,6 +317,8 @@ def _register_create_tool() -> None:
                 worker="deterministic",
                 description="Assemble markdown, write data/skills/<name>.md.",
                 handler=step_handlers.publish_skill,
+                # Deterministic file-write; same retry rationale as publish_tool.
+                max_retries=0,
                 output_schema={
                     "type": "object",
                     "required": ["skill_name", "skill_path"],
@@ -345,6 +363,7 @@ def _register_remove_tool() -> None:
                 worker="deterministic",
                 description="Move tool dir to _archive/<name>_<ts>/.",
                 handler=step_handlers.archive_tool,
+                max_retries=0,
                 output_schema={
                     "type": "object",
                     "required": ["tool_name", "archived"],
@@ -362,6 +381,7 @@ def _register_remove_tool() -> None:
                 worker="deterministic",
                 description="Move skill md to data/skills/_archive/.",
                 handler=step_handlers.archive_skill,
+                max_retries=0,
                 output_schema={
                     "type": "object",
                     "required": ["skill_name", "archived"],
