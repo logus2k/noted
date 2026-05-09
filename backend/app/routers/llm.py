@@ -2452,6 +2452,41 @@ async def clear_history(client_id: str, project_id: str):
     return {"ok": True}
 
 
+class SystemNoticeRequest(BaseModel):
+    """Body for POST /api/llm/system-notice — persists a workflow-lifecycle
+    notice (completed / failed / suspended) into the chat history so the
+    LLM sees it on the next user turn. The frontend renders the visible
+    bubble itself; this endpoint only stores it in conversation memory."""
+    client_id: str
+    project_id: str = "default"
+    content: str
+    workflow_id: str | None = None
+
+
+@router.post("/system-notice")
+async def post_system_notice(body: SystemNoticeRequest) -> dict[str, Any]:
+    """Append a system-side notice into the chat memory for a given
+    client + project. Stored as a user-role message prefixed with
+    `[notice]` so chat templates that don't surface mid-conversation
+    `system` messages still render it correctly. The LLM treats it as
+    informational context on the next turn — it kills the "I'll let you
+    know when the tool is ready" stale-anchor problem since the assistant
+    sees the actual workflow outcome in its history."""
+    memory_key = f"{body.client_id}_{body.project_id}"
+    text = body.content.strip()
+    if body.workflow_id:
+        prefix = f"[notice · workflow {body.workflow_id}]"
+    else:
+        prefix = "[notice]"
+    formatted = f"{prefix} {text}"
+    await memory.append(memory_key, "user", formatted)
+    return {
+        "ok": True,
+        "memory_key": memory_key,
+        "stored_chars": len(formatted),
+    }
+
+
 # ── Helpers ───────────────────────────────────────────────────────
 
 def _text_before_tool_call(text: str) -> str:

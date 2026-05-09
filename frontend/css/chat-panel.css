@@ -163,6 +163,39 @@
     padding-right: 60px;
 }
 
+/* Workflow lifecycle notice bubbles. Visually distinct from user/assistant
+   so the user can tell them apart at a glance, but readable copy that
+   communicates state + next action. The LLM sees the body text on the
+   next turn (persisted as a `[notice]` user-role message in chat history). */
+.chat-message-system {
+    align-self: stretch;
+    border-radius: 6px;
+    border: 1px solid #d0d0d0;
+    background-color: #fafbfc;
+    color: #2c2c2c;
+    font-size: 12px;
+    padding: 8px 12px;
+    box-shadow: rgba(60, 64, 67, 0.12) 0px 1px 2px 0px;
+    white-space: normal;
+}
+.chat-message-system .chat-system-head {
+    font-weight: 600;
+    font-size: 12px;
+    margin-bottom: 4px;
+    letter-spacing: 0.2px;
+}
+.chat-message-system .chat-system-body {
+    font-size: 12px;
+    line-height: 1.45;
+    color: #444;
+}
+.chat-message-system-completed { border-left: 3px solid #22a06b; }
+.chat-message-system-completed .chat-system-head { color: #1f7a4f; }
+.chat-message-system-failed { border-left: 3px solid #d32f2f; background-color: #fdf6f6; }
+.chat-message-system-failed .chat-system-head { color: #a52424; }
+.chat-message-system-suspended { border-left: 3px solid #e69138; background-color: #fdfaf3; }
+.chat-message-system-suspended .chat-system-head { color: #a25d18; }
+
 /* Top-right per-message action bar: [Show graph icon (lazy)] [Copy All] [Copy answer]. */
 .chat-msg-actions {
     position: absolute;

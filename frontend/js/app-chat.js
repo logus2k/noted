@@ -163,6 +163,48 @@ export function initChat(app) {
         // Double-click on chat thumbnails / file chips / assistant <img>
         // opens the artifact in a floating jsPanel viewer.
         app._chatPanel.onOpenArtifact((p) => app._openChatArtifact?.(p));
+
+        // Workflow lifecycle notices in chat. Subscribe the chat panel to
+        // the same Socket.io events the Workflow Monitor listens to, so
+        // when a request_new_tool-dispatched workflow finishes (or fails /
+        // suspends), a system bubble appears in the chat thread and the
+        // notice is persisted to chat history (so the next user turn
+        // carries it into the LLM's context). Without this, the assistant
+        // anchors on its turn-1 "I'm building it" reply forever and never
+        // knows the workflow's outcome.
+        if (app._client && typeof app._client.on === 'function') {
+            const route = (kind) => (data) => {
+                try { app._chatPanel.notifyWorkflowTerminal(kind, data || {}); }
+                catch (e) { console.warn('[chat-nudge] render failed:', e); }
+            };
+            app._client.on('workflow_completed', route('completed'));
+            app._client.on('workflow_failed', route('failed'));
+            app._client.on('workflow_suspended', route('suspended'));
+        }
+        // Persist each rendered notice into chat history so the LLM sees
+        // the workflow's outcome on the next user turn (no proactive
+        // notification mechanism — this is the closest substitute that
+        // actually works through the existing reply-only chat model).
+        app._chatPanel.onSystemNotice(async ({ content, workflow_id }) => {
+            try {
+                const ctx = (app._buildLLMContext && app._buildLLMContext()) || {};
+                const projectId = ctx.project_id || 'default';
+                const clientId = app._chatService?.clientId;
+                if (!clientId) return;
+                await fetch('api/llm/system-notice', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        client_id: clientId,
+                        project_id: projectId,
+                        workflow_id,
+                        content,
+                    }),
+                });
+            } catch (e) {
+                console.warn('[chat-nudge] persist failed:', e);
+            }
+        });
         // Per-answer KG trace: clicking the trace button on an assistant
         // message opens the GraphPanel in trace mode with the subgraph the
         // model actually used to ground that answer.

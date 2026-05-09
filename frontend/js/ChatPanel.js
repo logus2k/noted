@@ -1103,6 +1103,70 @@ export class ChatPanel {
         this._messagesArea.scrollTop = this._messagesArea.scrollHeight;
     }
 
+    /**
+     * Render a system-side notice in the chat thread. Used to surface
+     * workflow lifecycle events (completed / failed / suspended) so the
+     * user sees the outcome inline without polling, and the next user
+     * turn carries the notice into LLM context (the persistence is the
+     * caller's job, via onSystemNotice).
+     *
+     * @param {('completed'|'failed'|'suspended')} kind - terminal status flavor
+     * @param {object} info - { workflow_id, workflow_type?, outcomes?, error?, reason?, suspend_reason? }
+     */
+    notifyWorkflowTerminal(kind, info = {}) {
+        const wfId = info.workflow_id || '';
+        const wfType = info.workflow_type || info.type || 'workflow';
+
+        let icon, label, body;
+        if (kind === 'completed') {
+            icon = '✓'; label = 'Capability ready';
+            const outcomes = (info.outcomes || []).join(', ');
+            body = outcomes
+                ? `${wfType} ${wfId} completed (${outcomes}). The new tool/skill is callable now — try asking again.`
+                : `${wfType} ${wfId} completed. The new tool/skill is callable now — try asking again.`;
+        } else if (kind === 'failed') {
+            icon = '✗'; label = 'Workflow failed';
+            const reason = info.error || info.reason || 'unknown error';
+            body = `${wfType} ${wfId} ended in failure: ${reason}. See Workflow Monitor for details.`;
+        } else if (kind === 'suspended') {
+            icon = '⚠'; label = 'Workflow paused';
+            const reason = info.suspend_reason || info.reason || 'awaiting decision';
+            body = `${wfType} ${wfId} is suspended: ${reason}. Resume or abort via Workflow Monitor.`;
+        } else {
+            return;
+        }
+
+        const msg = document.createElement('div');
+        msg.className = `chat-message chat-message-system chat-message-system-${kind}`;
+        const head = document.createElement('div');
+        head.className = 'chat-system-head';
+        head.textContent = `${icon} ${label}`;
+        msg.appendChild(head);
+        const para = document.createElement('div');
+        para.className = 'chat-system-body';
+        para.textContent = body;
+        msg.appendChild(para);
+
+        this._messagesArea.insertBefore(msg, this._typingIndicator);
+        this._messagesArea.scrollTop = this._messagesArea.scrollHeight;
+
+        if (this._onSystemNotice) {
+            // Also persist into chat history so the LLM sees the notice on
+            // the next user turn. The caller (app-chat.js) attaches
+            // client_id + project_id and POSTs to /api/llm/system-notice.
+            this._onSystemNotice({
+                kind,
+                workflow_id: wfId,
+                content: `${label}: ${body}`,
+            });
+        }
+    }
+
+    /** Set callback invoked with the notice payload when a system notice
+     *  bubble is rendered. Caller uses this to persist the notice into
+     *  the per-(client,project) chat history. */
+    onSystemNotice(cb) { this._onSystemNotice = cb; }
+
     /** Start a new streaming assistant message. Returns nothing - tokens go to appendToken(). */
     startStreamingMessage() {
         this._streamingMsg = document.createElement('div');
