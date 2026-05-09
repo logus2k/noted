@@ -17,6 +17,7 @@ from mcp.shared.exceptions import McpError
 
 from app.mcp.tools import get_all_tools, is_write_tier, WRITE_TOOL_NAMES
 from app.mcp.rate_limiter import RateLimiter
+from app.mcp.user_tools_client import get_user_tools_client
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +46,10 @@ def create_mcp_server(managers: dict, ctx_provider=None) -> Server:
 
     @server.list_tools()
     async def handle_list_tools() -> list[types.Tool]:
-        return get_all_tools()
+        # Native + user tools in one namespace. _meta is dropped before
+        # the LLM sees the schema (the user_tools_client.get_user_tools()
+        # already returns plain types.Tool with no _meta).
+        return get_all_tools() + get_user_tools_client().get_user_tools()
 
     @server.call_tool()
     async def handle_call_tool(
@@ -53,8 +57,9 @@ def create_mcp_server(managers: dict, ctx_provider=None) -> Server:
     ) -> list[types.TextContent | types.ImageContent | types.EmbeddedResource]:
         arguments = arguments or {}
 
-        # Validate tool exists
-        tool_names = {t.name for t in get_all_tools()}
+        # Validate tool exists in the unified namespace (native + user).
+        user_client = get_user_tools_client()
+        tool_names = {t.name for t in get_all_tools()} | {t.name for t in user_client.get_user_tools()}
         if name not in tool_names:
             raise _mcp_error(
                 code=-32006,

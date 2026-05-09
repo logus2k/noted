@@ -8,6 +8,7 @@ This module converts them to the formats expected by each LLM backend:
 """
 
 from app.mcp.tools import get_all_tools, is_write_tier, tools_for_domains
+from app.mcp.user_tools_client import get_user_tools_client
 
 
 def to_anthropic_tools(
@@ -33,6 +34,15 @@ def to_anthropic_tools(
     for t in source:
         if not include_write and is_write_tier(t.name):
             continue
+        tools.append({
+            "name": t.name,
+            "description": t.description,
+            "input_schema": t.inputSchema,
+        })
+    # User tools (Phase A.5 federation). User tools are read-tier in V1
+    # and not domain-scoped — they're always available regardless of
+    # active_domains. _meta is stripped here; the LLM never sees it.
+    for t in get_user_tools_client().get_user_tools():
         tools.append({
             "name": t.name,
             "description": t.description,
@@ -67,6 +77,15 @@ def to_openai_tools(
     for t in source:
         if not include_write and is_write_tier(t.name):
             continue
+        tools.append({
+            "type": "function",
+            "function": {
+                "name": t.name,
+                "description": t.description,
+                "parameters": t.inputSchema,
+            },
+        })
+    for t in get_user_tools_client().get_user_tools():
         tools.append({
             "type": "function",
             "function": {

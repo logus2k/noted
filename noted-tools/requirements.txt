@@ -1,0 +1,6 @@
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+pydantic==2.13.4
+httpx==0.28.0
+mcp==1.27.0
+anyio==4.6.2.post1

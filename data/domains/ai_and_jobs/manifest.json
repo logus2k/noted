@@ -39,27 +39,28 @@
       "mode": "read_store",
       "added_at": "2026-05-08T18:08:19.475988+00:00",
       "category": "Job Market",
-      "display_name": ""
+      "display_name": "Automation and New Tasks: How Technology Displaces and Reinstates Labor"
     },
     {
       "path": "AI and jobs..pdf",
       "mode": "read_store",
       "added_at": "2026-05-08T18:08:19.847461+00:00",
       "category": "Job Market",
-      "display_name": ""
+      "display_name": "AI and Jobs - A Review of Theory, Estimates, and Evidence"
     },
     {
       "path": "Gmyrek et al. (2023).pdf",
       "mode": "read_store",
       "added_at": "2026-05-08T18:08:20.049064+00:00",
       "category": "Job Market",
-      "display_name": ""
+      "display_name": "Generative AI and Jobs"
     },
     {
       "path": "wpef25081.pdf",
       "mode": "read_store",
       "added_at": "2026-05-08T18:08:20.349354+00:00",
-      "category": "Job Market"
+      "category": "Job Market",
+      "display_name": "Implications of AI for Work, Employment and Social Dialogue"
     }
   ],
   "arcadedb_database": "ai_and_jobs",

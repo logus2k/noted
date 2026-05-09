@@ -976,6 +976,13 @@ async def execute_tool(tool_call: dict, managers: dict, ctx: dict = None) -> str
                 )
             return await _tool_graph_and_vector_search(args, managers)
         else:
+            # Phase A.5: federation fallback — if the tool isn't native,
+            # check the noted-tools sidecar's registry. Self-authored
+            # tools live there.
+            from app.mcp.user_tools_client import get_user_tools_client
+            user_client = get_user_tools_client()
+            if user_client.has_tool(name):
+                return await user_client.call(name, args)
             return f"Error: Unknown tool '{name}'"
     except Exception as e:
         logger.exception("Tool execution failed: %s", name)

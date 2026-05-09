@@ -4,7 +4,7 @@
     flex: 1;
     overflow-y: auto;
     box-sizing: border-box;
-    background: #e9e9e9;
+    background: #fefefe;
     margin-right: 5px;
     overflow-x: hidden;
 }
@@ -45,6 +45,7 @@
     white-space: pre;
     overflow: auto;
     tab-size: 4;
+    text-wrap: auto;
 }
 
 .document-viewer-markdown h1 {

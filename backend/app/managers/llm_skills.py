@@ -18,9 +18,13 @@ to get_static_skills / get_registry_text, only skills whose domain_id is
 in that list are considered.
 """
 
-import os
+import asyncio
 import logging
+import os
 import re
+import threading
+from pathlib import Path
+from typing import Iterable
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +61,10 @@ class SkillRegistry:
         self._domains_dir = domains_dir or DOMAINS_DIR
         self._legacy_skills_dir = legacy_skills_dir or LEGACY_SKILLS_DIR
         self._skills = {}  # name -> Skill
+        self._lock = threading.RLock()
+        # F4: file watcher state. Started by lifespan via start_watcher().
+        self._watcher_task: asyncio.Task | None = None
+        self._watcher_stop: asyncio.Event | None = None
         self._load_all()
 
     def _load_all(self):
@@ -105,15 +113,16 @@ class SkillRegistry:
                 skill = self._parse_skill(skill_md, entry_path, entry, domain_id)
                 if not skill:
                     continue
-                if skill.name in self._skills:
-                    prev = self._skills[skill.name]
-                    logger.warning(
-                        "Skill name collision: '%s' redefined by domain '%s' "
-                        "(previously from domain '%s'). Later registration wins; "
-                        "names should be unique across Domains.",
-                        skill.name, domain_id, prev.domain_id,
-                    )
-                self._skills[skill.name] = skill
+                with self._lock:
+                    if skill.name in self._skills:
+                        prev = self._skills[skill.name]
+                        logger.warning(
+                            "Skill name collision: '%s' redefined by domain '%s' "
+                            "(previously from domain '%s'). Later registration wins; "
+                            "names should be unique across Domains.",
+                            skill.name, domain_id, prev.domain_id,
+                        )
+                    self._skills[skill.name] = skill
                 count += 1
             except Exception as e:
                 logger.warning("Failed to load skill %s (%s): %s",
@@ -161,6 +170,145 @@ class SkillRegistry:
 
         return Skill(name, description, triggers, priority, max_tokens,
                      content, folder_path, domain_id)
+
+    # ── F4: hot-reload helpers ──────────────────────────────────
+
+    def _reload_skill_from_dir(self, skill_folder: str, domain_id: str) -> bool:
+        """Re-parse a skill folder's SKILL.md and update the registry.
+
+        Returns True on successful (re)load, False if the folder no longer
+        contains a valid SKILL.md.
+        """
+        skill_md = os.path.join(skill_folder, 'SKILL.md')
+        if not os.path.isfile(skill_md):
+            return False
+        folder_name = os.path.basename(os.path.normpath(skill_folder))
+        try:
+            skill = self._parse_skill(skill_md, skill_folder, folder_name, domain_id)
+        except Exception as e:
+            logger.warning("hot-reload skill %s failed: %s", folder_name, e)
+            return False
+        if skill is None:
+            return False
+        with self._lock:
+            prev = self._skills.get(skill.name)
+            self._skills[skill.name] = skill
+        verb = "updated" if prev else "loaded"
+        logger.info("skill hot-%s: %s (domain=%s)", verb, skill.name, domain_id)
+        return True
+
+    def _unload_skill_by_folder(self, skill_folder: str) -> bool:
+        """Drop any skill whose folder_path matches the deleted folder."""
+        target = os.path.abspath(skill_folder)
+        with self._lock:
+            for name, sk in list(self._skills.items()):
+                if os.path.abspath(sk.folder_path) == target:
+                    del self._skills[name]
+                    logger.info("skill hot-unloaded: %s", name)
+                    return True
+        return False
+
+    def _resolve_skill_folder(
+        self, changed_path: str
+    ) -> tuple[str, str] | None:
+        """Given an arbitrary path inside a watched root, resolve the
+        owning skill folder + domain_id. Returns (folder_path, domain_id)
+        or None if the path isn't inside any registered skill location."""
+        path = Path(os.path.abspath(changed_path))
+        legacy_root = Path(os.path.abspath(self._legacy_skills_dir))
+        domains_root = Path(os.path.abspath(self._domains_dir))
+
+        # Skip _archive subtrees in either layout.
+        if any(p.name == "_archive" or p.name.startswith(".") for p in path.parents):
+            return None
+
+        # Legacy: data/skills/<name>/...
+        try:
+            rel = path.relative_to(legacy_root)
+            if rel.parts:
+                first = rel.parts[0]
+                if first.startswith("_") or first.startswith("."):
+                    return None
+                return (str(legacy_root / first), LEGACY_DOMAIN_ID)
+        except ValueError:
+            pass
+
+        # Per-domain: data/domains/<domain_id>/skills/<name>/...
+        try:
+            rel = path.relative_to(domains_root)
+        except ValueError:
+            return None
+        parts = rel.parts
+        # Need at least domain_id / skills / skill_name
+        if len(parts) < 3 or parts[1] != "skills":
+            return None
+        domain_id, _, skill_name = parts[0], parts[1], parts[2]
+        if skill_name.startswith("_") or skill_name.startswith("."):
+            return None
+        return (str(domains_root / domain_id / "skills" / skill_name), domain_id)
+
+    def _watch_roots(self) -> list[str]:
+        roots = []
+        if os.path.isdir(self._legacy_skills_dir):
+            roots.append(self._legacy_skills_dir)
+        if os.path.isdir(self._domains_dir):
+            roots.append(self._domains_dir)
+        return roots
+
+    async def _watch_loop(self) -> None:
+        try:
+            from watchfiles import awatch
+        except ImportError:
+            logger.warning("watchfiles not installed; SkillRegistry hot-reload disabled")
+            return
+
+        roots = self._watch_roots()
+        if not roots:
+            logger.info("SkillRegistry watcher: no roots to watch")
+            return
+
+        logger.info("SkillRegistry watcher started on: %s", roots)
+        assert self._watcher_stop is not None
+        try:
+            async for changes in awatch(*roots, recursive=True, stop_event=self._watcher_stop):
+                affected: dict[str, str] = {}
+                for _change, path_str in changes:
+                    resolved = self._resolve_skill_folder(path_str)
+                    if resolved is None:
+                        continue
+                    folder, domain_id = resolved
+                    affected[folder] = domain_id
+                for folder, domain_id in affected.items():
+                    if os.path.isdir(folder) and os.path.isfile(os.path.join(folder, "SKILL.md")):
+                        self._reload_skill_from_dir(folder, domain_id)
+                    else:
+                        self._unload_skill_by_folder(folder)
+        except asyncio.CancelledError:
+            logger.info("SkillRegistry watcher cancelled")
+            raise
+        except Exception:
+            logger.exception("SkillRegistry watcher crashed")
+            raise
+
+    async def start_watcher(self) -> None:
+        """Start the file watcher background task. Idempotent."""
+        if self._watcher_task is not None and not self._watcher_task.done():
+            return
+        self._watcher_stop = asyncio.Event()
+        self._watcher_task = asyncio.create_task(self._watch_loop())
+
+    async def stop_watcher(self) -> None:
+        if self._watcher_stop is not None:
+            self._watcher_stop.set()
+        if self._watcher_task is not None and not self._watcher_task.done():
+            try:
+                await asyncio.wait_for(self._watcher_task, timeout=2.0)
+            except (asyncio.TimeoutError, asyncio.CancelledError):
+                self._watcher_task.cancel()
+        self._watcher_task = None
+        self._watcher_stop = None
+
+    # ── existing API ────────────────────────────────────────────
 
     def get_skill(self, name):
         """Get a skill by name. Returns the SKILL.md content string or None."""

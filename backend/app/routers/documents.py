@@ -135,7 +135,11 @@ def serve_document_file(file_path: str):
     URL is preserved so the DocumentViewer + onDocumentPreview wiring keeps
     working without changes; only the resolution logic moved.
     """
-    if ".." in file_path or file_path.startswith("/"):
+    # Reject path-traversal *components* (".." segment), not literal ".."
+    # substrings inside filenames — e.g. "AI and jobs..pdf" is a valid name
+    # and was being mis-rejected. The realpath containment check below is
+    # the actual security boundary.
+    if file_path.startswith("/") or ".." in file_path.replace("\\", "/").split("/"):
         raise HTTPException(status_code=400, detail="Invalid file path")
     parts = file_path.split("/", 1)
     if len(parts) < 2 or not parts[0] or not parts[1]:

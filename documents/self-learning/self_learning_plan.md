@@ -1,530 +1,346 @@
-# Self-Learning Plan: Autonomous Tool + Skill Authoring
+# Capability-Extension Workflow Framework
+
+(historical project name: self-learning - file kept at `documents/self-learning/self_learning_plan.md` for continuity)
 
 ## Goal
 
-Enable noted's Assistant to extend its own capabilities at runtime: given a mission ("integrate with service X so I can do Y"), the Assistant locates the relevant API documentation, generates a working client in Python or JavaScript, validates it against acceptance criteria, and publishes both a new MCP tool and a matching skill — without a code change to the noted codebase, without a container restart in the common case, and without leaking any secrets to the LLM context.
+A generic agentic-workflow framework that runs sequenced LLM-and-tool steps with shared infrastructure: workspace state, suspend / resume, telemetry, audit, identity threading. Workflows that durably extend the assistant's capabilities (publishing a new tool, a new skill, new domain content, or any combination of those) are the first wave registered on the framework. Self-learning is an outcome property a workflow can carry, not a workflow type.
 
-The end-state is a closed self-extension loop:
+The end-state for a capability-extending workflow is a closed loop:
 
 ```
-mission -> fetch docs -> author client -> author tests -> run tests -> publish tool + skill -> use tool
+mission -> fetch context -> author primitive -> validate -> publish -> next turn uses it
 ```
 
-This document is the plan for getting there. Single-user scope for V1; multi-user hooks are present so the later migration is purely additive.
+The framework is workflow-agnostic; future non-extending workflows benefit from the same primitives.
 
 ---
 
 ## Scope
 
-### In scope (V1)
+### In scope
 
-- Self-authored MCP tools, hot-reloadable, isolated in a dedicated container.
-- Self-authored skills, hot-reloadable, no restart.
-- Per-tool Python or JavaScript venv with isolated dependencies.
-- Subprocess execution boundary for crash containment + dependency isolation.
-- License-clean secret storage via Infisical (MIT) for credentials any new tool needs.
-- An autonomous orchestration loop with two new agent_server presets: `tool_author` (writes the client) and `api_tester` (writes + runs validation tests).
-- Iteration loop with model-aware caps (Claude: 3, Gemma: 6) and full streaming visibility into each iteration.
-- Audit log + rollback for every self-authored tool.
-- UI surface in noted to browse self-authored tools and inspect their creation history.
+- Framework primitives: workflow registry, workflow loop, per-(tenant, workflow) workspace, suspend / resume, telemetry events, per-step audit, identity threading hooks.
+- First-wave workflows registered on the framework: `create_tool`, `create_skill`, `remove_tool`, `remove_skill`. Each declares its outcome property.
+- Worker presets in agent_server: `planner`, `tool_author`, `api_tester`, `skill_author`. Each is a small system-prompt + sampling preset.
+- Validation tools registered with deterministic implementations where mechanical checks exist; sub-LLM implementations only where no mechanical signal does. Architects pick implementation per tool at design time.
+- Skills hot-reload in noted backend's existing SkillRegistry.
+- Workflow inspector UI in Explorer: list, detail, audit trail, HITL approval modal.
+- Provenance + outcome badges on tool / skill listings.
 
-### Deferred to later phases
+### Out of scope (separate plans)
 
-- Multi-user identity, RBAC, per-user tool ownership and secret scoping. Hooks are present in V1's data model.
-- Tool versioning and upstream-API drift detection (basic version field present, no auto-revalidation loop).
-- Inter-tool dependencies (a user tool depending on another user tool).
-- Tool deprecation lifecycle.
-- Public marketplace / sharing across noted instances.
+- Auth wiring (extending oauth2-proxy `auth_request` to `/noted/`, FastAPI middleware reading `X-Forwarded-User`). See separate auth plan.
+- Infisical secret store + per-tool secret allow-list. Moved to the auth plan.
+- KB ingestion retrofit onto this framework. Design for compatibility (this plan); retrofit only if duplication becomes painful.
+- Per-tenant GPU / queue fairness in agent_server. Tracked under deployment-tier work (T2 / T3 in `feedback_dont_assume_single_user_local.md`).
+- Inter-tool dependencies, public marketplace, drift detection. Deferred.
 
 ---
 
-## Foundation: what already exists in noted today
+## Foundation: what already exists and is live
 
 | Capability | Where | Used as |
 |---|---|---|
-| Web fetch (Camoufox) | `noted/backend/app/managers/web_fetch_manager.py` | Doc retrieval for `tool_author` |
-| Code generation + file write | `update_cell` / `insert_cell` / `create_file` MCP tools | Producing client code |
-| Code execution | Notebook kernel + Python/JS file execution + terminal | Running smoke tests |
-| Skills as markdown | `data/skills/` directory + SkillRegistry singleton | Publishing the skill alongside the tool |
-| Tool calling protocol | MCP schemas + native tool calls (Anthropic + Gemma) | The contract the new tool must satisfy |
-| Multi-language runtime | Python 3.10-3.14, Node.js 20/22, R 3.6.3-4.5.1 | Hosting the generated client |
-| Diff approval gate | Existing write-tool confirmation panel | Optional human-in-loop checkpoint |
-| Local + cloud LLMs | Gemma 4 E4B local, Anthropic Claude API | Local-first orchestration with cloud fallback |
-| Agent presets | `agent_server/data/agents/*.agent.json` + `agent_server/data/prompts/*.txt` | Where the new presets live |
-| MCP server | `/mcp/` endpoint with rate limiting, error taxonomy, feature toggle | Reused as the protocol between noted and the new tools container |
+| `noted-tools` container (Phase A complete, verified 2026-05-08) | live | Hosts user-authored tools as MCP, audited per-call. Hot-reload of tools, per-tool venv, subprocess executor with RLIMIT_AS + timeout. |
+| Tool federation into noted | live | `/api/llm/mcp-tools` includes user tools with `provenance` + `_meta`. LLM sees them in `to_anthropic_tools` / `to_openai_tools`. Live-tested 2026-05-08 with Gemma 4 calling `hello_user`. |
+| OAuth2Proxy + Google IdP | live (gating `/goaccess`) | Extension to `/noted/` and identity propagation tracked in separate auth plan. |
+| Per-domain ArcadeDB databases | live | Hard partitioning at the Domain axis; tenant axis is a naming change, not a schema migration. See `reference_per_domain_database_isolation.md`. |
+| ChromaDB collections per Domain | live | Prefix-named, naming convention extends to per-tenant. |
+| `agent_server` forwarding | live | LLM calls pooled (`pool_size=20`), forwarded to `llama-server` over HTTP. GPU-agnostic at the noted layer. |
+| Web fetch (Camoufox) | live | Doc retrieval source for `tool_author`. |
+| MCP Streamable HTTP transport | live | Protocol between noted and `noted-tools`; same client used by the framework for forwarding. |
+| Suspend / resume pattern | live in KB ingestion (`graph/app/research_builder.py`) | `threading.Event` + on-disk snapshot. The framework reuses the pattern in its own implementation; KB ingestion's code is not retrofitted. |
+| Native structured tool-call API | live | `delta.tool_calls` returns structured fields (verified by curl 2026-05-04). The framework relies on this; no GBNF, see `feedback_gbnf_kills_thinking_and_tool_calls.md`. |
 
 ---
 
 ## Architecture
 
-### Containers
+### Workflow lifecycle
+
+A workflow registration declares:
+
+- `type`: e.g., `create_tool`, `create_skill`, `remove_tool`.
+- `outcomes`: structured list (e.g., `["tool_published", "skill_published"]`). Used for audit, UI surface, future per-outcome permissions.
+- `plan_template`: ordered list of typed steps. Each step is either an LLM-driven call against a worker preset, or a deterministic step (no LLM).
+- `tools_available`: per-step task-named tools the worker can call. Architect-decided implementations (deterministic vs sub-LLM).
+
+Lifecycle:
 
 ```
-noted (existing)               noted-tools (new)              infisical (new)
-  - FastAPI + Socket.IO         - MCP server                    - MIT-licensed secret store
-  - Notebook kernel             - File watcher on               - Postgres-backed (uses
-  - Existing 25 tools             /app/data/user_tools/           noted's existing Postgres)
-  - LLM router                  - Per-tool venv subprocess      - HTTP API for set/get/list
-  - Skills singleton              executor                      - Master-key gated
-  - SSO-ready (later)           - Audit log writer
-
-         |                             |                              |
-         +-----------------------------+------------------------------+
-                            shared docker network
+mission -> orchestrator picks workflow type
+        -> instantiates workspace (keyed by tenant_id, workflow_id)
+        -> executes plan steps sequentially (LLM or deterministic)
+        -> emits per-step events on Socket.io
+        -> on success: invokes outcome handlers (publish tool, publish skill, etc.)
+        -> writes audit row per step + per workflow
+        -> on suspend: snapshots workspace to disk, blocks on threading.Event
+        -> on resume / abort: continues from snapshot or fails cleanly
 ```
 
-Communication:
+### Workspace state
 
-- **noted -> noted-tools**: MCP over HTTP. Same protocol noted's own `/mcp/` endpoint already exposes externally; the noted backend becomes a second consumer.
-- **noted-tools -> infisical**: HTTPS with short-lived tokens issued at tool-execution time. Tokens have tight TTL (60s default) and scope to a single secret name. The noted backend never holds long-lived secret material.
-- **noted-tools subprocess -> upstream API**: arbitrary HTTP/HTTPS to whatever service the tool integrates with. Network whitelist enforced at the container level (egress filtering optional but recommended).
+In-process Python dict, keyed by `(tenant_id, workflow_id)`. Structured: completed steps' results, current step's input / output, audit pointers. Survives suspend / resume via on-disk snapshot at `data/tenants/<tenant_id>/workflows/<workflow_id>/state.json`.
 
-### File layout
+Pruning: when workspace size exceeds 16k characters, mechanical pruning drops verbose logs of completed steps but keeps step results and metadata. No LLM-based summarization.
 
-```
-data/user_tools/
-  <tool_name>/
-    tool.json              # MCP schema + _meta block
-    tool.py | tool.js      # Implementation
-    requirements.txt       # Python deps (or package.json for JS)
-    smoke.py | smoke.js    # Validation tests written by api_tester
-    venv/                  # Created on first load, cached afterwards
-    history/               # Audit trail
-      v1/
-        prompt.md          # Original mission text
-        api_docs.md        # Fetched documentation snapshot
-        iterations/
-          1/
-            client.py
-            tests.py
-            test_output.txt
-            verdict.md
-          2/
-            ...
-        published.json     # Final manifest with timestamps + actor_id
+For T1 (single-host multi-user) the in-process dict is sufficient. For T2+ (multi-host) sticky session affinity at the load balancer keeps a workflow on its originating noted instance. T3+ scale would migrate workspace to an external KV (Redis); the framework's interface is shaped to allow that swap without changes to workflow definitions.
 
-data/skills/                # Existing directory; user-authored skills land here
-  <skill_name>.md           # Same format as native skills, with _meta header
-```
+### Telemetry events (Socket.io)
 
-### Tool schema with metadata
+| Event | Payload | UI use |
+|---|---|---|
+| `workflow_started` | `{workflow_id, type, outcomes, plan, tenant_id}` | Render workflow in inspector with checklist |
+| `step_started` | `{workflow_id, step_index, step_type}` | Spinner on the step |
+| `step_completed` | `{workflow_id, step_index, result_summary}` | Check-mark, expand for detail |
+| `step_failed` | `{workflow_id, step_index, error_summary, retry_count}` | Red mark, expandable error |
+| `workspace_sync` | `{workflow_id, delta}` | Live-update workspace preview tab |
+| `system_request` | `{workflow_id, type, prompt}` | HITL modal (approval, clarification) |
+| `workflow_suspended` | `{workflow_id, reason, snapshot_path}` | Suspended banner with Resume / Abort |
+| `workflow_resumed` | `{workflow_id}` | Banner cleared |
+| `workflow_completed` | `{workflow_id, outcomes}` | Final state + outcome badges |
+
+Same Socket.io pipeline that powers `services:health`. Per `feedback_sse_needs_x_accel_buffering.md`, no SSE-specific concerns at the noted entry point (these are Socket.io, not SSE).
+
+### Per-step LLM execution
+
+For an LLM-driven step:
+
+1. Framework picks the worker preset declared in the plan template.
+2. Builds context: relevant workspace slice + previous step's output + tools available at this step.
+3. Calls `agent_server`, which forwards to `llama-server` (`pool_size=20` so multiple workflows can run concurrently up to that cap).
+4. Captures structured tool calls via the native API (no GBNF).
+5. Executes tool calls via noted-tools or noted backend's tool dispatch.
+6. Validates step output against a JSON schema declared by the step type.
+7. On schema-validation failure: bounded retry (max 2) with the validator's complaint fed back as additional context. Beyond 2 retries: step fails, workflow suspends with `system_request` for HITL.
+8. Persists step result to workspace, emits `step_completed`.
+
+### Per-step deterministic execution
+
+For a deterministic step (no LLM):
+
+1. Framework calls the step function directly with workspace slice.
+2. Result persisted, `step_completed` emitted.
+3. No retry path needed.
+
+### Validation tools: architect-decided implementations
+
+The framework registers task-named tools the LLM can call. The implementation is fixed at design time:
+
+| Tool name | Implementation chosen by architect | Reasoning |
+|---|---|---|
+| `validate_generated_client` | subprocess + smoke tests | Mechanical signal exists |
+| `validate_schema` | `jsonschema.validate(...)` | Mechanical |
+| `assess_explanation_clarity` | sub-LLM call | No mechanical signal for prose quality |
+| `verify_tool_round_trip` | call the tool with sample input, check non-error response | Mechanical |
+
+The LLM picks the task tool by intent, not by cost. Architects do the cost optimization at design time.
+
+### Tool schema with provenance + outcome lineage
+
+Tool registration carries `_meta`:
 
 ```json
 {
   "name": "fetch_jira_issue",
-  "description": "Retrieve a Jira issue by key with full field expansion.",
-  "input_schema": {
-    "type": "object",
-    "properties": {
-      "issue_key": {"type": "string", "description": "Jira issue key, e.g. PROJ-123"}
-    },
-    "required": ["issue_key"]
-  },
+  "description": "...",
+  "input_schema": { ... },
   "_meta": {
     "provenance": "user",
-    "created_by": "system",
-    "created_at": "2026-05-07T12:00:00Z",
-    "source_api_docs": "https://developer.atlassian.com/cloud/jira/platform/rest/v3/",
+    "created_by": "<sub_claim_or_default>",
+    "created_at": "...",
+    "source_workflow": {
+      "type": "create_tool",
+      "workflow_id": "wf_abc123",
+      "tenant_id": "<tenant_id_or_default>"
+    },
     "version": 1,
-    "language": "python",
-    "iterations_to_pass": 2,
-    "model_used_for_authoring": "claude-sonnet-4-6"
+    "language": "python"
   }
 }
 ```
 
-`_meta` is stripped before the schema is sent to the LLM — the model sees only `name`, `description`, `input_schema`. Metadata drives the UI's audit panel, governance, and rollback flows.
-
-### Subprocess execution flow
-
-For each tool call from the LLM:
-
-1. noted backend posts the MCP `tools/call` request to `noted-tools`.
-2. `noted-tools` resolves the tool name, locates `data/user_tools/<name>/`, validates input against `tool.json`'s `input_schema`.
-3. Spawns subprocess: `<venv>/bin/python tool.py` (or `node tool.js`) with the input JSON on stdin.
-4. Tool process requests any secrets it needs by name from Infisical using a short-lived scoped token issued by `noted-tools` for THIS execution only.
-5. Tool process performs its work, writes the MCP response JSON to stdout.
-6. `noted-tools` validates the response against `output_schema` (when declared), forwards it back to noted, writes an audit-log entry.
-
-Crash containment: subprocess crash terminates that single tool call with a clean error. `noted-tools` stays alive. noted stays alive.
-
-Resource limits: each subprocess gets a memory cap (default 512MB), CPU cap (default 1 core), and execution timeout (default 60s). Configurable per tool via `_meta.limits`.
+`_meta` is stripped before LLM presentation (already verified in Phase A.5).
 
 ---
 
 ## Phased plan
 
-Effort estimates assume one focused engineer. Total: **~4 weeks** of execution time, plus ~1 week of buffer for integration and polish.
-
-### Phase A: noted-tools container + plugin model
-
-**Effort: ~2 weeks**
-
-#### A.1 Container skeleton
-
-- New service `noted-tools` in `services/docker-compose.yml`.
-- Base image: Python 3.12-slim + Node.js 22 LTS (for JS tools).
-- FastAPI process exposing MCP server on a dedicated port (e.g. 7702).
-- Bind mounts: `data/user_tools/` (read-write for tool execution + venv caching), `data/skills/` (read-only mirror for cross-reference, write happens on noted's side).
-
-#### A.2 File watcher + hot reload
-
-- Watch `data/user_tools/` for create/modify/delete of `tool.json` files.
-- On change: re-parse the affected tool, validate schema, swap into the in-memory tool registry atomically. Old in-flight executions of the previous version finish under the previous code (subprocess-isolated, no shared state).
-- Reload completes in < 200ms for a typical tool.
-
-#### A.3 Per-tool venv management
-
-- On first reference to a tool, check for `<tool_dir>/venv/`.
-- If missing: create with `uv venv` (or `python -m venv` fallback), `uv pip install -r requirements.txt`. Cache.
-- On `requirements.txt` change: rebuild venv. Increment `_meta.version`.
-- For JavaScript tools: `npm install` into a per-tool `node_modules/`.
-
-#### A.4 Subprocess executor
-
-- Pythontools: `<venv>/bin/python tool.py < input.json > output.json`.
-- JavaScript tools: `node tool.js < input.json > output.json`.
-- Resource limits via `resource.setrlimit` (Python) or container-level `cgroup` settings.
-- Timeout enforced via `subprocess.run(timeout=...)`.
-- stderr captured into the audit log on failure.
-
-#### A.5 MCP exposure
-
-- `noted-tools` registers itself in noted's MCP client list.
-- noted backend's `/api/mcp/discover` endpoint aggregates tools from both its own internal registry and `noted-tools`'s registry into a single namespace.
-- Tools sorted alphabetically; `_meta.provenance` carried in metadata for UI use only.
-
-#### A.6 Audit log writer
-
-- Every `tools/call` to a user tool produces an audit entry: `{tool_name, version, actor_id, started_at, finished_at, status, input_hash, output_hash, error}`.
-- Append-only JSONL at `data/user_tools/<name>/history/audit.jsonl`.
-
-#### Acceptance criteria — Phase A
-
-- [ ] `docker compose up` brings up `noted-tools` and noted backend can list its tools via MCP.
-- [ ] Drop a hand-written `tool.json` + `tool.py` into `data/user_tools/test_tool/` -> tool appears in noted's tool list within 1 second, no container restart.
-- [ ] LLM can call the tool; result round-trips correctly; audit entry written.
-- [ ] Modify `tool.py`, save -> next tool call uses new code; in-flight calls finish with old code.
-- [ ] Crash a tool deliberately (`raise RuntimeError`) -> noted-tools stays up; noted stays up; LLM gets a clean error response with stderr in the diagnostic field.
-- [ ] Modify `requirements.txt` to add a new package -> next call rebuilds venv (visible in logs); subsequent calls use new package.
-- [ ] Memory cap enforced: a tool that allocates 1GB is killed at 512MB with a clean error.
-- [ ] Timeout enforced: a tool that sleeps 120s is killed at 60s with a clean error.
-- [ ] Two tools with conflicting Python deps (e.g. `requests==2.28` vs `requests==2.31`) coexist and both work.
-
----
-
-### Phase B: Infisical secret store
-
-**Effort: ~3-4 days**
-
-#### B.1 Container setup
-
-- `infisical/infisical:latest` image (MIT-licensed, verified at integration time).
-- Postgres connection: shares noted's existing `noted-postgres` instance, separate database `infisical`.
-- Master key from environment variable `INFISICAL_ENCRYPTION_KEY` (256-bit, generated once, persisted in compose `.env`).
-- Web UI exposed on a dedicated port for secret management; API on a separate port for `noted-tools` consumption.
-- Single-user / single-project / single-environment configuration in V1. Multi-user expansion is configuration-only (no schema migration).
-
-#### B.2 Token broker in noted-tools
-
-- New endpoint `noted-tools` -> Infisical: `issue_scoped_token(actor_id, secret_name, ttl_seconds=60)`.
-- Returns a token usable only for the requested secret name, expires after TTL.
-- Each tool subprocess invocation receives one such token via stdin (alongside the input payload), uses it to fetch its secret(s), discards.
-
-#### B.3 Secret-reference indirection
-
-- Tool inputs may contain `{"$secret": "infisical_secret_name"}` placeholders.
-- The LLM never sees the actual secret value — only the placeholder name.
-- `noted-tools` resolves placeholders during input validation (before subprocess invocation).
-- Secrets named in the LLM's tool call are validated against an allow-list per tool, declared in `tool.json._meta.allowed_secrets`. Prevents one tool from exfiltrating arbitrary secrets.
-
-#### B.4 Skill: secret management
-
-- New skill `secrets_management.md` published to noted's skills directory.
-- Documents: how the Assistant requests user-provided secrets, the never-in-LLM-context invariant, the allow-list pattern.
-
-#### Acceptance criteria — Phase B
-
-- [ ] Infisical container starts and persists secrets across restarts.
-- [ ] `set_secret(name, value)` via Web UI -> `get_secret(name)` returns the value.
-- [ ] `noted-tools` can fetch a secret using a scoped token; access is denied if the token's scoped name doesn't match the requested name.
-- [ ] Token TTL enforced: a 60s-expired token is rejected.
-- [ ] A tool calling `{"$secret": "github_token"}` in its input gets the resolved value at execution time.
-- [ ] A tool that requests a secret NOT in its `allowed_secrets` list is denied with a clear error message.
-- [ ] Audit log records "tool X requested secret Y" with timestamps; never records the secret value.
-- [ ] LLM tool-call traces in `noted/data/llm_traces/` never contain plaintext secret values.
-
----
-
-### Phase C: Authoring presets + orchestrator tools
-
-**Effort: ~1 week**
-
-#### C.1 `tool_author` preset
-
-- New file `agent_server/data/agents/tool_author.agent.json`.
-- New file `agent_server/data/prompts/tool_author_system_prompt.txt`.
-- Sampling: temperature 0.1, max_tokens 4096 (clients can be long), top_p 0.9.
-- System prompt instructs: read API docs, generate a self-contained client (Python preferred, JavaScript when explicitly requested), produce `tool.json` schema matching the client's signature, declare required secrets in `_meta.allowed_secrets`, declare resource limits if non-default.
-
-#### C.2 `api_tester` preset
-
-- New file `agent_server/data/agents/api_tester.agent.json`.
-- New file `agent_server/data/prompts/api_tester_system_prompt.txt`.
-- Sampling: temperature 0.1, max_tokens 2048.
-- System prompt instructs: given a client implementation and acceptance criteria, write smoke tests covering the criteria, run them inside the per-tool venv subprocess, report pass/fail with structured diagnostics. On failure, identify which acceptance criterion failed and why.
-
-#### C.3 `create_tool` orchestrator (built-in noted tool)
-
-- Signature: `create_tool(name: str, mission: str, api_docs_url: str, language: str = "python", acceptance_criteria: list[str] = [])`.
-- Implementation:
-  1. Fetch `api_docs_url` via existing web fetch tool. If multi-page docs, follow up to N depth.
-  2. Loop (max iterations from `MAX_ITERATIONS[backend]`):
-     - Call `tool_author` preset with mission + docs + previous-iteration diagnostics.
-     - Receive `client_code`, `tool_schema`, `requirements`.
-     - Write to `data/user_tools/<name>/iterations/<i>/`.
-     - Call `api_tester` preset with `acceptance_criteria` + client + a fresh subprocess invocation harness.
-     - Receive test code; execute in subprocess; capture verdict.
-     - If pass: break.
-     - If fail: feed failure diagnostics back into next iteration.
-  3. On pass: copy iteration's files to `data/user_tools/<name>/` (top level), increment version, write `published.json`, trigger noted-tools hot-reload.
-  4. On exhaust without pass: leave iteration tree in place; report failure with last verdict; tool is NOT registered.
-- Streams progress to chat panel as collapsible thinking blocks per iteration.
-
-#### C.4 `remove_tool` built-in
-
-- Signature: `remove_tool(name: str)`.
-- Effect: archive `data/user_tools/<name>/` to `data/user_tools/_archive/<name>_<timestamp>/`, remove from active registry, trigger reload.
-- Idempotent: removing a tool that doesn't exist is a no-op with a clear message.
-
-#### C.5 Model-aware iteration cap
-
-- Config in noted backend: `TOOL_AUTHOR_MAX_ITERATIONS = {"claude": 3, "gemma": 6}` (env-var overridable).
-- Orchestrator reads the active model and applies the cap.
-- All iterations stream to the chat panel; user can intervene via "Stop" button at any point.
-
-#### Acceptance criteria — Phase C
-
-- [ ] Both presets are loaded by agent_server at startup; both reachable via direct probe.
-- [ ] `create_tool(name="github_issue", mission="fetch GitHub issue by repo+number", api_docs_url=..., language="python")` against Claude completes within 3 iterations on a clean OpenAPI-documented service.
-- [ ] Same call against Gemma 4 completes within 6 iterations on the same service.
-- [ ] Generated tool registers in `noted-tools` after a successful run.
-- [ ] LLM (in a subsequent chat turn) can call the new tool by name; round-trips correctly.
-- [ ] Failed creation (max iterations exhausted) leaves no tool registered; iteration history preserved for diagnostic.
-- [ ] All iterations visible in chat as collapsible thinking blocks with code + test output.
-- [ ] `remove_tool("github_issue")` archives the directory; tool no longer in registry; subsequent calls return tool-not-found.
-
----
-
-### Phase D: Skills hot-reload
-
-**Effort: ~3 days**
-
-#### D.1 SkillRegistry watcher
-
-- noted backend's existing SkillRegistry singleton gains a file watcher on `data/skills/`.
-- On change: re-parse affected skill, swap atomically.
-
-#### D.2 `create_skill` built-in
-
-- Signature: `create_skill(name: str, when_to_use: str, content: str, priority: int = 2)`.
-- Writes `data/skills/<name>.md` with the standard `_meta` header (provenance, created_by, created_at, version) and the standard skill body format.
-- Triggers SkillRegistry reload.
-
-#### D.3 `tool_author` co-publishes a skill
-
-- When the orchestrator publishes a tool, it ALSO calls `create_skill` with a skill that documents when to use the tool, what the inputs mean, what kind of result to expect.
-- Skill content is generated by `tool_author` preset in the same authoring step (single LLM call, two outputs).
-
-#### Acceptance criteria — Phase D
-
-- [ ] Drop a `.md` file into `data/skills/` -> SkillRegistry reflects it within 1 second; relevant LLM turns auto-inject if priority=1.
-- [ ] `create_skill(...)` writes the file and triggers reload; skill becomes available in next LLM turn.
-- [ ] Successful `create_tool` ALWAYS produces both a tool entry in `noted-tools` AND a skill entry in `data/skills/`.
-- [ ] Removing a tool via `remove_tool` ALSO archives its sibling skill (paired lifecycle).
-
----
-
-### Phase E: Audit log + UI
-
-**Effort: ~3-4 days**
-
-#### E.1 Audit panel
-
-- New tab in the Explorer's Assistant section: "Self-authored tools".
-- Lists every user tool with: name, description, language, version, created_at, last_used, total_invocations.
-- Click a tool -> detail panel showing: full creation history (iteration tree), audit log of invocations, Remove button.
-- "Self-authored skills" sub-tab mirrors the structure for skills.
-
-#### E.2 Per-tool detail page
-
-- Shows current `tool.json`, current implementation file, current `smoke.py`/`smoke.js`, current skill markdown.
-- Source API docs link.
-- "Re-run smoke tests" button: triggers `api_tester` against the live tool with the original acceptance criteria. Surfaces drift (upstream API changed).
-- "Remove" button with confirmation modal.
-
-#### E.3 Tool versioning surface
-
-- Each invocation in the audit log shows the version that handled it.
-- When a tool is updated (re-authored), prior versions remain in the iteration tree; the audit log links each invocation to its handling version.
-- "Rollback to version N" button reverts the active version pointer; previous version becomes active again.
-
-#### Acceptance criteria — Phase E
-
-- [ ] Self-authored tools appear in Explorer with badges distinguishing them from native tools.
-- [ ] Clicking a tool opens a detail page with full history.
-- [ ] Re-run smoke tests button executes the tester against the live tool and reports verdict.
-- [ ] Audit log shows every invocation with input hash, output hash (or status), version, timestamp.
-- [ ] Rollback to version N -> next call uses version N's code; audit log records the rollback as an event.
-
----
-
-### Phase F: Tool metadata + UI badges
-
-**Effort: ~2 days**
-
-#### F.1 Schema extension
-
-- All tools (native and user) carry `_meta` field, stripped before LLM presentation.
-- Native tools' `_meta`: `{provenance: "native"}`.
-- User tools' `_meta`: full block as documented above.
-
-#### F.2 UI badge layer
-
-- Tool listings in the Explorer / chat panel / settings show a small badge for user-authored tools (icon + tooltip with creator + creation date).
-- Native tools show no badge — visual default.
-
-#### F.3 LLM-side invariance
-
-- Verify via integration test: the schema seen by the LLM is identical for native and user tools (modulo name/description/input_schema differences). No `_meta` leaks into the LLM context.
-
-#### Acceptance criteria — Phase F
-
-- [ ] LLM tool-list payload is byte-identical for a native tool and a user tool with the same name + description + input_schema.
-- [ ] UI shows the user-tool badge in all three surfaces (Explorer, chat tool-call view, settings).
-- [ ] Toggling a tool from user to native (test scenario) flips the badge correctly without LLM-side changes.
+Effort assumes one focused engineer. Total: ~4 weeks plus ~1 week of buffer for integration.
+
+### F1: Framework primitives (~1.5 weeks)
+
+- Workflow registry module.
+- Workflow loop with state machine + retry.
+- Workspace state container with mechanical pruning.
+- Suspend / resume mechanism (mirrors KB ingestion's pattern in a separate codebase).
+- Identity-threading hooks reading `X-Forwarded-User` (default `"default"` constant when absent).
+- Audit log writer per workflow.
+- Telemetry event emitters integrated with the existing Socket.io pipeline.
+
+Acceptance:
+- A synthetic 3-step workflow runs end-to-end via direct API call; all events fire; audit lands; workspace state retrievable via inspector.
+- Triggered step failure causes suspend; on-disk snapshot present at expected path; manual resume completes the workflow.
+- Identity threading: with `X-Forwarded-User=alice`, audit shows `actor_id=alice`; without header, audit shows `actor_id=default`.
+- Two concurrent workflows in different tenants run without state collision.
+
+### F2: Worker presets (~3 days)
+
+- `planner`: system prompt for plan generation. Output is a tool call returning structured plan args validated against a JSON schema.
+- `tool_author`: writes Python / JS clients + tool.json schemas.
+- `api_tester`: writes smoke tests, runs them in subprocess, returns verdict.
+- `skill_author`: writes skill markdown with `_meta` header.
+
+Each preset is `agent_server/data/agents/<preset>.agent.json` + `agent_server/data/prompts/<preset>_system_prompt.txt`. Sampling tuned per preset (low temperature for structured outputs; default for prose).
+
+Acceptance:
+- Each preset reachable via direct probe; structured output rate >= 95% over 50 trials.
+- `planner` produces valid plan JSON for representative missions against both Claude and Gemma. Bounded retry catches malformations.
+
+### F3: First-wave workflows (~1.5 weeks)
+
+- `create_tool` workflow registered: plan template (fetch_docs -> tool_author -> api_tester -> publish), step types, outcomes (`["tool_published"]`).
+- `create_skill` workflow: when `create_tool` succeeds, the matching skill is published via an embedded `skill_author` step. Outcome: `["skill_published"]`.
+- `remove_tool` / `remove_skill`: archive directories under `data/tenants/<tenant_id>/user_tools/_archive/`, drop from active registries, hot-reload.
+- Validation tools registered with architect-decided implementations.
+
+Acceptance:
+- `create_tool` from a representative mission against Claude completes in <= 3 iterations on a clean OpenAPI-documented service.
+- Same against Gemma in <= 6 iterations.
+- Generated tool registers in `noted-tools` (Phase A wiring already verified); LLM calls it on the next chat turn and round-trips correctly.
+- Failed creation: max iterations exhausted, no tool registered, iteration history preserved for debug, workflow ends in `failed` state.
+- All iterations stream as collapsible blocks via the Socket.io event schema.
+- `remove_tool` archives and reloads cleanly; subsequent calls return tool-not-found.
+
+### F4: Skills hot-reload (~3 days)
+
+- File watcher in noted backend's existing `SkillRegistry` on `data/skills/`.
+- `create_skill` workflow's publish step writes the skill file with `_meta` header; `SkillRegistry` picks it up within 1 second.
+
+Acceptance:
+- Drop a skill `.md` file: registered within 1 second; auto-injects on relevant turns when `priority=1`.
+- Skill removal triggers reload; skill no longer in registry.
+- `create_tool` always co-publishes a paired skill; `remove_tool` archives both atomically.
+
+### F5: Workflow inspector UI (~3-4 days)
+
+- New tab in Explorer's Assistant section: "Workflows" / "Activities."
+- Lists workflows by tenant: type, outcomes, status, started_at, finished_at.
+- Workflow detail page: step list, current state, audit trail, "Re-run" button (re-instantiate with same inputs as a new workflow).
+- HITL approval modal triggered by `system_request` event with timeout (auto-abort after configurable wall-clock cap).
+
+Acceptance:
+- Workflow appears in Explorer within 1 second of starting (Socket.io push verified).
+- Clicking a workflow shows step-by-step audit trail + workspace snapshot.
+- Re-run produces a new workflow with same inputs and a fresh audit / workflow_id.
+- HITL modal: approval resumes; abort cleanly fails the workflow.
+
+### F6: UI badges + provenance polish (~2 days)
+
+- Tool listings in Explorer + chat panel + settings show `provenance` badge for user tools.
+- Skill listings show same.
+- User-tool detail page links to its `source_workflow` (workflow_id), opens that workflow in the inspector.
+
+Acceptance:
+- LLM tool-list payload byte-identical for native and user tools (already verified in Phase A.5; preserve invariant).
+- UI badges rendered in all three surfaces.
+- Click-through from tool to source workflow works.
 
 ---
 
 ## Cross-cutting concerns
 
-### Security
+### Identity threading
 
-- **Process isolation**: every user tool runs in a subprocess inside `noted-tools`, with resource limits and timeout. A crashing or hanging tool can't affect noted or other tools.
-- **Dependency isolation**: per-tool venv prevents one tool's dependencies from breaking another.
-- **Network isolation** (future option): container-level egress filtering can restrict which upstream services tools can reach. Not enforced in V1; documented as a hardening step.
-- **Secret invariant**: secret values NEVER appear in the LLM context. Tools fetch them at execution time via short-lived scoped tokens.
-- **Allow-list per tool**: each tool declares which secret names it may request. `noted-tools` enforces; an exfiltration attempt is blocked at the token-issuance step.
-- **Code review for high-risk tools** (future): a `_meta.requires_review` flag could gate publication on human approval. Not in V1.
+Request entry middleware reads `X-Forwarded-User` (set by oauth2-proxy when its `auth_request` block extends to `/noted/`). Threaded through the workflow context as `tenant_id` and `actor_id`. Falls back to `"default"` constant when the header is absent. Audit, `_meta.created_by`, tool subprocess `ACTOR_ID` env var all populated from this. No code change in this plan when the auth plan lands.
 
-### Multi-user readiness (hooks present, full implementation deferred)
+### Multi-tenant storage
 
-These zero-cost-now choices keep the future migration purely additive:
+All persistent state under `data/tenants/<tenant_id>/...` from day one. Single-tenant mode uses `tenant_id="default"`. Specific paths:
 
-- `_meta.created_by` field present from day one. V1 value: constant `"system"`. V2: real user ID.
-- Audit log `actor_id` field present from day one. Same defaulting.
-- Infisical configured with project + environment scoping even with one user. V2 adds users; schema unchanged.
-- Tool subprocess receives `actor_id` env var; V1 always the constant. V2 carries through the calling user's ID for downstream auth.
+- `data/tenants/<tenant_id>/user_tools/<tool_name>/` (replaces `data/user_tools/<tool_name>/` flat layout from Phase A; migration is rename + symlink during cutover)
+- `data/tenants/<tenant_id>/workflows/<workflow_id>/state.json` (suspend snapshot)
+- `data/tenants/<tenant_id>/workflows/<workflow_id>/audit.jsonl` (per-workflow audit)
+- `data/skills/` stays flat for now; per-tenant skill storage is a follow-on.
 
-When multi-user lands later, the work is: SSO/OIDC integration with Infisical, identity-aware UI surfaces ("your tools" vs "team tools"), per-user tool ownership policies. None of these touch the V1 data model.
+### LLM call discipline
 
-### Observability
+- Native structured tool-call API for plan / step output. No GBNF, per `feedback_gbnf_kills_thinking_and_tool_calls.md` (current llama-server's grammar enforcement blocks `<|channel>` thinking and `<|tool_call>` markers; bare-tool-call API doesn't have this issue).
+- JSON-schema-validate after each call; bounded retry with validator's complaint fed back if validation fails.
+- Workspace pruning is mechanical; no summarizer LLM call.
+- Workflow length capped at default 6 steps; longer requires explicit user opt-in. Per-step ETA streamed via `step_started` event so users can abort.
 
-- Every iteration of `create_tool` streams to the chat panel as a collapsible thinking block.
-- `noted-tools` exposes Prometheus metrics: invocation count, success/failure ratio, p50/p95/p99 latency, venv build time, subprocess kill count.
-- Audit log is JSONL append-only; queryable via the Explorer detail page or directly from disk.
+### Verifier vs LLM-Critic discipline
+
+Implemented at the architect level, fixed at design time, hidden behind task-named tools. The LLM calls `validate_generated_client` (subprocess + smoke tests) or `assess_explanation_clarity` (sub-LLM) by task fit. The LLM never picks based on cost; the architect commits to the cheapest mechanism that fits the task at registration time.
 
 ### Failure modes and recovery
 
 | Failure | Behavior |
 |---|---|
-| LLM authoring exhausts iteration cap | Tool not registered. Iteration tree preserved. User can retry with adjusted criteria. |
-| Generated tool's smoke tests pass but production call fails | Audit log captures the failure. UI surfaces it. User can re-run smoke tests to detect drift. |
-| `noted-tools` container crashes | Systemd / Docker restart policy brings it back. In-flight tool calls return error; LLM can retry. noted itself unaffected. |
-| Infisical container crashes | Tools that need secrets fail with a clear error. Tools that don't need secrets continue working. |
-| Disk full | Hot-reload failures logged. New tool registration blocked with clear error. Existing tools continue running. |
-| User accidentally deletes a tool's directory | Tool drops out of registry. Audit log preserves the history. Re-run `create_tool` re-authors. |
+| Worker preset fails to produce valid output after retries | Step marked failed; workflow suspends; `system_request` event fires for HITL |
+| Workflow exceeds wall-clock cap | Suspends; on-disk snapshot; operator decides resume or abort via inspector UI |
+| Subprocess executor (e.g., `api_tester`) crashes | Step marked failed with stderr in audit; framework continues; doesn't affect host |
+| `agent_server` / `llama-server` unreachable | Workflow suspends; auto-resumes when service recovers (verified by `services:health` LED) |
+| `noted-tools` unreachable mid-workflow | Same as above; workflow can resume on the same tenant once `noted-tools` is healthy |
+| KB ingestion runs concurrently | Untouched; both mechanisms operate independently |
+
+### Compatibility with KB ingestion
+
+The framework's primitives (workspace, suspend / resume, telemetry, audit) are designed to mirror what KB ingestion already implements internally. Retrofit is feasible later if the duplication becomes painful, but is not in this plan. Both mechanisms run independently.
 
 ---
 
-## Open decisions resolved
+## Test plan
 
-| Question | Decision | Rationale |
-|---|---|---|
-| Where do user tools live in MCP namespace? | Same flat namespace as native tools | Easier for LLM. Metadata distinguishes for UI/governance. |
-| Tool registration mechanism | Separate `noted-tools` container, file-drop directory, hot-reload on file change | Process isolation for safety; hot-reload for autonomy without restart. |
-| Secret store | Infisical (MIT) | License-clean. Multi-user-ready. Off-the-shelf maturity over rolling our own. |
-| Authoring orchestrator backend | Both Claude and Gemma 4 | Local-first is a stated business driver. Iteration cap differs (3 vs 6). |
-| Tool versioning | Increment-on-update, prior versions preserved in iteration tree, rollback via active-version pointer | Minimal complexity; supports rollback without separate version table. |
-| Multi-user | Deferred to a later phase. Hooks present in V1. | Reduces V1 scope by ~1.5 weeks; migration stays additive. |
-| Skill lifecycle | Paired with tools (create_tool always co-publishes a skill; remove_tool archives both) | Tools and skills are two halves of one capability. |
+Per-phase live-evidence verification (no claims of "verified" without probe output, per `feedback_no_verified_without_live_evidence.md`):
 
----
-
-## Out of scope (V1)
-
-- Cross-user collaboration on tools (sharing, forking, peer review).
-- Public registry / marketplace for tools across noted instances.
-- Inter-tool dependencies (one user tool importing another).
-- Auto-detection of upstream API drift via background re-validation.
-- Network egress whitelisting per tool.
-- LLM-side review / approval gate (`_meta.requires_review` flag).
-- Tool deprecation lifecycle and migration prompts.
-- Sandboxed JavaScript execution inside Deno or similar (V1 uses standard Node.js).
+- F1: synthetic 3-step workflow probe with controlled failing step. Verify suspend, observe state file, manual resume, completion. Audit trail + Socket.io trace inspected.
+- F2: per-preset direct probe, structured output validity rate measured.
+- F3: end-to-end `create_tool` probe with both Claude and Gemma backends. Success rate measured against representative APIs (target: Claude >= 80%, Gemma >= 50%).
+- F4: skill drop / remove cycle, subsequent chat turn auto-injects.
+- F5: click-through verification in browser; no claim of "shipped" without browser-pixel evidence.
+- F6: byte-comparison of LLM tool-list payload (native vs user); UI badge verification across three surfaces.
 
 ---
 
-## Migration path (when each deferred item lands)
-
-| Deferred | Future work | Effort estimate |
-|---|---|---|
-| Multi-user | SSO/OIDC + Infisical user mapping + per-user UI surfaces + ownership policies | ~1.5 weeks |
-| API drift detection | Cron-scheduled `api_tester` re-runs against published tools; flag failures in UI | ~3-4 days |
-| Network egress whitelisting | Per-tool `_meta.allowed_hosts` + iptables/cgroup enforcement | ~3-4 days |
-| Tool versioning UX | Side-by-side diff between versions + manual selection | ~3 days |
-| Public marketplace | Out-of-band; depends on multi-user being live | TBD |
-
----
-
-## Test plan summary
-
-Test coverage required before V1 ships:
-
-- **Unit tests** for the orchestrator, the file watcher, the venv manager, the subprocess executor, the schema validator, the secret-token broker.
-- **Integration test** end-to-end: a known-good API (e.g. JSONPlaceholder, a static-stable test endpoint), a deterministic mission, a deterministic acceptance criterion, run the full `create_tool -> use_tool` loop with both Claude and Gemma backends, assert success.
-- **Negative integration test**: an API that exists but returns garbage; expect `create_tool` to exhaust iterations and fail cleanly.
-- **Security tests**: secret allow-list enforcement, token TTL enforcement, no-secrets-in-LLM-context invariant.
-- **Resilience tests**: kill `noted-tools` mid-call; kill Infisical mid-call; corrupt a tool.json; full disk; hostile tool that tries to spawn child processes or open arbitrary sockets.
-- **Performance tests**: hot-reload latency under load; subprocess startup overhead; venv build time on cold cache.
-
----
-
-## Total V1 effort: ~4 weeks
+## Effort estimate
 
 | Phase | Effort |
 |---|---|
-| A. noted-tools container + plugin model | ~2 weeks |
-| B. Infisical secret store | ~3-4 days |
-| C. Authoring presets + orchestrator | ~1 week |
-| D. Skills hot-reload | ~3 days |
-| E. Audit log + UI | ~3-4 days |
-| F. Tool metadata + UI badges | ~2 days |
+| F1 framework primitives | ~1.5 weeks |
+| F2 worker presets | ~3 days |
+| F3 first-wave workflows | ~1.5 weeks |
+| F4 skills hot-reload | ~3 days |
+| F5 workflow inspector UI | ~3-4 days |
+| F6 badges + polish | ~2 days |
 
-Plus ~1 week of buffer for integration, polish, and the test plan above. **Realistic shipping timeline: ~5 weeks of focused engineering.**
+Total: ~4 weeks of execution + ~1 week buffer = realistic ~5 weeks of focused engineering.
 
 ---
 
-## Definition of done (V1)
+## Definition of done
 
-The V1 of self-learning ships when ALL of the following hold:
+The framework + first-wave workflows ship when ALL hold:
 
-1. A user can issue `create_tool(name, mission, api_docs_url)` and the system completes the loop end-to-end against an OpenAPI-documented service, with both Claude and Gemma backends, with success rates of >= 80% (Claude) and >= 50% (Gemma) on a held-out test set of 10 representative APIs.
-2. The resulting tool is callable by the LLM in subsequent chat turns and produces correct results for the original acceptance criteria.
-3. A matching skill is published alongside the tool and auto-injected when relevant.
-4. Removing the tool via `remove_tool` cleanly removes both the tool and its skill; archives are recoverable.
-5. No secret value ever appears in: LLM context, tool-call traces, frontend diagnostics, audit log values, or stderr captures.
-6. Hot-reload completes within 1 second of a file change.
-7. Subprocess crashes do not affect noted or other tools.
-8. Audit panel surfaces every self-authored tool with full history; rollback works.
-9. All multi-user hooks present (data-model fields populated with constants); the future migration requires zero schema changes.
-10. The full integration test suite (above) passes in CI before merge to main.
+1. Framework primitives shipped and live-verified: workflow registry, loop, workspace, suspend / resume, audit, telemetry, identity-threading hooks.
+2. First-wave workflows round-trip end-to-end:
+   - `create_tool` succeeds with both Claude and Gemma backends on representative APIs (Claude >= 80%, Gemma >= 50%).
+   - `create_skill` paired with `create_tool` publishes both atomically.
+   - `remove_tool` / `remove_skill` archive and audit cleanly.
+3. Telemetry events render in the workflow inspector UI for every workflow execution.
+4. Identity threading: `X-Forwarded-User` propagates to audit when present; fallback to `"default"` constant when absent. No code change required when the auth plan lands.
+5. Tenant-prefixed storage paths from day one. Single-tenant mode uses `"default"` tenant id. Phase A's flat tool layout migrated to `data/tenants/default/user_tools/...` during cutover.
+6. Suspend / resume verified end-to-end (kill mid-execution, observe state file, resume via inspector UI, completion).
+7. UI badges (provenance) present on tool + skill listings in Explorer + chat panel + settings.
+8. LLM tool-list payload byte-identical for native and user tools (Phase A.5 invariant preserved).
+9. No GBNF anywhere in the framework's LLM call paths. Plan / step validation goes through native tool-call API + JSON schema + bounded retry.
+10. KB ingestion remains untouched and continues to function identically. Framework primitives are shaped for future retrofit; no retrofit performed in this plan.
+
+---
+
+## Open dependencies on other plans
+
+- Auth plan (separate): extending oauth2-proxy `auth_request` to `/noted/`, `X-Forwarded-User` middleware in noted backend, Infisical secret store. The framework ships with constant fallbacks; activates on tenants when auth lands.
+- Deployment-tier work: per-tenant GPU / queue fairness, multi-host orchestration via Swarm / K3s / K8s, cross-host workspace state migration. Not blocked on this plan; this plan is tier-agnostic at the application layer.

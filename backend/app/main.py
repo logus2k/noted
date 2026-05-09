@@ -99,6 +99,23 @@ async def lifespan(app: FastAPI):
     _health_monitor = HealthMonitor(sio)
     set_monitor(_health_monitor)
     await _health_monitor.start()
+    # User-tools federation: pull self-authored MCP tools from the
+    # noted-tools sidecar and merge them into the LLM's tool list.
+    from app.mcp.user_tools_client import get_user_tools_client
+    _user_tools_client = get_user_tools_client()
+    await _user_tools_client.start()
+    # Wire the workflow framework's telemetry to the existing sio pipeline.
+    # Workflow events (workflow_started, step_*, workspace_sync, etc.) ride
+    # the same Socket.io pipeline that powers services:health.
+    from app.workflow.telemetry import set_sio as _wf_set_sio
+    _wf_set_sio(sio)
+    # F4: SkillRegistry hot-reload. Watches data/skills/ + data/domains/*/skills/
+    # so workflow-published skills (create_tool's pair) auto-register without
+    # restarting noted. Same threading.Event + asyncio.create_task pattern
+    # used by noted-tools' watcher.
+    from app.managers.llm_skills import get_registry as _get_skill_registry
+    _skill_registry = _get_skill_registry()
+    await _skill_registry.start_watcher()
     # Generate compose mounts file on startup
     from app.managers import config_manager
     try:
@@ -126,6 +143,14 @@ async def lifespan(app: FastAPI):
     try:
         if _health_monitor is not None:
             await _health_monitor.stop()
+    except Exception:
+        pass
+    try:
+        await _user_tools_client.stop()
+    except Exception:
+        pass
+    try:
+        await _skill_registry.stop_watcher()
     except Exception:
         pass
     await lsp_mgr.stop_all()
@@ -174,6 +199,19 @@ app.include_router(models_router.router)
 app.include_router(health.router)
 from app.routers import file_debug
 app.include_router(file_debug.router)
+
+# Workflow framework synthetic probe (F1.9). Registers the
+# `synthetic_probe` workflow type at import time and exposes
+# /api/workflow/probe/* for live-verification of the framework.
+from app.workflow import probe as workflow_probe
+app.include_router(workflow_probe.router)
+# Builtin workflows (F3): create_tool, remove_tool. Importing the module
+# triggers their registration with the WorkflowRegistry singleton.
+from app.workflow import builtin_workflows  # noqa: F401
+# F5: Workflow inspector API. Tenant-scoped list / detail / control surface
+# consumed by the Explorer Workflows tab.
+from app.routers import workflows as workflows_router
+app.include_router(workflows_router.router)
 
 # --- MCP Server (failure-isolated, one-directional dependency) ---
 from app.config import MCP_ENABLED

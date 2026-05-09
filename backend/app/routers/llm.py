@@ -2260,21 +2260,46 @@ async def list_mcp_tools():
     by domain_id; the chat assembly filters the model-facing tool list by
     active Domains."""
     from app.mcp.tools import _READ_TOOLS, _WRITE_TOOLS, get_tool_domain
+    from app.mcp.user_tools_client import get_user_tools_client
 
-    def _serialize(tool, tier: str) -> dict:
+    def _serialize(tool, tier: str, provenance: str = "native") -> dict:
         return {
             "name": tool.name,
             "description": tool.description or "",
             "input_schema": tool.inputSchema or {},
             "tier": tier,
             "domain_id": get_tool_domain(tool.name),
+            "provenance": provenance,
         }
 
     tools = (
         [_serialize(t, "read") for t in _READ_TOOLS]
         + [_serialize(t, "write") for t in _WRITE_TOOLS]
     )
-    return {"tools": tools}
+    user_client = get_user_tools_client()
+    for t in user_client.get_user_tools():
+        meta = user_client.get_meta(t.name)
+        tools.append({
+            "name": t.name,
+            "description": t.description or "",
+            "input_schema": t.inputSchema or {},
+            "tier": "read",
+            "domain_id": "general",
+            "provenance": "user",
+            "_meta": meta,
+        })
+    return {"tools": tools, "user_tools_status": user_client.status()}
+
+
+@router.post("/mcp-tools/refresh")
+async def refresh_user_tools():
+    """Force-refresh the user-tool federation cache. Used by the Phase C
+    orchestrator after a successful create_tool / remove_tool, and by
+    Explorer's Tools tab when the user clicks Refresh."""
+    from app.mcp.user_tools_client import get_user_tools_client
+    client = get_user_tools_client()
+    ok = await client.refresh()
+    return {"ok": ok, "status": client.status()}
 
 
 class KgAnswerRequest(BaseModel):
