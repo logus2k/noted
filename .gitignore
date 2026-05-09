@@ -45,3 +45,9 @@ data/arcadedb/
 data/tenants/*/workflows/
 data/tenants/*/user_tools/
 !data/tenants/*/user_tools/.gitkeep
+
+# Archive of skills removed via remove_tool. Pure debris; remove_tool
+# regenerates entries here whenever a tool/skill pair is archived. The
+# same exclusion pattern is already applied to user_tools/_archive
+# implicitly via the parent wildcard above.
+data/skills/_archive/
