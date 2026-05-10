@@ -357,24 +357,25 @@ async def _execute_plan(
         ok = await _run_step(state, step, index, definition)
 
         if not ok:
-            # A2: when run_smoke_tests fails AND we still have rewinds left,
-            # rewind to either tool_author or api_tester (depending on
-            # which one is most likely at fault). The selected step gets
-            # re-invoked with the smoke-test failure as feedback. All
-            # subsequent steps re-run in the same cycle.
-            if step.name == "run_smoke_tests" and state.smoke_rewinds < SMOKE_REWIND_CAP:
+            # A2: when a recoverable validation/test step fails AND we still
+            # have rewinds left, rewind to the LLM step that produced the
+            # broken artifact, re-invoked with the failure as feedback.
+            # All subsequent steps re-run in the same cycle.
+            #   - run_smoke_tests:        tool_author (AssertionError) | api_tester (SyntaxError etc)
+            #   - validate_tool_structure: always tool_author (its files didn't parse / shape wrong)
+            #   - validate_smoke_contract: always api_tester (its smoke.py asserts on invented keys)
+            target_name: str | None = None
+            if state.smoke_rewinds < SMOKE_REWIND_CAP:
                 err = state.steps[index].error or ""
-                # Heuristic: AssertionError means the tool did something
-                # the test didn't expect (output shape, key naming,
-                # missing field). That's a tool_author problem — its
-                # output didn't match the contract. Other errors
-                # (SyntaxError, ImportError, NameError, fixture-not-found)
-                # are api_tester problems — the test code itself is broken.
-                target_name = (
-                    "tool_author"
-                    if "AssertionError" in err
-                    else "api_tester"
-                )
+                if step.name == "run_smoke_tests":
+                    target_name = (
+                        "tool_author" if "AssertionError" in err else "api_tester"
+                    )
+                elif step.name == "validate_tool_structure":
+                    target_name = "tool_author"
+                elif step.name == "validate_smoke_contract":
+                    target_name = "api_tester"
+            if target_name is not None:
                 target_idx = next(
                     (i for i, s in enumerate(definition.plan_template) if s.name == target_name),
                     None,

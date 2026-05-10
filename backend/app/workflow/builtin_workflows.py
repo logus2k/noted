@@ -247,6 +247,26 @@ def _register_create_tool() -> None:
                 output_schema=_API_TESTER_OUTPUT_SCHEMA,
             ),
             StepType(
+                name="validate_smoke_contract",
+                worker="deterministic",
+                description="Static check that smoke.py asserts only on keys named in acceptance_criteria.",
+                handler=step_handlers.validate_smoke_contract,
+                # Deterministic — same smoke.py + criteria → same outcome.
+                # Recovery comes from A2 rewinding api_tester, not retry.
+                max_retries=0,
+                output_schema={
+                    "type": "object",
+                    "required": ["ok"],
+                    "properties": {
+                        "ok": {"const": True},
+                        "checked": {"type": "boolean"},
+                        "reason": {"type": "string"},
+                        "asserted_output_keys": {"type": "array"},
+                        "criteria_count": {"type": "integer"},
+                    },
+                },
+            ),
+            StepType(
                 name="publish_tool",
                 worker="deterministic",
                 description="Write files to data/tenants/<tenant>/user_tools/<name>/ + refresh federation.",

@@ -1,0 +1,40 @@
+id: pokemon_lookup
+name: PokéAPI multi-mode (list pokemon OR fetch one by name)
+api_family: reference
+
+# Multi-mode scenario: the tool dispatches between two endpoints based on
+# whether `name` is supplied. Acceptance_criteria deliberately pin the
+# detail-mode output ('types' array) but DO NOT pin the list-mode output
+# key. This mirrors the planner-produced criteria shape that broke the
+# fail-on-extras validator (a real chat run on 2026-05-10). With the
+# coverage-only validator, api_tester can assert on extras (e.g. `pokemon`
+# for the list mode) without being blocked.
+
+inputs:
+  tool_name: pokemon_lookup
+  language: python
+  mission: |
+    Wrap PokéAPI. The tool takes one optional input field: `name` (string).
+    When `name` is provided, fetch
+    GET https://pokeapi.co/api/v2/pokemon/{name}
+    and return the pokemon's detail (including its types array).
+    When `name` is omitted, fetch
+    GET https://pokeapi.co/api/v2/pokemon
+    and return the list of pokemon names.
+  api_docs_urls:
+    - https://pokeapi.co/api/v2/pokemon
+    - https://pokeapi.co/api/v2/pokemon/pikachu
+  acceptance_criteria:
+    - "Input is a JSON object with an optional string field named name."
+    - "When name is provided, successful output JSON contains a non-empty 'types' array."
+    - "When name is omitted, successful output JSON returns the list of pokemon retrieved from the index endpoint."
+    - "Tool exits non-zero if the upstream HTTP request fails."
+  verify_inputs:
+    name: pikachu
+
+post_publish_probe:
+  args:
+    name: pikachu
+  expect_keys:
+    - types
+  expect_status: 0

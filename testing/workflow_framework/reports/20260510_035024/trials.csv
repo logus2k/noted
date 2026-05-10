@@ -1,0 +1,23 @@
+scenario_id,trial,tool_name,wf_status,smoke_rewinds,failed_step,duration_s,probe_ok,probe_keys_present,workflow_id,failed_tail,probe_error
+github_issue,1,github_issue_lookup,completed,0,,28.69,True,True,wf_1778384316781_c4dfdba9,,
+github_issue,2,github_issue_lookup,completed,0,,32.64,True,True,wf_1778384349611_74bb1e8b,,
+github_issue,3,github_issue_lookup,completed,0,,28.66,True,True,wf_1778384386374_296ac561,,
+open_meteo,1,open_meteo_current,completed,0,,32.66,True,True,wf_1778384419143_97e324c2,,
+open_meteo,2,open_meteo_current,completed,0,,36.66,True,True,wf_1778384455930_af878b0e,,
+open_meteo,3,open_meteo_current,completed,0,,32.66,True,True,wf_1778384496714_0e318032,,
+pokemon_lookup,1,pokemon_lookup,suspended,2,run_smoke_tests,114.59,,,wf_1778384533504_7ec0ad70,"  where False = isinstance({'pokemon_names': ['bulbasaur', 'ivysaur', 'venusaur', 'charmander', 'charmeleon', 'charizard', ...]}, list)
+
+smoke.py:35: AssertionError
+=========================== short test summary info ============================
+FAILED smoke.py::test_successful_index_lookup_no_name - AssertionError: asser...
+!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!
+============================== 1 failed in 0.59s ===============================
+ | stderr: ",
+pokemon_lookup,2,pokemon_lookup,suspended,2,validate_smoke_contract,93.93,,,wf_1778384648094_6b0a13a1,"ke.py is missing asserts for output keys ['types'] that the acceptance_criteria pin. Add asserts that check for these keys in the tool's output. asserted=[] acceptance_criteria=['Input is a JSON object with an optional string field named name.', ""When name is provided, successful output JSON contains a non-empty 'types' array."", 'When name is omitted, successful output JSON returns the list of pokemon retrieved from the index endpoint.', 'Tool exits non-zero if the upstream HTTP request fails.']",
+pokemon_lookup,3,pokemon_lookup,completed,0,,44.65,False,False,wf_1778384742027_f63d5bd7,,verify_tool_round_trip preview missing key(s): ['types']
+sapo_weather,1,sapo_weather,completed,0,,36.65,True,True,wf_1778384790819_d4ff8c2c,,
+sapo_weather,2,sapo_weather,completed,0,,32.64,True,True,wf_1778384831617_6a21ede6,,
+sapo_weather,3,sapo_weather,completed,0,,32.65,True,True,wf_1778384869025_ac3b13d5,,
+wikipedia_summary,1,wikipedia_summary,completed,0,,32.65,True,True,wf_1778384905826_e5bffce6,,
+wikipedia_summary,2,wikipedia_summary,completed,0,,36.66,True,True,wf_1778384942623_7fdfb43b,,
+wikipedia_summary,3,wikipedia_summary,completed,0,,36.65,True,True,wf_1778384983431_4b6a3976,,

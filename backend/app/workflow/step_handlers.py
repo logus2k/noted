@@ -29,6 +29,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import shutil
 import time
 from pathlib import Path
@@ -225,6 +226,141 @@ async def validate_tool_structure(
         "files_present": sorted(files.keys()),
         "tool_json_keys": sorted(tool_json.keys()),
         "ok": True,
+    }
+
+
+# ─── validate_smoke_contract ──────────────────────────────────────
+
+
+_OUTPUT_VERB = r"(?:contains?|returns?|includes?|produces?|emits?|outputs?|provides?|yields?|has|exposes?)"
+_ARTICLE = r"(?:an?|the|some)"
+_QUAL_WORD = r"[a-z][a-z\-]*"
+_TYPE_WORD = r"(?:array|string|field|object|number|integer|boolean)"
+_TYPE_WORDS_SET = {"array", "string", "field", "object", "number", "integer", "boolean"}
+_CRITERIA_STOPWORDS = {
+    "input", "output", "tool", "argument", "arguments", "fields",
+    "the", "value", "type", "data", "json",
+}
+
+# Quoted keys: 'weather', "days", `extract`. Quoting is the planner's
+# explicit signal that the token is a field name.
+_QUOTED_KEY_RE = re.compile(r"['\"`]([a-zA-Z_][a-zA-Z0-9_]{1,40})['\"`]")
+
+# Typed keys: only when anchored on an output-describing verb so we do
+# not match arbitrary "<adjective> <type>" prose like "with string fields"
+# or "integer field <name>". Pattern allows one optional qualifier word
+# between article and id, and one between id and type.
+_TYPED_KEY_RE = re.compile(
+    # First qualifier slot is RELUCTANT (`??`) so the engine tries id at
+    # the earliest position. Greedy here would eat "temperature" in
+    # "contains a temperature numeric field", leaving id="numeric".
+    rf"\b{_OUTPUT_VERB}\s+{_ARTICLE}\s+(?:{_QUAL_WORD}\s+)??"
+    rf"([a-zA-Z_][a-zA-Z0-9_]{{2,40}})\s+(?:{_QUAL_WORD}\s+)?{_TYPE_WORD}\b",
+    flags=re.IGNORECASE,
+)
+
+
+_OUTPUT_VERB_ANYWHERE_RE = re.compile(rf"\b{_OUTPUT_VERB}\b", flags=re.IGNORECASE)
+
+
+def _extract_pinned_output_keys(criteria: list[Any]) -> set[str]:
+    """Heuristic: pull identifiers that the criteria explicitly tag as
+    output fields. Two patterns:
+    (a) quoted identifiers (`'weather'`, `"days"`, `` `extract` ``)
+    (b) output-verb-anchored typed phrases (`contains a non-empty days
+        array`, `returns a temperature numeric field`).
+
+    Per-criterion gate: only mine criteria whose text contains an
+    output-describing verb anywhere. Otherwise quoted identifiers in
+    INPUT or ERROR-behavior criteria (e.g. "exits if 'city_code' is
+    absent") get falsely pinned as output requirements.
+
+    Filters out matches whose captured id is itself a JSON type word."""
+    pinned: set[str] = set()
+    for criterion in criteria:
+        text = str(criterion)
+        if not _OUTPUT_VERB_ANYWHERE_RE.search(text):
+            continue
+        for m in _QUOTED_KEY_RE.finditer(text):
+            w = m.group(1)
+            if w.lower() in _TYPE_WORDS_SET or w.lower() in _CRITERIA_STOPWORDS:
+                continue
+            pinned.add(w)
+        for m in _TYPED_KEY_RE.finditer(text):
+            w = m.group(1)
+            if w.lower() in _TYPE_WORDS_SET or w.lower() in _CRITERIA_STOPWORDS:
+                continue
+            pinned.add(w)
+    return pinned
+
+
+async def validate_smoke_contract(
+    state: WorkspaceState, inputs: dict[str, Any]
+) -> dict[str, Any]:
+    """Coverage check: every output key the acceptance_criteria pin MUST be
+    asserted somewhere in smoke.py. Catches the api_tester-asserts-on-
+    WRONG-key class (criteria say `days`, smoke asserts `forecast` →
+    `days` missing). Permissive on extras: smoke.py may assert on keys
+    the criteria mention but don't formally pin (multi-mode tools where
+    a secondary mode's output isn't named in any criterion). Rewinds to
+    api_tester via A2 on failure."""
+    api_tester_out = _previous(inputs, "api_tester") or _previous(inputs)
+    files: dict[str, str] = api_tester_out.get("files") or {}
+    smoke_src = files.get("smoke.py") or ""
+    if not smoke_src.strip():
+        return {"ok": True, "checked": False, "reason": "no smoke.py to check"}
+
+    workflow_inputs = inputs.get("workflow_inputs") or {}
+    criteria = workflow_inputs.get("acceptance_criteria") or []
+    if not isinstance(criteria, list) or not criteria:
+        return {"ok": True, "checked": False, "reason": "no acceptance_criteria"}
+
+    pinned = _extract_pinned_output_keys(criteria)
+    if not pinned:
+        return {
+            "ok": True, "checked": False,
+            "reason": "no pinned output keys extractable from criteria",
+        }
+
+    try:
+        tree = ast.parse(smoke_src, filename="smoke.py")
+    except SyntaxError as e:
+        # Smoke run will catch the SyntaxError; not our job.
+        return {"ok": True, "checked": False, "reason": f"smoke.py SyntaxError: {e}"}
+
+    asserted: set[str] = set()
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Subscript)
+            and isinstance(node.value, ast.Name)
+            and node.value.id == "output"
+            and isinstance(node.slice, ast.Constant)
+            and isinstance(node.slice.value, str)
+        ):
+            asserted.add(node.slice.value)
+        if isinstance(node, ast.Compare) and isinstance(node.left, ast.Constant) and isinstance(node.left.value, str):
+            for op, right in zip(node.ops, node.comparators):
+                if (
+                    isinstance(op, ast.In)
+                    and isinstance(right, ast.Name)
+                    and right.id == "output"
+                ):
+                    asserted.add(node.left.value)
+
+    missing = sorted(k for k in pinned if k not in asserted)
+    if missing:
+        raise ValueError(
+            f"validate_smoke_contract: smoke.py is missing asserts for output keys "
+            f"{missing} that the acceptance_criteria pin. Add asserts that check "
+            f"for these keys in the tool's output. asserted={sorted(asserted)} "
+            f"acceptance_criteria={criteria}"
+        )
+
+    return {
+        "ok": True,
+        "checked": True,
+        "pinned_keys": sorted(pinned),
+        "asserted_keys": sorted(asserted),
     }
 
 
