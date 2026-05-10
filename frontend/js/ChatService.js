@@ -701,12 +701,24 @@ export class ChatService {
             }
         });
 
-        // STT transcripts arrive via agent_server's UserTranscript event
+        // STT transcripts arrive via agent_server's UserTranscript event.
+        //   - onInterim: streaming partials from stt_server v2 (Parakeet).
+        //     v1 (Whisper) never emits these; the handler stays inert.
+        //     Renders a "composing" user bubble in the messages area that
+        //     updates live as the user speaks. The text input textarea is
+        //     reserved for typed messages and never touched by STT.
+        //   - onFinal: utterance committed. Promote the composing bubble
+        //     to a normal user message + trigger the LLM call without
+        //     creating a duplicate bubble (showUserMessage: false).
         this.agentClient.onTranscripts({
+            onInterim: (payload) => {
+                const text = (payload?.text || '').trim();
+                if (text) this.chatPanel.setComposingUserMessage(text);
+            },
             onFinal: (payload) => {
-                if (payload.text && payload.text.trim()) {
-                    this.sendMessage(payload.text.trim());
-                }
+                const committedFromBubble = this.chatPanel.commitComposingUserMessage();
+                const text = (payload?.text || '').trim() || committedFromBubble;
+                if (text) this.sendMessage(text, { showUserMessage: false });
             },
         });
 

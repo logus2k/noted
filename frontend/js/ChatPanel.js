@@ -2146,6 +2146,62 @@ export class ChatPanel {
         return { ...this._voiceSettings };
     }
 
+    /** STT dictation: render a "composing" user message bubble in the
+     *  messages area that updates live as Parakeet emits partials.
+     *  Looks like the user is typing-via-voice. The input textarea is
+     *  reserved for typed messages — never touched by STT.
+     *
+     *  Behaviour:
+     *   - First call creates a fresh user bubble with `.chat-message--composing`
+     *     styling (italic + faded) and stashes a reference.
+     *   - Subsequent calls update that same bubble's text content.
+     *   - commitComposingUserMessage() removes the composing styling so
+     *     it becomes a normal historical user message; ChatService then
+     *     fires sendMessage(text, {showUserMessage: false}) to trigger
+     *     the LLM without creating a duplicate bubble. */
+    setComposingUserMessage(text) {
+        const safe = (text || '').toString();
+        if (!this._composingUserBubbleEl) {
+            const msg = document.createElement('div');
+            // The composing bubble is visually IDENTICAL to a committed
+            // user message — no styling difference. The class is kept as
+            // an internal marker so commitComposingUserMessage knows
+            // which element to "promote".
+            msg.className = 'chat-message chat-message-user chat-message--composing';
+            const body = document.createElement('span');
+            body.className = 'chat-message-composing-body';
+            msg.appendChild(body);
+            this._messagesArea.insertBefore(msg, this._typingIndicator);
+            this._composingUserBubbleEl = msg;
+            this._composingUserBubbleBodyEl = body;
+        }
+        this._composingUserBubbleBodyEl.textContent = safe;
+        this._messagesArea.scrollTop = this._messagesArea.scrollHeight;
+    }
+
+    /** Drop the composing marker class — the bubble becomes a normal
+     *  user message. Returns the final committed text (or '') so
+     *  ChatService can pass it to sendMessage without re-rendering.
+     *  Idempotent. */
+    commitComposingUserMessage() {
+        if (!this._composingUserBubbleEl) return '';
+        const text = (this._composingUserBubbleBodyEl?.textContent || '').trim();
+        this._composingUserBubbleEl.classList.remove('chat-message--composing');
+        this._composingUserBubbleEl = null;
+        this._composingUserBubbleBodyEl = null;
+        return text;
+    }
+
+    /** Drop the composing bubble entirely (no commit). Used if STT is
+     *  cancelled before any final fires. */
+    discardComposingUserMessage() {
+        if (this._composingUserBubbleEl?.parentNode) {
+            this._composingUserBubbleEl.parentNode.removeChild(this._composingUserBubbleEl);
+        }
+        this._composingUserBubbleEl = null;
+        this._composingUserBubbleBodyEl = null;
+    }
+
     setTtsActive(active) {
         this._ttsActive = active;
         this._ttsBtn.classList.toggle('active', active);

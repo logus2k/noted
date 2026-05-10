@@ -758,6 +758,14 @@
     color: var(--text-muted);
 }
 
+/* STT dictation: while Parakeet (v2) is emitting partials, ChatService
+ * renders a "composing" user bubble whose text updates live. The bubble
+ * is visually IDENTICAL to a committed user message — the live updates
+ * themselves are the cue that something is happening. The
+ * .chat-message--composing class is kept as an internal DOM marker only
+ * (commitComposingUserMessage uses it to find the bubble to promote);
+ * no visual styling is attached to it. */
+
 /* Action buttons */
 .chat-stt-btn,
 .chat-send-btn,
