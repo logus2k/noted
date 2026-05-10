@@ -276,15 +276,68 @@ _READ_TOOLS: list[types.Tool] = [
     types.Tool(
         name="chart",
         description=(
-            "Render a chart in the chat using ECharts. Use when the user asks "
-            "to plot, graph, visualise, show as a chart, draw a bar/pie/scatter/"
-            "heatmap/line/area/histogram/box plot. Pass a short natural-language "
-            "description that includes (a) the kind of chart, (b) what to plot, "
-            "(c) the data source — values stated in chat, OR a CSV/Parquet/JSON "
-            "file in a noted project (give the project_id and path). The backend "
-            "delegates to the chart_designer LLM role to choose the right shape "
-            "and column bindings, then renders it directly into the chat. Do NOT "
-            "fabricate data values; let chart_designer reference the file path."
+            "Render a chart in the chat using ECharts — STRUCTURED form. You "
+            "ship the data and the chart shape directly; the backend renders "
+            "deterministically with NO second LLM in the path. Use this for "
+            "ANY chart whose data is in chat (numbers the user typed, values "
+            "you computed from prior tool outputs, etc). For data that lives "
+            "in a project file (CSV / Parquet / JSON), use `chart_from_file` "
+            "instead. Supply `data` as a CSV string (with a header row) OR a "
+            "GitHub-flavoured markdown table — either format is parsed."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "chart_type": {
+                    "type": "string",
+                    "enum": ["bar", "line", "area", "scatter", "pie", "heatmap", "histogram", "box"],
+                    "description": (
+                        "bar = categorical x + numeric y · line/area = ordered "
+                        "x + numeric y · scatter = numeric x AND numeric y · "
+                        "histogram = single numeric column (server bins it) · "
+                        "box = single numeric column, optional series for "
+                        "grouping · pie = category + value · heatmap = two "
+                        "categorical/ordered axes + one numeric value."
+                    ),
+                },
+                "title": {"type": "string", "description": "Short, declarative chart title."},
+                "data": {
+                    "type": "string",
+                    "description": (
+                        "The dataset, as either: (1) CSV with header row — "
+                        "e.g. 'category,value\\nA,5\\nB,10\\nC,15'  OR  "
+                        "(2) a GitHub-flavoured markdown table starting "
+                        "with '|'. Numeric cells are auto-coerced. Rows "
+                        "are observations; column names are referenced by "
+                        "the x/y/series/category/value/label fields below."
+                    ),
+                },
+                "x":         {"type": "string", "description": "Column name for x-axis (bar/line/area/scatter). Required for those types."},
+                "y":         {"type": "string", "description": "Column name for y-axis (bar/line/area/scatter/histogram/box). Required for those types."},
+                "series":    {"type": "string", "description": "Optional column to group/colour by (multi-series chart)."},
+                "category":  {"type": "string", "description": "Pie/heatmap category column."},
+                "value":     {"type": "string", "description": "Pie/heatmap value column."},
+                "label":     {"type": "string", "description": "Optional column whose value labels each scatter point."},
+                "agg":       {"type": "string", "enum": ["sum", "mean", "median", "min", "max", "count"], "description": "Aggregation when multiple rows share the same x. Optional."},
+                "x_label":   {"type": "string", "description": "Optional axis label override."},
+                "y_label":   {"type": "string", "description": "Optional axis label override."},
+                "limit":     {"type": "integer", "description": "Optional top-N cap (e.g. 20 categories) for busy bar charts."},
+            },
+            "required": ["chart_type", "title", "data"],
+        },
+    ),
+    types.Tool(
+        name="chart_from_file",
+        description=(
+            "Render a chart in the chat using ECharts, sourced from a file "
+            "in a noted project (CSV / Parquet / JSON / TSV / JSONL). The "
+            "backend delegates to the chart_designer LLM, which can call "
+            "inspect_dataset to learn the file's schema before picking the "
+            "chart shape and column bindings. Use this for ANY chart whose "
+            "data lives in a file. For data that's in chat already (numbers "
+            "the user typed, values from a prior tool output), use the "
+            "structured `chart` tool instead — it's deterministic and "
+            "skips the lossy prose roundtrip."
         ),
         inputSchema={
             "type": "object",
@@ -292,16 +345,18 @@ _READ_TOOLS: list[types.Tool] = [
                 "description": {
                     "type": "string",
                     "description": (
-                        "Natural-language description of the chart, including the "
-                        "data source. Example: 'Bar chart of mean run duration by "
-                        "experiment from data/runs.csv in project Examples'."
+                        "Natural-language description of the chart, including "
+                        "the file's role. Example: 'Bar chart of mean run "
+                        "duration by experiment from data/runs.csv in project "
+                        "Examples'. The chart_designer reads the file's "
+                        "schema and picks the right shape + column bindings."
                     ),
                 },
                 "project_id": {
                     "type": "string",
                     "description": (
-                        "Optional default project for file-based data sources. When "
-                        "set, chart_designer can refer to files by relative path."
+                        "Default project for the file path. When set, "
+                        "chart_designer can refer to files by relative path."
                     ),
                 },
             },

@@ -1387,21 +1387,73 @@ async def llm_chat(request: ChatRequest):
                             yield f"data: {json.dumps({'navigate': {'cell_index': cell_index_0}})}\n\n"
                             tool_result = f"Cell {cell_index_1} is now visible."
                         elif tool_call["name"] == "chart":
-                            # Two-stage: (1) call chart_designer to get a
-                            # ChartIntent JSON from the natural-language
-                            # description; (2) hand that intent to the
-                            # deterministic builder in app/charts.py to
-                            # produce an ECharts option dict; (3) emit
-                            # SSE event for the frontend to render.
+                            # Structured path — assistant supplies data + chart
+                            # shape directly. NO chart_designer LLM in the
+                            # path (CHART-8 fix: eliminates the lossy prose
+                            # roundtrip for inline data). Backend assembles a
+                            # ChartIntent with data_source.kind="structured"
+                            # and runs the existing builder.
+                            from app import charts as _charts
+                            args = tool_call.get("args") or {}
+                            chart_type = (args.get("chart_type") or "").strip()
+                            title = (args.get("title") or "").strip()
+                            data_str = (args.get("data") or "").strip()
+                            if not chart_type or not title or not data_str:
+                                tool_result = (
+                                    "chart: missing required arg(s); need "
+                                    "chart_type, title, and data."
+                                )
+                            else:
+                                intent = {
+                                    "chart_type": chart_type,
+                                    "title": title,
+                                    "x_label": args.get("x_label"),
+                                    "y_label": args.get("y_label"),
+                                    "data_source": {"kind": "structured", "data": data_str},
+                                    "x":        args.get("x"),
+                                    "y":        args.get("y"),
+                                    "series":   args.get("series"),
+                                    "category": args.get("category"),
+                                    "value":    args.get("value"),
+                                    "label":    args.get("label"),
+                                    "agg":      args.get("agg"),
+                                    "limit":    args.get("limit"),
+                                }
+                                projects_root = os.environ.get("PROJECTS_DIR", "/app/data/projects")
+                                result = _charts.build_chart_option(intent, projects_root)
+                                if result["ok"]:
+                                    chart_payload = {
+                                        "option": result["option"],
+                                        "title": result.get("title", ""),
+                                        "chart_type": result.get("chart_type", ""),
+                                    }
+                                    yield f"data: {json.dumps({'chart': chart_payload})}\n\n"
+                                    tool_result = (
+                                        f"Rendered a {result['chart_type']} chart titled "
+                                        f"'{result.get('title', '')}' in the chat. "
+                                        f"The user can now see it."
+                                    )
+                                else:
+                                    tool_result = (
+                                        f"chart: render failed — {result.get('error', 'unknown error')}. "
+                                        f"Check chart_type ↔ data shape compatibility "
+                                        f"(e.g. scatter requires numeric x AND y; bar accepts categorical x)."
+                                    )
+                        elif tool_call["name"] == "chart_from_file":
+                            # File-path delegation — chart_designer LLM picks
+                            # the chart shape and column bindings after
+                            # (optionally) calling inspect_dataset. This is the
+                            # ONLY path that uses the LLM intermediate; inline
+                            # data goes through the structured `chart` tool
+                            # above without any second LLM in the loop.
                             from app import charts as _charts
                             from app.managers.llm_manager import LLM_BASE_URL as _LLM_BASE_URL
                             args = tool_call.get("args") or {}
                             description = (args.get("description") or "").strip()
                             project_id = (args.get("project_id") or "").strip() or None
                             if not description:
-                                tool_result = "chart: missing 'description' argument."
+                                tool_result = "chart_from_file: missing 'description' argument."
                             else:
-                                # Stage 1: chart_designer call.
                                 user_msg = description
                                 if project_id:
                                     user_msg = f"(default project_id: {project_id})\n{description}"
@@ -1420,7 +1472,7 @@ async def llm_chat(request: ChatRequest):
                                         )
                                     if _r.status_code != 200:
                                         tool_result = (
-                                            f"chart: chart_designer call failed "
+                                            f"chart_from_file: chart_designer call failed "
                                             f"(HTTP {_r.status_code}): {_r.text[:200]}"
                                         )
                                     else:
@@ -1430,16 +1482,14 @@ async def llm_chat(request: ChatRequest):
                                             intent = json.loads(_content)
                                         except Exception as _e:
                                             tool_result = (
-                                                f"chart: chart_designer returned non-JSON "
+                                                f"chart_from_file: chart_designer returned non-JSON "
                                                 f"({type(_e).__name__}: {_e}). Raw: {_content[:200]}"
                                             )
                                             intent = None
                                         if intent is not None:
-                                            # Stage 2: build option.
                                             projects_root = os.environ.get("PROJECTS_DIR", "/app/data/projects")
                                             result = _charts.build_chart_option(intent, projects_root)
                                             if result["ok"]:
-                                                # Stage 3: emit chart event.
                                                 chart_payload = {
                                                     "option": result["option"],
                                                     "title": result.get("title", ""),
@@ -1453,11 +1503,11 @@ async def llm_chat(request: ChatRequest):
                                                 )
                                             else:
                                                 tool_result = (
-                                                    f"chart: render failed — {result.get('error', 'unknown error')}. "
+                                                    f"chart_from_file: render failed — {result.get('error', 'unknown error')}. "
                                                     f"Intent was: {json.dumps(intent)[:200]}"
                                                 )
                                 except httpx.RequestError as _e:
-                                    tool_result = f"chart: agent_server unreachable: {_e}"
+                                    tool_result = f"chart_from_file: agent_server unreachable: {_e}"
                         elif tool_call["name"] == "open_file":
                             # UI-action tool: tells the frontend to open the
                             # named file in the appropriate tab (notebook /

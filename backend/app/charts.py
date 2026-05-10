@@ -41,7 +41,7 @@ _VALID_CHART_TYPES = {
     "histogram", "box", "heatmap",
 }
 _VALID_AGGS = {"sum", "mean", "median", "min", "max", "count", None}
-_VALID_DATA_KINDS = {"inline", "project_file", "prior_result"}
+_VALID_DATA_KINDS = {"inline", "project_file", "prior_result", "structured"}
 
 # Soft cap before we down-sample. Charts past ~5k points become noise
 # anyway; ECharts can handle more but it slows rendering and the visual
@@ -90,6 +90,9 @@ def validate_intent(intent: dict) -> tuple[bool, str | None]:
     elif kind == "prior_result":
         if not ds.get("result_id"):
             return False, "data_source.result_id required for kind='prior_result'"
+    elif kind == "structured":
+        if not (ds.get("data") or "").strip():
+            return False, "data_source.data must be non-empty for kind='structured'"
 
     agg = intent.get("agg")
     if agg not in _VALID_AGGS:
@@ -163,6 +166,66 @@ def _resolve_inline(intent_ds: dict):
     return df, None
 
 
+def _parse_markdown_table(s: str):
+    """Parse a GitHub-flavored markdown table into a DataFrame. Returns
+    (df, error_str). Recognises the leading `|`-bar style; tolerates
+    extra whitespace + empty leading/trailing pipes."""
+    import pandas as pd
+    lines = [ln.strip() for ln in s.strip().splitlines() if ln.strip()]
+    if len(lines) < 2:
+        return None, "markdown table needs at least a header row and one data row"
+
+    def _split(row: str) -> list[str]:
+        # Strip leading/trailing pipe then split. `\|` escaping not handled
+        # — chart data shouldn't contain pipe characters in cells.
+        row = row.strip()
+        if row.startswith("|"):
+            row = row[1:]
+        if row.endswith("|"):
+            row = row[:-1]
+        return [c.strip() for c in row.split("|")]
+
+    header = _split(lines[0])
+    # Skip the separator row (--- | --- | ...) if present.
+    data_start = 1
+    if len(lines) > 1 and set(lines[1].replace("|", "").replace(":", "").replace("-", "").strip()) == set():
+        data_start = 2
+    rows = [_split(ln) for ln in lines[data_start:]]
+    rows = [r for r in rows if any(c for c in r)]
+    if not rows:
+        return None, "markdown table has no data rows"
+    if any(len(r) != len(header) for r in rows):
+        return None, f"markdown table rows must have {len(header)} cells to match the header"
+    # Coerce numeric-looking cells; leave strings alone.
+    df = pd.DataFrame(rows, columns=header)
+    for col in df.columns:
+        coerced = pd.to_numeric(df[col], errors="coerce")
+        if coerced.notna().all():
+            df[col] = coerced
+    return df, None
+
+
+def _resolve_structured(intent_ds: dict):
+    """Structured data: parse a CSV string OR markdown table the assistant
+    supplied directly via the structured `chart` tool. Auto-detects
+    format by leading character (`|` = markdown table, otherwise CSV)."""
+    import io
+    import pandas as pd
+    raw = (intent_ds.get("data") or "").strip()
+    if not raw:
+        return None, "structured data is empty"
+    # Heuristic: leading pipe (with optional whitespace) → markdown table.
+    if raw.lstrip().startswith("|"):
+        return _parse_markdown_table(raw)
+    try:
+        df = pd.read_csv(io.StringIO(raw))
+    except Exception as e:
+        return None, f"failed to parse CSV data: {type(e).__name__}: {e}"
+    if df.empty:
+        return None, "structured CSV produced an empty table"
+    return df, None
+
+
 def resolve_data(intent: dict, projects_root: str):
     """Dispatch on data_source.kind. Returns (df, error_str)."""
     ds = intent.get("data_source") or {}
@@ -171,6 +234,8 @@ def resolve_data(intent: dict, projects_root: str):
         return _resolve_inline(ds)
     if kind == "project_file":
         return _resolve_project_file(ds, projects_root)
+    if kind == "structured":
+        return _resolve_structured(ds)
     if kind == "prior_result":
         return None, "data_source kind='prior_result' is not yet implemented"
     return None, f"unknown data_source.kind: {kind!r}"
