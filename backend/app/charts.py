@@ -613,11 +613,11 @@ def _wrap_axis_chart(intent: dict, x_vals: list, ser_list: list) -> dict:
     chart_type = intent.get("chart_type")
     return {
         "title": {"text": intent.get("title", ""), "left": "center", "top": 24},
-        "tooltip": {"trigger": "axis"},
-        "legend": {"top": 54, "show": multi},
-        "grid": {"top": 90 if multi else 70, "left": 50, "right": 30, "bottom": 50, "containLabel": True},
-        "xAxis": {"type": "category", "data": x_vals, "name": intent.get("x_label") or ""},
-        "yAxis": {"type": "value", "name": intent.get("y_label") or "", "scale": chart_type in ("line", "area")},
+        "tooltip": {"trigger": "axis", "textStyle": {"fontSize": 13}},
+        "legend": {"top": 64, "show": multi},
+        "grid": {"top": 100 if multi else 70, "left": 50, "right": 30, "bottom": 30, "containLabel": True},
+        "xAxis": {"type": "category", "data": x_vals, "name": intent.get("x_label") or "", "axisLabel": {"fontSize": 11}, "nameTextStyle": {"fontSize": 11}},
+        "yAxis": {"type": "value", "name": intent.get("y_label") or "", "scale": chart_type in ("line", "area"), "axisLabel": {"fontSize": 11}, "nameTextStyle": {"fontSize": 11}},
         "series": ser_list,
     }
 
@@ -628,11 +628,11 @@ def _wrap_value_axis_chart(intent: dict, ser_list: list) -> dict:
     multi = len(ser_list) > 1
     return {
         "title": {"text": intent.get("title", ""), "left": "center", "top": 24},
-        "tooltip": {"trigger": "item"},
-        "legend": {"top": 54, "show": multi},
-        "grid": {"top": 90 if multi else 70, "left": 50, "right": 30, "bottom": 50, "containLabel": True},
-        "xAxis": {"type": "value", "name": intent.get("x_label") or "", "scale": True},
-        "yAxis": {"type": "value", "name": intent.get("y_label") or "", "scale": True},
+        "tooltip": {"trigger": "item", "textStyle": {"fontSize": 13}},
+        "legend": {"top": 64, "show": multi},
+        "grid": {"top": 100 if multi else 70, "left": 50, "right": 30, "bottom": 30, "containLabel": True},
+        "xAxis": {"type": "value", "name": intent.get("x_label") or "", "scale": True, "axisLabel": {"fontSize": 11}, "nameTextStyle": {"fontSize": 11}},
+        "yAxis": {"type": "value", "name": intent.get("y_label") or "", "scale": True, "axisLabel": {"fontSize": 11}, "nameTextStyle": {"fontSize": 11}},
         "series": ser_list,
     }
 

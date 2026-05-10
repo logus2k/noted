@@ -1703,14 +1703,37 @@ export class ChatPanel {
             host.className = 'chat-message chat-message-assistant';
             this._messagesArea.insertBefore(host, this._typingIndicator);
         }
+        // Frame is the positioned parent. Light background so default
+        // ECharts text/axis colors (dark) contrast properly. Charts in
+        // noted intentionally break from the surrounding dark theme —
+        // readability beats consistency.
+        const frame = document.createElement('div');
+        frame.className = 'chat-message-chart-frame';
+        frame.title = 'Double-click to open in a floating viewer';
+
         const wrapper = document.createElement('div');
         wrapper.className = 'chat-message-chart';
-        // Light background so default ECharts text/axis colors (dark)
-        // contrast properly. Charts in noted intentionally break from
-        // the surrounding dark theme — readability beats consistency.
-        wrapper.style.cssText = 'width:100%;height:380px;margin:8px 0;background:#ffffff;border:1px solid #ccc;border-radius:6px;cursor:zoom-in;overflow:hidden';
-        wrapper.title = 'Double-click to open in a floating viewer';
-        host.appendChild(wrapper);
+        frame.appendChild(wrapper);
+
+        // Hover-revealed action buttons (Copy / Save). Font Awesome to
+        // match the rest of noted's iconography.
+        const actions = document.createElement('div');
+        actions.className = 'chat-message-chart-actions';
+        const copyBtn = document.createElement('button');
+        copyBtn.type = 'button';
+        copyBtn.className = 'chat-chart-action';
+        copyBtn.title = 'Copy Image';
+        copyBtn.innerHTML = '<i class="fa-solid fa-copy"></i>';
+        const saveBtn = document.createElement('button');
+        saveBtn.type = 'button';
+        saveBtn.className = 'chat-chart-action';
+        saveBtn.title = 'Save As Image';
+        saveBtn.innerHTML = '<i class="fa-solid fa-download"></i>';
+        actions.appendChild(copyBtn);
+        actions.appendChild(saveBtn);
+        frame.appendChild(actions);
+
+        host.appendChild(frame);
         let chart = null;
         try {
             chart = echarts.init(wrapper);
@@ -1720,8 +1743,55 @@ export class ChatPanel {
             wrapper.textContent = `Chart render failed: ${e?.message || e}`;
             return;
         }
+
+        const _safeName = ((payload.title || payload.chart_type || 'chart') + '')
+            .replace(/[^\w\-]+/g, '_').replace(/^_+|_+$/g, '') || 'chart';
+        const _flashIcon = (btn, glyph, restoreTitle, ms = 1200) => {
+            const i = btn.querySelector('i');
+            const orig = i.className;
+            const origTitle = btn.title;
+            i.className = `fa-solid ${glyph}`;
+            if (restoreTitle) btn.title = restoreTitle;
+            setTimeout(() => { i.className = orig; btn.title = origTitle; }, ms);
+        };
+
+        copyBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            try {
+                const dataUrl = chart.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: '#fff' });
+                const blob = await (await fetch(dataUrl)).blob();
+                if (!navigator.clipboard || !window.ClipboardItem) {
+                    throw new Error('Clipboard image API unavailable (needs HTTPS or localhost)');
+                }
+                await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+                _flashIcon(copyBtn, 'fa-check', 'Copied');
+            } catch (err) {
+                console.warn('[ChatPanel] copy chart failed', err);
+                _flashIcon(copyBtn, 'fa-xmark', 'Copy failed — try Save', 1800);
+            }
+        });
+
+        saveBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            try {
+                const dataUrl = chart.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: '#fff' });
+                const a = document.createElement('a');
+                a.href = dataUrl;
+                a.download = _safeName + '.png';
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                _flashIcon(saveBtn, 'fa-check', 'Saved');
+            } catch (err) {
+                console.warn('[ChatPanel] save chart failed', err);
+                _flashIcon(saveBtn, 'fa-xmark', 'Save failed', 1800);
+            }
+        });
+
         // Double-click → open in floating viewer with the same option.
-        wrapper.addEventListener('dblclick', (e) => {
+        // Lives on the frame so the action buttons (which stop propagation)
+        // don't accidentally trigger the viewer.
+        frame.addEventListener('dblclick', (e) => {
             e.stopPropagation();
             if (this._onOpenArtifact) {
                 this._onOpenArtifact({

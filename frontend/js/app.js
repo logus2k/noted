@@ -748,6 +748,7 @@ class App {
         const name = payload.name || (payload.kind === 'image' ? 'image' : 'file');
         let content = '';
         let panelOpts = {};
+        let panelClass = '';
 
         if (payload.kind === 'image') {
             // Image viewer: full-bleed <img>, contain-fit, dark
@@ -767,9 +768,13 @@ class App {
             // setOption. ResizeObserver keeps it responsive.
             // White background to match the in-bubble chart and let
             // ECharts' default dark text/axis colors stay readable.
+            // overflow:hidden contains ECharts' internal canvas (which
+            // can render 1-2px past the wrapper bounds and trigger the
+            // global .jsPanel-content overflow-y:auto scrollbars).
             const containerId = `_chart_artifact_${Date.now().toString(36)}_${Math.floor(Math.random() * 1e6)}`;
-            content = `<div id="${containerId}" style="width:100%;height:100%;background:#ffffff"></div>`;
+            content = `<div id="${containerId}" style="width:100%;height:100%;background:#ffffff;overflow:hidden"></div>`;
             panelOpts = { width: 880, height: 600 };
+            panelClass = 'chart-artifact-panel';
             // Defer init until the jsPanel mounts the content into the DOM.
             queueMicrotask(() => {
                 const el = document.getElementById(containerId);
@@ -814,10 +819,11 @@ class App {
             position: 'center',
             dragit: {},
             resizeit: {},
-            // Reserve room in the header for the future Save icon
-            // (Backlog CHAT-2) by keeping the standard maximize/close
-            // controls in place.
-            headerControls: 'all',
+            // Close-only header — these are simple read-only viewers.
+            // (Save / Copy live as in-chart hover buttons for charts;
+            // images use the browser's native context menu.)
+            headerControls: 'closeonly',
+            panelclass: panelClass || undefined,
             border: '1px solid var(--border-color, #444)',
             borderRadius: '6px',
             theme: 'none',

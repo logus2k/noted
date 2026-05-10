@@ -1106,3 +1106,62 @@
 .chat-citation.cite-edge:hover      { background: #b8862b; color: #ffffff; border-color: #b8862b; }
 .chat-citation.cite-community { background: #f1e6fb; border-color: #7e57c2; color: #4527a0; }
 .chat-citation.cite-community:hover { background: #7e57c2; color: #ffffff; border-color: #7e57c2; }
+
+/* In-chat ECharts chart frame + hover-revealed action buttons (Copy / Save).
+ * The frame is the positioned parent; ECharts initialises on the inner
+ * .chat-message-chart div. Action buttons fade in on frame hover. */
+.chat-message-chart-frame {
+    position: relative;
+    width: 100%;
+    height: 380px;
+    margin: 8px 0;
+    background: #ffffff;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    cursor: zoom-in;
+    overflow: hidden;
+}
+.chat-message-chart {
+    width: 100%;
+    height: 100%;
+}
+.chat-message-chart-actions {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    pointer-events: none;
+}
+.chat-message-chart-frame:hover .chat-message-chart-actions {
+    opacity: 1;
+    pointer-events: auto;
+}
+.chat-chart-action {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid #bbb;
+    border-radius: 4px;
+    color: #1565c0;
+    cursor: pointer;
+    font-size: 11px;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.chat-chart-action:hover {
+    background: #ffffff;
+    border-color: #1565c0;
+    color: #0d47a1;
+}
+.chat-chart-action:active {
+    background: #f0f0f0;
+}
+.chat-chart-action i {
+    pointer-events: none;
+}

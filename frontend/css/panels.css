@@ -23,7 +23,9 @@
     font-size: 12px !important;
     text-transform: none !important;
     font-variant: normal !important;
-    padding: 6px 20px 3px 1px;
+    padding: 9px 20px 6px 1px;
+    display: flex;
+    align-items: center;
 }
 
 .jsPanel .jsPanel-controlbar {
@@ -71,6 +73,15 @@
     background: #1e1e20 !important;
     overflow: hidden !important;
     padding: 8px !important;
+}
+
+/* Chart artifact viewer (double-click on a chat chart). The chart fills
+ * the panel exactly; ECharts' internal canvas can render 1-2px past the
+ * wrapper bounds, which would otherwise trigger the global content-area
+ * scrollbars. */
+.jsPanel.chart-artifact-panel .jsPanel-content {
+    overflow: hidden !important;
+    background: #ffffff;
 }
 
 /* Panel shared styles */
