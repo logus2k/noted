@@ -3407,23 +3407,45 @@ async def _tool_graph_and_vector_search(args: dict, managers: dict) -> str:
 
 
 async def _tool_request_new_tool(args: dict) -> str:
-    """Free-text capability request → planner → create_tool workflow.
+    """Spec-driven capability request → planner → create_tool workflow.
 
-    Mirrors POST /api/workflows/from-request. The handler returns
-    immediately with the workflow_id; the workflow runs asynchronously.
-    The model can describe what's being built to the user, and the new
-    tool will federate into the MCP namespace once the workflow finishes.
+    Reads the approved tool spec from the in-memory doc buffer (created
+    by the Assistant via create_doc) and submits its markdown to the
+    planner as the contract. Mirrors POST /api/workflows/from-request.
+    The handler returns immediately with the workflow_id; the workflow
+    runs asynchronously. The new tool will federate into the MCP
+    namespace once the workflow finishes.
 
     Identity: tenant_id and actor_id come from the chat request's
     X-Forwarded-User threading when available; for now we default to
     "default" since chat→MCP identity threading isn't wired through the
     execute_tool signature yet.
     """
-    request_text = (args.get("request") or "").strip()
-    if not request_text or len(request_text) < 4:
+    spec_doc_id = (args.get("spec_doc_id") or "").strip()
+    if not spec_doc_id:
         return (
-            "Error: 'request' must be a non-empty natural-language "
-            "description of the capability you want built."
+            "Error: 'spec_doc_id' is required. Spec-driven flow: first "
+            "use create_doc to draft a tool specification (template "
+            "sections: Description, Source documentation, Inputs, "
+            "Outputs, Acceptance criteria; with `**status:** draft` at "
+            "the top). Iterate with the user via replace_doc until they "
+            "approve (set `**status:** approved`), then call this tool "
+            "with the buffer_id returned by create_doc."
+        )
+
+    from app.managers import notes_buffer
+    buf = notes_buffer.get(spec_doc_id)
+    if buf is None:
+        return (
+            f"Error: spec_doc_id {spec_doc_id!r} not found in the doc "
+            f"buffer. Verify the buffer_id returned by create_doc."
+        )
+    spec_markdown = (buf.content or "").strip()
+    if not spec_markdown:
+        return (
+            f"Error: spec doc {spec_doc_id!r} is empty. Populate the "
+            f"spec template (Description, Source documentation, Inputs, "
+            f"Outputs, Acceptance criteria) before submitting."
         )
 
     from app.workflow.from_request import (
@@ -3432,7 +3454,7 @@ async def _tool_request_new_tool(args: dict) -> str:
     )
     try:
         result = await dispatch_from_request(
-            request_text,
+            spec_markdown,
             tenant_id="default",
             actor_id="default",
         )
@@ -3440,7 +3462,7 @@ async def _tool_request_new_tool(args: dict) -> str:
         return (
             f"Error: capability request rejected at stage {e.stage!r}. "
             f"{e.detail.get('error', '')} "
-            f"(reasoning: {e.detail.get('reasoning', '')})"
+            f"(planner reasoning: {e.detail.get('reasoning', '')})"
         )
 
     planner = result.get("planner") or {}
@@ -3450,6 +3472,7 @@ async def _tool_request_new_tool(args: dict) -> str:
             "workflow_id": result.get("workflow_id"),
             "workflow_type": result.get("workflow_type"),
             "status": result.get("status"),
+            "spec_doc_id": spec_doc_id,
             "planner_reasoning": planner.get("reasoning"),
             "planned_tool_name": inputs.get("tool_name"),
             "planned_language": inputs.get("language"),
@@ -3457,8 +3480,8 @@ async def _tool_request_new_tool(args: dict) -> str:
             "next_step": (
                 "The capability-extension workflow is now running in the "
                 "background. Tell the user what is being built (use "
-                "planned_tool_name + planned_acceptance_criteria), and "
-                "let them know the new tool will be callable on the "
+                "planned_tool_name + the spec's acceptance criteria), "
+                "and let them know the new tool will be callable on the "
                 "next turn once the workflow completes."
             ),
         }

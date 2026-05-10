@@ -557,36 +557,38 @@ _READ_TOOLS: list[types.Tool] = [
     types.Tool(
         name="request_new_tool",
         description=(
-            "Request that a NEW MCP tool be authored from the user's "
-            "natural-language description and (when supplied) the URLs of "
-            "the API documentation. Use this when the user asks the "
-            "assistant to extend its own capabilities — e.g. 'figure out "
-            "how to use these endpoints', 'build me a tool that wraps X', "
-            "'I want a skill that reports on Y'. The orchestrator runs a "
-            "create_tool workflow: it fetches the docs, an LLM authors the "
-            "client + smoke tests, the framework publishes the tool and "
-            "pairs it with a skill. The new tool will be callable on a "
-            "follow-up turn once the workflow completes; this call returns "
-            "immediately with the workflow_id. Do NOT call this tool to "
-            "answer the user's question directly — call it to BUILD the "
-            "capability they're asking for. Pass the user's full request "
-            "(including any URLs they mentioned) verbatim in `request`."
+            "Submit a USER-APPROVED tool specification for build. SPEC-DRIVEN "
+            "FLOW (mandatory): when the user asks for a new tool, you MUST "
+            "first use `create_doc` to draft a tool spec (template sections: "
+            "Description, Source documentation URLs, Inputs, Outputs, "
+            "Acceptance criteria; mark `**status:** draft` at the top). "
+            "Iterate with the user via `replace_doc` until they approve "
+            "(either by saying so or by setting `**status:** approved` in "
+            "the doc). ONLY THEN call this tool with the buffer_id returned "
+            "by create_doc. The orchestrator runs a create_tool workflow: "
+            "an LLM-architect (planner) validates the spec, an LLM authors "
+            "the client + smoke tests, the framework publishes the tool. "
+            "The new tool will be callable on a follow-up turn once the "
+            "workflow completes; this call returns immediately with the "
+            "workflow_id. Do NOT call this tool to answer the user's "
+            "question directly — call it to BUILD the capability they want."
         ),
         inputSchema={
             "type": "object",
             "properties": {
-                "request": {
+                "spec_doc_id": {
                     "type": "string",
                     "description": (
-                        "The user's full natural-language capability "
-                        "request, verbatim. Include any API URLs, example "
-                        "inputs, and clues about the expected output. The "
-                        "planner LLM reads this verbatim to pick the "
-                        "right workflow and synthesise its inputs."
+                        "buffer_id of an approved tool-spec doc previously "
+                        "created via `create_doc`. The doc's markdown "
+                        "content is the literal contract sent to the "
+                        "planner. The doc MUST have `**status:** approved` "
+                        "and contain non-TBD entries in every required "
+                        "section, or the planner will refuse."
                     ),
                 },
             },
-            "required": ["request"],
+            "required": ["spec_doc_id"],
         },
     ),
 ]

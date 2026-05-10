@@ -52,14 +52,20 @@ class RunWorkflowRequest(BaseModel):
 
 
 class FromRequestBody(BaseModel):
-    """Free-text capability request. The planner picks the workflow type and
-    populates inputs; the wrapper validates against the chosen workflow's
-    input_schema and dispatches if valid."""
-    request: str = Field(..., min_length=4, description=(
-        "Natural-language description of what the user wants the assistant "
-        "to be able to do — e.g. 'I found these two URLs that return weather "
-        "info; figure out how to use them so I get a new skill to report "
-        "on the weather: <urls>'."
+    """Spec-driven capability request. The body's `request` field contains
+    the FULL tool-spec markdown (the agreed contract); the planner acts as
+    architect: validates the spec, completes technical details, translates
+    to workflow_inputs. The wrapper validates against the chosen workflow's
+    input_schema and dispatches if valid.
+
+    For chat-side use, prefer the `request_new_tool` MCP tool which reads
+    the spec from a doc buffer by id. This HTTP endpoint exists for direct
+    spec submission (e.g. the harness writing pre-authored specs)."""
+    request: str = Field(..., min_length=20, description=(
+        "Full tool-spec markdown (header lines + Description + Source "
+        "documentation + Inputs + Outputs + Acceptance criteria sections). "
+        "The planner refuses if status is draft or any required section "
+        "contains TBD."
     ))
     backend: str | None = Field(default=None, description=(
         "Optional override for the planner LLM backend ('gemma' default, "
@@ -188,11 +194,13 @@ async def run_new(request: Request, body: RunWorkflowRequest) -> dict[str, Any]:
 
 @router.post("/from-request")
 async def run_from_request(request: Request, body: FromRequestBody) -> dict[str, Any]:
-    """Free-text capability request → planner-decided workflow.
+    """Spec-driven capability request → planner-decided workflow.
 
     Thin wrapper over `app.workflow.from_request.dispatch_from_request`;
     the heavy lifting (planner call, validation, dispatch) lives there so
-    the same logic backs the `request_new_tool` MCP tool.
+    the same logic backs the `request_new_tool` MCP tool. The body's
+    `request` field is now the full tool-spec markdown (the contract),
+    not free text.
     """
     from app.workflow.from_request import (
         FromRequestError,

@@ -1,13 +1,18 @@
-"""Free-text capability request -> planner-decided workflow dispatch.
+"""Spec-driven capability request -> planner-decided workflow dispatch.
 
 Shared helper used by:
   - app.routers.workflows / POST /api/workflows/from-request
   - app.managers.llm_tools / `request_new_tool` MCP tool handler
 
-The helper takes a natural-language request, calls the `planner` agent_server
-preset to pick a workflow type and populate its inputs, validates the inputs
-against the chosen workflow's `input_schema`, then dispatches the workflow
-asynchronously. Returns a dict the caller can return as JSON.
+The helper takes a tool specification (markdown), calls the `planner`
+agent_server preset to validate + complete + translate it into the chosen
+workflow's required inputs, validates those inputs against the workflow's
+`input_schema`, then dispatches the workflow asynchronously. Returns a dict
+the caller can return as JSON.
+
+The spec is the contract — the BA (user + chat Assistant) authored it
+collaboratively; the planner acts as the architect (no re-authoring of
+description / criteria / inputs the BA already agreed).
 
 On any structured failure (planner returned no JSON, picked an unknown
 workflow, or filled inputs that fail input_schema validation) the helper
@@ -50,10 +55,10 @@ class FromRequestError(Exception):
         self.detail = detail
 
 
-def render_planner_user_message(free_text: str) -> str:
-    """Render the user-message the planner preset expects: a `mission` line
-    plus the registered workflows' types, descriptions, outcomes, and
-    input_schemas.
+def render_planner_user_message(spec_markdown: str) -> str:
+    """Render the user-message the planner preset expects: a `specification`
+    block (the agreed tool spec) plus the registered workflows' types,
+    descriptions, outcomes, and input_schemas.
 
     Workflows without an `input_schema` (e.g. dev-only synthetic_probe) are
     excluded so the planner can't pick them.
@@ -70,18 +75,18 @@ def render_planner_user_message(free_text: str) -> str:
         if d.input_schema is not None
     ]
     return (
-        f"mission: {free_text.strip()}\n\n"
+        f"specification:\n{spec_markdown.strip()}\n\n"
         f"available_workflows:\n{_json.dumps(available, indent=2)}"
     )
 
 
-async def call_planner(free_text: str) -> tuple[dict[str, Any], dict[str, Any]]:
+async def call_planner(spec_markdown: str) -> tuple[dict[str, Any], dict[str, Any]]:
     """POST the rendered user-message to agent_server's `planner` preset and
     return (parsed_planner_output, capture). The capture dict contains the
     full request + response so the caller can persist it into the workflow
     log once a workflow_id is known."""
     import time as _time
-    user_message = render_planner_user_message(free_text)
+    user_message = render_planner_user_message(spec_markdown)
     payload = {
         "model": "planner",
         "messages": [{"role": "user", "content": user_message}],
@@ -149,13 +154,13 @@ async def call_planner(free_text: str) -> tuple[dict[str, Any], dict[str, Any]]:
 
 
 async def dispatch_from_request(
-    free_text: str,
+    spec_markdown: str,
     *,
     tenant_id: str,
     actor_id: str,
 ) -> dict[str, Any]:
-    """Run the planner against `free_text`, validate the inputs it produced,
-    and kick off the chosen workflow.
+    """Run the planner against `spec_markdown` (the agreed tool spec),
+    validate the inputs it produced, and kick off the chosen workflow.
 
     Returns:
         {
@@ -167,7 +172,7 @@ async def dispatch_from_request(
         }
     Raises FromRequestError on any structured failure.
     """
-    plan, planner_capture = await call_planner(free_text)
+    plan, planner_capture = await call_planner(spec_markdown)
 
     workflow_type = plan.get("workflow_type") or ""
     inputs = plan.get("inputs") or {}
