@@ -203,17 +203,74 @@ async def dispatch_claude(
     return parsed
 
 
+def _llm_log_path(tenant_id: str, workflow_id: str):
+    """Per-workflow LLM-call log file. Sits next to audit.jsonl + state.json
+    under data/tenants/<tenant>/workflows/<workflow_id>/. One JSON object
+    per line (jsonl). Captures the full request user_message + the raw
+    response + the parse outcome so we can read exactly what Gemma
+    emitted on a failing run."""
+    from app.config import DATA_DIR
+    from pathlib import Path
+    return Path(DATA_DIR) / "tenants" / tenant_id / "workflows" / workflow_id / "llm_calls.jsonl"
+
+
+def _record_llm_call(
+    state,
+    *,
+    preset: str,
+    backend: str,
+    duration_s: float,
+    user_message: str,
+    raw_content: str,
+    stripped: str,
+    parsed: dict[str, Any] | None,
+    parse_error: str | None,
+) -> None:
+    """Append one LLM-call entry to the per-workflow log. Best-effort;
+    logging failures are swallowed so a disk issue can't break the
+    workflow itself."""
+    if state is None:
+        return
+    try:
+        from datetime import datetime, timezone
+        path = _llm_log_path(state.tenant_id, state.workflow_id)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        entry = {
+            "ts": datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z"),
+            "tenant_id": state.tenant_id,
+            "workflow_id": state.workflow_id,
+            "preset": preset,
+            "backend": backend,
+            "duration_s": round(duration_s, 3),
+            "request": {"user_message": user_message},
+            "response": {
+                "raw_content": raw_content,
+                "stripped": stripped,
+                "parsed": parsed,
+                "parse_error": parse_error,
+            },
+        }
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(entry, ensure_ascii=False, default=str) + "\n")
+    except Exception as e:  # noqa: BLE001
+        logger.warning("llm-call log write failed: %s", e)
+
+
 async def dispatch(
     preset_name: str,
     step_inputs: dict[str, Any],
     *,
     base_url: str = AGENT_SERVER_URL,
     timeout_s: float = DEFAULT_TIMEOUT_S,
+    state=None,
 ) -> dict[str, Any]:
     """Call the agent_server preset, return the parsed JSON output dict.
 
     Raises ValueError on transport / parse failure. The loop catches this
     and feeds it into the validator-complaint retry path.
+
+    `state` (WorkspaceState) is optional but lets the dispatcher write
+    every request/response into the per-workflow llm_calls.jsonl log.
     """
     # F2.6: backend hint via the inputs dict (any plan template can opt in
     # by passing `_backend: "claude"` in the workflow's inputs). Default
@@ -229,44 +286,63 @@ async def dispatch(
         "messages": [{"role": "user", "content": user_message}],
         "stream": False,
     }
+    import time as _time
+    _t0 = _time.perf_counter()
+    raw_content = ""
+    stripped = ""
+    parsed_out: dict[str, Any] | None = None
+    parse_error: str | None = None
     try:
-        async with httpx.AsyncClient(timeout=timeout_s) as client:
-            resp = await client.post(
-                f"{base_url}/v1/chat/completions",
-                json=payload,
-                headers={"Content-Type": "application/json"},
-            )
-            resp.raise_for_status()
-            data = resp.json()
-    except httpx.RequestError as e:
-        raise ValueError(f"agent_server unreachable: {type(e).__name__}: {e}") from e
-    except httpx.HTTPStatusError as e:
-        raise ValueError(
-            f"agent_server HTTP {e.response.status_code}: {e.response.text[:300]}"
-        ) from e
+        try:
+            async with httpx.AsyncClient(timeout=timeout_s) as client:
+                resp = await client.post(
+                    f"{base_url}/v1/chat/completions",
+                    json=payload,
+                    headers={"Content-Type": "application/json"},
+                )
+                resp.raise_for_status()
+                data = resp.json()
+        except httpx.RequestError as e:
+            parse_error = f"agent_server unreachable: {type(e).__name__}: {e}"
+            raise ValueError(parse_error) from e
+        except httpx.HTTPStatusError as e:
+            parse_error = f"agent_server HTTP {e.response.status_code}: {e.response.text[:300]}"
+            raise ValueError(parse_error) from e
 
-    choices = data.get("choices") or []
-    if not choices:
-        raise ValueError("agent_server returned no choices")
-    content = (choices[0].get("message") or {}).get("content") or ""
-    cleaned = _strip_code_fence(_strip_thinking(content))
-    if not cleaned:
-        raise ValueError(
-            "worker preset returned empty content (after stripping <think> and fences)"
+        choices = data.get("choices") or []
+        if not choices:
+            parse_error = "agent_server returned no choices"
+            raise ValueError(parse_error)
+        raw_content = (choices[0].get("message") or {}).get("content") or ""
+        stripped = _strip_code_fence(_strip_thinking(raw_content))
+        if not stripped:
+            parse_error = "worker preset returned empty content (after stripping <think> and fences)"
+            raise ValueError(parse_error)
+        try:
+            parsed_out = json.loads(stripped)
+        except json.JSONDecodeError as e:
+            head = stripped[:300].replace("\n", "\\n")
+            parse_error = (
+                f"worker output is not valid JSON ({e.msg} at line {e.lineno} col {e.colno}); "
+                f"head: {head}"
+            )
+            raise ValueError(parse_error) from e
+        if not isinstance(parsed_out, dict):
+            tname = type(parsed_out).__name__
+            parsed_out = None
+            parse_error = f"worker output is JSON but not an object: {tname}"
+            raise ValueError(parse_error)
+    finally:
+        _record_llm_call(
+            state,
+            preset=preset_name,
+            backend="gemma",
+            duration_s=_time.perf_counter() - _t0,
+            user_message=user_message,
+            raw_content=raw_content,
+            stripped=stripped,
+            parsed=parsed_out,
+            parse_error=parse_error,
         )
-    try:
-        parsed = json.loads(cleaned)
-    except json.JSONDecodeError as e:
-        # Provide enough context for the loop's validator-complaint feedback
-        # to guide the next iteration.
-        head = cleaned[:300].replace("\n", "\\n")
-        raise ValueError(
-            f"worker output is not valid JSON ({e.msg} at line {e.lineno} col {e.colno}); "
-            f"head: {head}"
-        ) from e
-    if not isinstance(parsed, dict):
-        raise ValueError(
-            f"worker output is JSON but not an object (top-level type: {type(parsed).__name__})"
-        )
-    logger.info("worker %s returned %d top-level keys", preset_name, len(parsed))
-    return parsed
+    logger.info("worker %s returned %d top-level keys", preset_name, len(parsed_out))
+    return parsed_out

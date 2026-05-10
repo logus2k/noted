@@ -2452,6 +2452,52 @@ async def clear_history(client_id: str, project_id: str):
     return {"ok": True}
 
 
+class _SecretBody(BaseModel):
+    """Body for delete-tool / delete-skill endpoints. The secret is
+    matched against `NOTED_TERMINAL_SECRET` (same key as the terminal
+    open gate); when that env var is empty, the gate is open."""
+    secret: str = ""
+
+
+@router.post("/access-key/verify")
+async def verify_access_key(body: _SecretBody) -> dict[str, Any]:
+    """One-shot HTTP verify for the access key. Used by the frontend's
+    SecretPrompt module to validate a cached secret without performing
+    a destructive action. Returns 200 when the secret matches (or when
+    no secret is configured server-side); 403 otherwise."""
+    if _NOTED_SECRET and body.secret != _NOTED_SECRET:
+        raise HTTPException(status_code=403, detail="Invalid access key")
+    return {"ok": True}
+
+
+@router.post("/user-tool/{tool_name}/delete")
+async def delete_user_tool(tool_name: str, body: _SecretBody) -> dict[str, Any]:
+    """Delete a user-authored tool + its paired skill in one call.
+
+    Gated on the same `NOTED_TERMINAL_SECRET` as the Terminal so a
+    misclick in Explorer can't wipe a published capability. Internally
+    runs the `remove_tool` workflow (archives both the tool dir and the
+    skill folder under `_archive/<name>_<ts>/`, refreshes federation).
+    """
+    if _NOTED_SECRET and body.secret != _NOTED_SECRET:
+        raise HTTPException(status_code=403, detail="Invalid access key")
+    if not tool_name or not tool_name.replace("_", "").isalnum():
+        raise HTTPException(status_code=400, detail="invalid tool_name")
+    from app.workflow.loop import run_workflow
+    state = await run_workflow(
+        tenant_id="default",
+        workflow_type="remove_tool",
+        inputs={"tool_name": tool_name},
+        actor_id="default",
+    )
+    return {
+        "removed": True,
+        "tool_name": tool_name,
+        "workflow_id": state.workflow_id,
+        "status": state.status,
+    }
+
+
 class SystemNoticeRequest(BaseModel):
     """Body for POST /api/llm/system-notice — persists a workflow-lifecycle
     notice (completed / failed / suspended) into the chat history so the

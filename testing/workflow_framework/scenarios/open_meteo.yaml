@@ -1,0 +1,30 @@
+id: open_meteo
+name: Open-Meteo current weather by lat/lon (no auth required)
+api_family: weather
+
+inputs:
+  tool_name: open_meteo_current
+  language: python
+  mission: |
+    Wrap the Open-Meteo current-weather endpoint. The tool takes two inputs:
+    `latitude` (float) and `longitude` (float). It calls
+    https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true
+    and returns the current weather block (temperature, windspeed, weathercode).
+  api_docs_urls:
+    - https://api.open-meteo.com/v1/forecast?latitude=38.72&longitude=-9.14&current_weather=true
+  acceptance_criteria:
+    - "Input is a JSON object with float fields latitude and longitude."
+    - "Successful output JSON contains a temperature numeric field."
+    - "Successful output JSON contains a windspeed numeric field."
+    - "Tool exits non-zero if latitude or longitude is missing."
+  verify_inputs:
+    latitude: 38.72
+    longitude: -9.14
+
+post_publish_probe:
+  args:
+    latitude: 38.72
+    longitude: -9.14
+  expect_keys:
+    - temperature
+  expect_status: 0

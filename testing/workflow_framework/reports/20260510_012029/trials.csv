@@ -1,0 +1,13 @@
+scenario_id,trial,tool_name,wf_status,smoke_rewinds,failed_step,duration_s,probe_ok,probe_keys_present,workflow_id,failed_tail,probe_error
+github_issue,1,github_issue_lookup,completed,0,,32.04,True,True,wf_1778375575899_fc362232,,
+github_issue,2,github_issue_lookup,completed,0,,36.03,True,True,wf_1778375611983_68285ef8,,
+github_issue,3,github_issue_lookup,completed,0,,36.03,True,True,wf_1778375652066_e99c1166,,
+open_meteo,1,open_meteo_current,completed,0,,36.04,True,True,wf_1778375692157_73be706a,,
+open_meteo,2,open_meteo_current,completed,0,,36.03,True,True,wf_1778375732256_b5a9ac27,,
+open_meteo,3,open_meteo_current,completed,0,,36.04,True,True,wf_1778375772358_115aced8,,
+sapo_weather,1,sapo_weather,completed,0,,36.04,True,True,wf_1778375812464_c5ceffb4,,
+sapo_weather,2,sapo_weather,completed,0,,32.04,True,True,wf_1778375852571_d02973b0,,
+sapo_weather,3,sapo_weather,completed,0,,28.03,True,True,wf_1778375889112_18b806b5,,
+wikipedia_summary,1,wikipedia_summary,completed,0,,28.03,True,True,wf_1778375921215_d3ba9897,,
+wikipedia_summary,2,wikipedia_summary,completed,0,,36.03,True,True,wf_1778375953327_a83e6e40,,
+wikipedia_summary,3,wikipedia_summary,completed,0,,32.04,True,True,wf_1778375993439_8f777c04,,

@@ -75,15 +75,28 @@ def render_planner_user_message(free_text: str) -> str:
     )
 
 
-async def call_planner(free_text: str) -> dict[str, Any]:
+async def call_planner(free_text: str) -> tuple[dict[str, Any], dict[str, Any]]:
     """POST the rendered user-message to agent_server's `planner` preset and
-    return the parsed planner-output JSON."""
+    return (parsed_planner_output, capture). The capture dict contains the
+    full request + response so the caller can persist it into the workflow
+    log once a workflow_id is known."""
+    import time as _time
     user_message = render_planner_user_message(free_text)
     payload = {
         "model": "planner",
         "messages": [{"role": "user", "content": user_message}],
         "stream": False,
     }
+    capture: dict[str, Any] = {
+        "preset": "planner",
+        "user_message": user_message,
+        "raw_content": "",
+        "stripped": "",
+        "parsed": None,
+        "parse_error": None,
+        "duration_s": 0.0,
+    }
+    _t0 = _time.perf_counter()
     try:
         async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT_S) as client:
             resp = await client.post(
@@ -94,30 +107,42 @@ async def call_planner(free_text: str) -> dict[str, Any]:
             resp.raise_for_status()
             data = resp.json()
     except httpx.RequestError as e:
+        capture["parse_error"] = f"agent_server unreachable: {type(e).__name__}: {e}"
+        capture["duration_s"] = _time.perf_counter() - _t0
         raise FromRequestError(
             "planner_call",
-            {"error": f"agent_server unreachable: {type(e).__name__}: {e}"},
+            {"error": capture["parse_error"]},
         ) from e
     except httpx.HTTPStatusError as e:
+        capture["parse_error"] = f"agent_server HTTP {e.response.status_code}: {e.response.text[:300]}"
+        capture["duration_s"] = _time.perf_counter() - _t0
         raise FromRequestError(
             "planner_call",
-            {"error": f"agent_server HTTP {e.response.status_code}: {e.response.text[:300]}"},
+            {"error": capture["parse_error"]},
         ) from e
 
     choices = data.get("choices") or []
     if not choices:
+        capture["parse_error"] = "planner returned no choices"
+        capture["duration_s"] = _time.perf_counter() - _t0
         raise FromRequestError(
-            "planner_call", {"error": "planner returned no choices"},
+            "planner_call", {"error": capture["parse_error"]},
         )
     raw = (choices[0].get("message") or {}).get("content") or ""
     cleaned = _strip_code_fence(_strip_thinking(raw))
+    capture["raw_content"] = raw
+    capture["stripped"] = cleaned
+    capture["duration_s"] = _time.perf_counter() - _t0
     try:
-        return _json.loads(cleaned)
+        parsed = _json.loads(cleaned)
+        capture["parsed"] = parsed
+        return parsed, capture
     except _json.JSONDecodeError as e:
+        capture["parse_error"] = f"planner output not valid JSON: {e.msg}"
         raise FromRequestError(
             "planner_parse",
             {
-                "error": f"planner output not valid JSON: {e.msg}",
+                "error": capture["parse_error"],
                 "raw": cleaned[:1500],
             },
         ) from e
@@ -142,7 +167,7 @@ async def dispatch_from_request(
         }
     Raises FromRequestError on any structured failure.
     """
-    plan = await call_planner(free_text)
+    plan, planner_capture = await call_planner(free_text)
 
     workflow_type = plan.get("workflow_type") or ""
     inputs = plan.get("inputs") or {}
@@ -180,6 +205,35 @@ async def dispatch_from_request(
         )
 
     workflow_id = _new_workflow_id()
+
+    # Persist the planner request/response into the workflow's log so the
+    # full LLM trace (planner → tool_author → api_tester → skill_author)
+    # lives in one place per workflow_id.
+    try:
+        from datetime import datetime, timezone
+        from pathlib import Path
+        from app.config import DATA_DIR
+        log_path = Path(DATA_DIR) / "tenants" / tenant_id / "workflows" / workflow_id / "llm_calls.jsonl"
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        entry = {
+            "ts": datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z"),
+            "tenant_id": tenant_id,
+            "workflow_id": workflow_id,
+            "preset": "planner",
+            "backend": "gemma",
+            "duration_s": round(planner_capture.get("duration_s", 0.0), 3),
+            "request": {"user_message": planner_capture.get("user_message", "")},
+            "response": {
+                "raw_content": planner_capture.get("raw_content", ""),
+                "stripped": planner_capture.get("stripped", ""),
+                "parsed": planner_capture.get("parsed"),
+                "parse_error": planner_capture.get("parse_error"),
+            },
+        }
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(_json.dumps(entry, ensure_ascii=False, default=str) + "\n")
+    except Exception:
+        logger.exception("planner llm-call log write failed for %s/%s", tenant_id, workflow_id)
 
     async def _run() -> None:
         try:

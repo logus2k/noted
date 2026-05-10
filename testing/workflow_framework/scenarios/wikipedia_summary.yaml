@@ -1,0 +1,29 @@
+id: wikipedia_summary
+name: Wikipedia REST page summary by title (no auth required)
+api_family: reference
+
+inputs:
+  tool_name: wikipedia_summary
+  language: python
+  mission: |
+    Wrap the Wikipedia REST API page-summary endpoint. The tool takes one
+    input: `title` (string). It calls
+    GET https://en.wikipedia.org/api/rest_v1/page/summary/{title}
+    and returns the page's title and extract (a short plain-text summary).
+  api_docs_urls:
+    - https://en.wikipedia.org/api/rest_v1/page/summary/Lisbon
+  acceptance_criteria:
+    - "Input is a JSON object with a string field named title."
+    - "Successful output JSON contains a non-empty extract string."
+    - "Successful output JSON contains a title string."
+    - "Tool exits non-zero if title is missing."
+  verify_inputs:
+    title: Lisbon
+
+post_publish_probe:
+  args:
+    title: Lisbon
+  expect_keys:
+    - extract
+    - title
+  expect_status: 0

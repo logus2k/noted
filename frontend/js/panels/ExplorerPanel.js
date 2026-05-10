@@ -3329,6 +3329,80 @@ export class ExplorerPanel {
                 }
             }
 
+            // ── Delete affordance for user-authored skills (gated on the
+            //     same access key as the Terminal). User-authored skills
+            //     are always paired with a tool of the same name (the
+            //     publish_skill step canonicalises this), so deleting the
+            //     skill removes the pair via the same /user-tool/{name}/delete
+            //     endpoint. Same UX as the tool-detail Delete button. ──
+            if (isUser) {
+                const actionsRow = document.createElement('div');
+                actionsRow.style.cssText = 'padding:8px 12px;display:flex;justify-content:flex-end;gap:8px;border-top:1px solid #eee;margin-top:6px';
+                const delBtn = document.createElement('button');
+                delBtn.style.cssText = 'padding:5px 12px;border:1px solid #d28a8a;background:#fff;color:#8a3838;border-radius:4px;font-size:12px;cursor:pointer';
+                delBtn.innerHTML = '<i class="fa-solid fa-trash" style="margin-right:4px"></i>Delete skill + paired tool';
+                delBtn.title = 'Archive this skill and its paired tool (requires access key)';
+                delBtn.addEventListener('click', async () => {
+                    const confirmed = confirm(
+                        `Delete skill "${skillName}" and its paired tool?\n\n` +
+                        `Both will be archived under _archive/. ` +
+                        `You'll be asked for the noted access key.`
+                    );
+                    if (!confirmed) return;
+                    const { getVerifiedSecret } = await import('../SecretPrompt.js');
+                    const verify = async (secret) => {
+                        try {
+                            const r = await fetch('api/llm/access-key/verify', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ secret }),
+                            });
+                            return r.ok;
+                        } catch { return false; }
+                    };
+                    const secret = await getVerifiedSecret(verify, {
+                        title: `Delete ${skillName}`,
+                        body: 'Enter the noted access key to delete this skill and its paired tool.',
+                        confirmLabel: 'Delete',
+                    });
+                    if (!secret) return;
+                    delBtn.disabled = true;
+                    delBtn.textContent = 'Deleting…';
+                    try {
+                        const r = await fetch(`api/llm/user-tool/${encodeURIComponent(skillName)}/delete`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ secret }),
+                        });
+                        const data = await r.json().catch(() => ({}));
+                        if (!r.ok) {
+                            alert(`Delete failed: HTTP ${r.status} ${data.detail || ''}`);
+                            delBtn.disabled = false;
+                            delBtn.innerHTML = '<i class="fa-solid fa-trash" style="margin-right:4px"></i>Delete skill + paired tool';
+                            return;
+                        }
+                        // Refresh the skills + tools trees + clear detail.
+                        this._mcpToolsCache = null;
+                        if (this._tree) {
+                            this._tree.visit((n) => {
+                                const k = n.key || '';
+                                if (/^asst-domain:[^:]+:(skills|tools)$/.test(k) && typeof n.load === 'function') {
+                                    n.load(true);
+                                }
+                            });
+                        }
+                        this._detailEl.innerHTML = `<div style="padding:14px;color:#555;font-size:13px">` +
+                            `Deleted <code>${skillName}</code> via workflow <code>${data.workflow_id}</code>.</div>`;
+                    } catch (e) {
+                        alert(`Delete error: ${e.message}`);
+                        delBtn.disabled = false;
+                        delBtn.innerHTML = '<i class="fa-solid fa-trash" style="margin-right:4px"></i>Delete skill + paired tool';
+                    }
+                });
+                actionsRow.appendChild(delBtn);
+                this._detailEl.appendChild(actionsRow);
+            }
+
             // Content
             if (data.content) {
                 const pre = document.createElement('pre');
@@ -3451,6 +3525,82 @@ export class ExplorerPanel {
             headerCard.appendChild(descRow);
         }
         container.appendChild(headerCard);
+
+        // ── Delete affordance for user-authored tools (gated on the same
+        //     access key as the Terminal). Reuses the SecretPrompt module
+        //     so the UX is identical to opening a shell. The endpoint
+        //     internally runs the remove_tool workflow, archiving both
+        //     the tool dir and the paired skill folder. ──
+        if (isUser) {
+            const actionsRow = document.createElement('div');
+            actionsRow.style.cssText = 'padding:8px 12px;border-bottom:1px solid #eee;display:flex;justify-content:flex-end;gap:8px';
+            const delBtn = document.createElement('button');
+            delBtn.style.cssText = 'padding:5px 12px;border:1px solid #d28a8a;background:#fff;color:#8a3838;border-radius:4px;font-size:12px;cursor:pointer';
+            delBtn.innerHTML = '<i class="fa-solid fa-trash" style="margin-right:4px"></i>Delete';
+            delBtn.title = 'Archive this tool and its paired skill (requires access key)';
+            delBtn.addEventListener('click', async () => {
+                const confirmed = confirm(
+                    `Delete tool "${tool.name}"?\n\n` +
+                    `Both the tool and its paired skill will be archived under _archive/. ` +
+                    `You'll be asked for the noted access key.`
+                );
+                if (!confirmed) return;
+                const { getVerifiedSecret } = await import('../SecretPrompt.js');
+                const verify = async (secret) => {
+                    try {
+                        const r = await fetch('api/llm/access-key/verify', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ secret }),
+                        });
+                        return r.ok;
+                    } catch { return false; }
+                };
+                const secret = await getVerifiedSecret(verify, {
+                    title: `Delete ${tool.name}`,
+                    body: 'Enter the noted access key to delete this user-authored tool and its paired skill.',
+                    confirmLabel: 'Delete',
+                });
+                if (!secret) return;
+                delBtn.disabled = true;
+                delBtn.textContent = 'Deleting…';
+                try {
+                    const r = await fetch(`api/llm/user-tool/${encodeURIComponent(tool.name)}/delete`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ secret }),
+                    });
+                    const data = await r.json().catch(() => ({}));
+                    if (!r.ok) {
+                        alert(`Delete failed: HTTP ${r.status} ${data.detail || ''}`);
+                        delBtn.disabled = false;
+                        delBtn.innerHTML = '<i class="fa-solid fa-trash" style="margin-right:4px"></i>Delete';
+                        return;
+                    }
+                    // Refresh the tools tree + clear the detail pane.
+                    this._mcpToolsCache = null;
+                    if (this._tree) {
+                        // Reload all asst-domain:*:tools branches so the
+                        // deleted tool drops out regardless of which
+                        // domain the user was inspecting it under.
+                        this._tree.visit((n) => {
+                            const k = n.key || '';
+                            if (/^asst-domain:[^:]+:tools$/.test(k) && typeof n.load === 'function') {
+                                n.load(true);
+                            }
+                        });
+                    }
+                    this._detailEl.innerHTML = `<div style="padding:14px;color:#555;font-size:13px">` +
+                        `Deleted <code>${tool.name}</code> via workflow <code>${data.workflow_id}</code>.</div>`;
+                } catch (e) {
+                    alert(`Delete error: ${e.message}`);
+                    delBtn.disabled = false;
+                    delBtn.innerHTML = '<i class="fa-solid fa-trash" style="margin-right:4px"></i>Delete';
+                }
+            });
+            actionsRow.appendChild(delBtn);
+            headerCard.appendChild(actionsRow);
+        }
 
         // ── F6.5: source-workflow click-through (user-authored tools only) ──
         const meta = tool._meta || {};

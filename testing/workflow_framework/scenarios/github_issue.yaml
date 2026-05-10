@@ -1,0 +1,34 @@
+id: github_issue
+name: GitHub issue lookup by owner/repo/number
+api_family: code_hosting
+
+inputs:
+  tool_name: github_issue_lookup
+  language: python
+  mission: |
+    Wrap the GitHub REST API endpoint that returns a single issue. The tool
+    takes three inputs: `owner` (string, e.g. "octocat"), `repo` (string, e.g.
+    "Hello-World"), and `issue_number` (integer). It calls
+    GET https://api.github.com/repos/{owner}/{repo}/issues/{issue_number}
+    and returns the issue's title, state, and body.
+  api_docs_urls:
+    - https://api.github.com/repos/octocat/Hello-World/issues/1
+  acceptance_criteria:
+    - "Input is a JSON object with string fields owner, repo and integer field issue_number."
+    - "Successful output JSON contains a non-empty title string."
+    - "Successful output JSON contains a state string."
+    - "Tool exits non-zero if any of owner, repo, issue_number is missing."
+  verify_inputs:
+    owner: octocat
+    repo: Hello-World
+    issue_number: 1
+
+post_publish_probe:
+  args:
+    owner: octocat
+    repo: Hello-World
+    issue_number: 1
+  expect_keys:
+    - title
+    - state
+  expect_status: 0

@@ -88,7 +88,7 @@ async def _dispatch_step(
     # from the preset's structured output. The loop validates against
     # step.output_schema next; on validation failure the bounded-retry
     # path feeds the complaint back via inputs["validator_complaint"].
-    return await llm_dispatcher.dispatch(step.worker, inputs)
+    return await llm_dispatcher.dispatch(step.worker, inputs, state=state)
 
 
 async def _run_step(
@@ -358,21 +358,33 @@ async def _execute_plan(
 
         if not ok:
             # A2: when run_smoke_tests fails AND we still have rewinds left,
-            # rewind to api_tester instead of suspending. The api_tester step
-            # gets re-invoked with the smoke-test failure as feedback so it
-            # can author a corrected smoke.py + tool source. Tool gets re-
-            # published in the same cycle; smoke tests run again.
+            # rewind to either tool_author or api_tester (depending on
+            # which one is most likely at fault). The selected step gets
+            # re-invoked with the smoke-test failure as feedback. All
+            # subsequent steps re-run in the same cycle.
             if step.name == "run_smoke_tests" and state.smoke_rewinds < SMOKE_REWIND_CAP:
-                api_tester_idx = next(
-                    (i for i, s in enumerate(definition.plan_template) if s.name == "api_tester"),
+                err = state.steps[index].error or ""
+                # Heuristic: AssertionError means the tool did something
+                # the test didn't expect (output shape, key naming,
+                # missing field). That's a tool_author problem — its
+                # output didn't match the contract. Other errors
+                # (SyntaxError, ImportError, NameError, fixture-not-found)
+                # are api_tester problems — the test code itself is broken.
+                target_name = (
+                    "tool_author"
+                    if "AssertionError" in err
+                    else "api_tester"
+                )
+                target_idx = next(
+                    (i for i, s in enumerate(definition.plan_template) if s.name == target_name),
                     None,
                 )
-                if api_tester_idx is not None:
+                if target_idx is not None:
                     state.smoke_rewinds += 1
-                    state.last_smoke_error = state.steps[index].error
+                    state.last_smoke_error = err
                     # Reset the records for steps we're about to re-run so
                     # the inspector clearly shows them as in-flight again.
-                    for j in range(api_tester_idx, index + 1):
+                    for j in range(target_idx, index + 1):
                         rec = state.steps[j]
                         rec.status = "pending"
                         rec.started_at = None
@@ -385,17 +397,17 @@ async def _execute_plan(
                         {
                             "rewind_index": state.smoke_rewinds,
                             "rewind_cap": SMOKE_REWIND_CAP,
-                            "rewinding_to": "api_tester",
+                            "rewinding_to": target_name,
                             "reason": (state.last_smoke_error or "")[:300],
                         },
                         actor_id=state.actor_id,
                     )
                     logger.info(
-                        "smoke rewind %d/%d for %s/%s: rewinding to api_tester",
+                        "smoke rewind %d/%d for %s/%s: rewinding to %s",
                         state.smoke_rewinds, SMOKE_REWIND_CAP,
-                        state.tenant_id, state.workflow_id,
+                        state.tenant_id, state.workflow_id, target_name,
                     )
-                    index = api_tester_idx
+                    index = target_idx
                     await telemetry.workspace_sync(
                         state.tenant_id, state.workflow_id, state.to_serializable(),
                     )

@@ -1,0 +1,2 @@
+scenario_id,trial,tool_name,wf_status,smoke_rewinds,failed_step,duration_s,probe_ok,probe_keys_present,workflow_id,failed_tail,probe_error
+sapo_weather,1,sapo_weather,completed,0,,32.05,True,True,wf_1778374651292_adc0d313,,

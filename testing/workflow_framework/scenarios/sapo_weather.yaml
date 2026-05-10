@@ -1,0 +1,28 @@
+id: sapo_weather
+name: SAPO weather forecast for a Portuguese city by code
+api_family: weather
+
+inputs:
+  tool_name: sapo_weather
+  language: python
+  mission: |
+    Wrap the SAPO Portuguese weather service so the assistant can fetch the
+    weather forecast for a given city code. The tool takes one input field,
+    `city_code` (a string like "LPLG" for Lisbon), calls
+    GetWeatherForecast?cityCode=<code>, and returns the parsed forecast.
+  api_docs_urls:
+    - https://services.sapo.pt/WeatherJSON/GetCities
+    - https://services.sapo.pt/WeatherJSON/GetWeatherForecast?cityCode=LPLG
+  acceptance_criteria:
+    - "Input is a JSON object with a string field named city_code."
+    - "Successful output JSON contains a non-empty days array."
+    - "Tool exits non-zero if the required city_code argument is absent."
+  verify_inputs:
+    city_code: LPLG
+
+post_publish_probe:
+  args:
+    city_code: LPLG
+  expect_keys:
+    - days
+  expect_status: 0

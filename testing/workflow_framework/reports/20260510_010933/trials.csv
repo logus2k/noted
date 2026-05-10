@@ -1,0 +1,41 @@
+scenario_id,trial,tool_name,wf_status,smoke_rewinds,failed_step,duration_s,probe_ok,probe_keys_present,workflow_id,failed_tail,probe_error
+github_issue,1,github_issue_lookup,completed,0,,32.04,True,True,wf_1778374697059_5f44bedb,,
+github_issue,2,github_issue_lookup,completed,0,,36.03,True,True,wf_1778374733099_6e50d168,,
+github_issue,3,github_issue_lookup,completed,0,,32.02,True,True,wf_1778374773139_753050d7,,
+open_meteo,1,open_meteo_current,completed,0,,44.04,True,True,wf_1778374809179_c7eb3d36,,
+open_meteo,2,open_meteo_current,completed,0,,36.03,True,True,wf_1778374857235_fd106a7d,,
+open_meteo,3,open_meteo_current,completed,0,,44.03,True,True,wf_1778374897285_2fec2f3b,,
+sapo_weather,1,sapo_weather,completed,0,,32.03,True,True,wf_1778374945343_b3e24c69,,
+sapo_weather,2,sapo_weather,suspended,2,run_smoke_tests,88.07,,,wf_1778374981403_f837230f,"', ...}, {'D...{'Description': 'Nuvens com abertas', 'High': '16', 'Icon': 'http://imgs.sapo.pt/meteo/04.gif', 'Low': '8', ...}, ...]})
+
+smoke.py:38: AssertionError
+=========================== short test summary info ============================
+FAILED smoke.py::test_successful_weather_fetch - AssertionError: assert ('for...
+!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!
+============================== 1 failed in 0.74s ===============================
+ | stderr: ",
+sapo_weather,3,sapo_weather,completed,0,,28.03,True,True,wf_1778375069476_b229c709,,
+wikipedia_summary,1,wikipedia_summary,suspended,2,run_smoke_tests,84.07,,,wf_1778375101536_a7175740,"edia_summary/venv/bin/python', 'tool.py'], returncode=1, stdout=b'', stderr=b'Error: API request failed with status 403.\n').returncode
+
+smoke.py:28: AssertionError
+=========================== short test summary info ============================
+FAILED smoke.py::test_successful_summary_retrieval - AssertionError: tool exi...
+!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!
+============================== 1 failed in 0.84s ===============================
+ | stderr: ",
+wikipedia_summary,2,wikipedia_summary,suspended,2,run_smoke_tests,96.09,,,wf_1778375185602_40f1ebc0,"od...a from Wikipedia API: 403 Client Error: Forbidden for url: https://en.wikipedia.org/api/rest_v1/page/summary/Lisbon\n').returncode
+
+smoke.py:28: AssertionError
+=========================== short test summary info ============================
+FAILED smoke.py::test_successful_summary_retrieval - AssertionError: tool exi...
+!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!
+============================== 1 failed in 0.78s ===============================
+ | stderr: ",
+wikipedia_summary,3,wikipedia_summary,suspended,2,run_smoke_tests,92.07,,,wf_1778375281700_1aaa88ce,"od...equest failed with status 403. Details: Forbidden for url: https://en.wikipedia.org/api/rest_v1/page/summary/Lisbon\n').returncode
+
+smoke.py:32: AssertionError
+=========================== short test summary info ============================
+FAILED smoke.py::test_successful_summary_retrieval - AssertionError: tool exi...
+!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!
+============================== 1 failed in 0.70s ===============================
+ | stderr: ",
