@@ -89,6 +89,19 @@ export class ChatPanel {
         this._onLiveTraceQuery = null;
         this._liveTraceTimer = null;
         this._sttActive = false;
+        // Voice Settings (TTS) — current in-memory selection. Defaults
+        // mirror tts_server's settings. `language: 'auto'` means keep the
+        // existing per-text language detection (current behavior); a
+        // specific language code disables auto-switching and pins the
+        // chosen voice + speed for every TTS turn. No persistence: the
+        // selection resets on browser refresh.
+        this._voiceSettings = {
+            language: 'auto',
+            gender: 'f',
+            voice: 'af_heart',
+            speed: 1.1,
+        };
+        this._onVoiceSettingsChangeCallback = null;
         this._build();
     }
 
@@ -349,8 +362,6 @@ export class ChatPanel {
             + '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" class="chat-icon-outline"><path fill="currentColor" d="M18 5.604c0-1.114-1.346-1.671-2.134-.884l-4.694 4.695A2 2 0 0 1 9.757 10H6a4 4 0 0 0-4 4v4a4 4 0 0 0 4 4h3.757a2 2 0 0 1 1.415.585l4.694 4.695c.788.787 2.134.23 2.134-.884zm-5.414 5.225L16 7.415v17.171l-3.414-3.414A4 4 0 0 0 9.757 20H6a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h3.757a4 4 0 0 0 2.829-1.171m10.238-1.395a1 1 0 1 0-1.648 1.133c1.285 1.87 1.887 3.676 1.887 5.433c0 1.758-.602 3.565-1.887 5.434a1 1 0 1 0 1.648 1.133c1.465-2.13 2.238-4.324 2.238-6.567c0-2.242-.773-4.435-2.238-6.566m2.866-4.158a1 1 0 0 0-1.38 1.449c2.387 2.273 3.628 5.738 3.628 9.275s-1.241 7.003-3.628 9.276a1 1 0 1 0 1.38 1.449c2.863-2.727 4.247-6.762 4.247-10.725S28.554 8.003 25.69 5.276"/></svg>'
             + '</span>';
         this._ttsBtn.innerHTML = this._ttsIconOff;
-        // Breathing room from the right edge of the input bar.
-        this._ttsBtn.style.marginRight = '10px';
         this._ttsActive = false;
         this._ttsBtn.addEventListener('click', () => {
             this._ttsActive = !this._ttsActive;
@@ -359,6 +370,31 @@ export class ChatPanel {
             if (this._onTtsToggleCallback) this._onTtsToggleCallback();
         });
         inputArea.appendChild(this._ttsBtn);
+
+        // Voice Settings button — opens a modal to choose language, gender,
+        // voice, and speed. Sits to the right of the Speaker, follows the
+        // same Fluent-style icon + cream pill resting/hover treatment. Not
+        // a toggle: every click opens the modal. The icon is an equalizer
+        // (three horizontal sliders with knobs) — semantically "tune the
+        // voice", visually distinct from Mic / Speaker.
+        this._voiceSettingsBtn = document.createElement('button');
+        this._voiceSettingsBtn.className = 'chat-voice-settings-btn';
+        this._voiceSettingsBtn.title = 'Voice settings';
+        this._voiceSettingsBtn.innerHTML =
+            '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 32 32" fill="currentColor">'
+            + '<path d="M3 8a1 1 0 0 1 1-1h6.05a3.5 3.5 0 0 1 6.9 0H28a1 1 0 1 1 0 2H16.95a3.5 3.5 0 0 1-6.9 0H4a1 1 0 0 1-1-1m10.5 1.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3M3 16a1 1 0 0 1 1-1h14.05a3.5 3.5 0 0 1 6.9 0H28a1 1 0 1 1 0 2h-3.05a3.5 3.5 0 0 1-6.9 0H4a1 1 0 0 1-1-1m18.5 1.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3M3 24a1 1 0 0 1 1-1h2.05a3.5 3.5 0 0 1 6.9 0H28a1 1 0 1 1 0 2H12.95a3.5 3.5 0 0 1-6.9 0H4a1 1 0 0 1-1-1m6.5 1.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3"/>'
+            + '</svg>';
+        this._voiceSettingsBtn.style.marginRight = '10px';
+        this._voiceSettingsBtn.addEventListener('click', async () => {
+            const { modalVoiceSettings } = await import('./modal.js');
+            const result = await modalVoiceSettings(this._voiceSettings);
+            if (!result) return;  // cancelled
+            this._voiceSettings = result;
+            if (this._onVoiceSettingsChangeCallback) {
+                this._onVoiceSettingsChangeCallback(result);
+            }
+        });
+        inputArea.appendChild(this._voiceSettingsBtn);
 
         panel.appendChild(inputArea);
 
@@ -2096,6 +2132,18 @@ export class ChatPanel {
 
     onTtsToggle(callback) {
         this._onTtsToggleCallback = callback;
+    }
+
+    /** Subscribe to Voice Settings changes. Callback receives the new
+     *  settings object: {language, gender, voice, speed}.
+     *  language === 'auto' means: use existing per-text language detection. */
+    onVoiceSettingsChange(callback) {
+        this._onVoiceSettingsChangeCallback = callback;
+    }
+
+    /** Read current voice settings (used by ChatService at init). */
+    getVoiceSettings() {
+        return { ...this._voiceSettings };
     }
 
     setTtsActive(active) {

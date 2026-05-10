@@ -164,6 +164,15 @@ export function initChat(app) {
         // opens the artifact in a floating jsPanel viewer.
         app._chatPanel.onOpenArtifact((p) => app._openChatArtifact?.(p));
 
+        // Voice Settings (TTS) — when the user saves the modal, push the
+        // new {language, gender, voice, speed} into ChatService so the
+        // next TTS turn applies it. Also seed ChatService with the panel's
+        // initial defaults so the two stay in sync at startup.
+        app._chatService.setVoiceSettings(app._chatPanel.getVoiceSettings());
+        app._chatPanel.onVoiceSettingsChange((settings) => {
+            app._chatService.setVoiceSettings(settings);
+        });
+
         // Workflow lifecycle notices in chat. Subscribe the chat panel to
         // the same Socket.io events the Workflow Monitor listens to, so
         // when a request_new_tool-dispatched workflow finishes (or fails /

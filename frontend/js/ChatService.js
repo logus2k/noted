@@ -245,6 +245,13 @@ export class ChatService {
         // belongs to, _sendVoiceToTTS fires `tts_configure_client` to
         // swap voices BEFORE the chunk goes out.
         this._currentTtsVoice = TTS_DEFAULT_VOICE;
+        // Currently-applied speed (per-session, mirrors what was last
+        // sent to tts_configure_client). null = never overridden, server
+        // uses its own default_speed.
+        this._currentTtsSpeed = null;
+        // User Voice Settings — set by ChatPanel via setVoiceSettings.
+        // {language: 'auto'|<code>, gender: 'f'|'m', voice: <id>, speed: <num>}
+        this._voiceSettings = { language: 'auto', gender: 'f', voice: TTS_DEFAULT_VOICE, speed: 1.1 };
         this.ttsEnabled = false;
 
         // The static greeting shown at chat-open (when there's no prior
@@ -1304,27 +1311,49 @@ export class ChatService {
         // barge-in would be silent.
         this._ttsBargedIn = false;
         try {
-            // Language auto-switch. Detect the language of THIS voice
-            // block, look up the preferred voice for it, and emit a
-            // configure event if it doesn't match the current voice.
-            const detected = detectKokoroLanguage(text);
-            const targetVoice = TTS_LANGUAGE_VOICE_MAP[detected] || TTS_DEFAULT_VOICE;
-            if (targetVoice && targetVoice !== this._currentTtsVoice) {
-                console.info(
-                    `[ChatService] TTS language switch: ${this._currentTtsVoice} → ${targetVoice} ` +
-                    `(detected lang='${detected}')`
-                );
+            // Voice resolution. Two paths:
+            //   1. User picked a specific language in Voice Settings →
+            //      use the chosen voice + speed verbatim, skip auto-detect.
+            //   2. Language is 'auto' (default) → detect the language of
+            //      THIS voice block and pick the matching default voice.
+            //      Speed still flows from the user's setting (or the
+            //      server default if untouched).
+            const vs = this._voiceSettings || {};
+            const userPickedLanguage = vs.language && vs.language !== 'auto';
+
+            let targetVoice;
+            if (userPickedLanguage) {
+                targetVoice = vs.voice || TTS_DEFAULT_VOICE;
+            } else {
+                const detected = detectKokoroLanguage(text);
+                targetVoice = TTS_LANGUAGE_VOICE_MAP[detected] || TTS_DEFAULT_VOICE;
+            }
+            const targetSpeed = (typeof vs.speed === 'number') ? vs.speed : null;
+
+            const voiceChanged = targetVoice && targetVoice !== this._currentTtsVoice;
+            const speedChanged = targetSpeed !== null && targetSpeed !== this._currentTtsSpeed;
+            if (voiceChanged || speedChanged) {
+                if (voiceChanged) {
+                    console.info(
+                        `[ChatService] TTS voice switch: ${this._currentTtsVoice} → ${targetVoice} ` +
+                        `(${userPickedLanguage ? 'user-pinned' : "detected lang='" + detectKokoroLanguage(text) + "'"})`
+                    );
+                }
+                if (speedChanged) {
+                    console.info(`[ChatService] TTS speed: ${this._currentTtsSpeed} → ${targetSpeed}`);
+                }
                 // tts_configure_client routes through audio_client_mapping
                 // (populated by register_audio_client at TTS connect time)
-                // so the right session is updated. Server validates the
-                // voice name + has the pipeline pre-loaded — failure here
-                // is silent on the wire (server logs the warning) and
-                // worst-case the chunk plays in the previous voice.
-                this._ttsSocket.emit('tts_configure_client', {
-                    client_id: this.clientId,
-                    voice: targetVoice,
-                });
-                this._currentTtsVoice = targetVoice;
+                // so the right session is updated. Server validates voice
+                // name + speed range — failure is silent on the wire (server
+                // logs warnings) and worst-case the chunk plays in the
+                // previous voice / speed.
+                const cfg = { client_id: this.clientId };
+                if (voiceChanged) cfg.voice = targetVoice;
+                if (speedChanged) cfg.speed = targetSpeed;
+                this._ttsSocket.emit('tts_configure_client', cfg);
+                if (voiceChanged) this._currentTtsVoice = targetVoice;
+                if (speedChanged) this._currentTtsSpeed = targetSpeed;
             }
 
             this._ttsSocket.emit('tts_text_chunk', {
@@ -1335,6 +1364,13 @@ export class ChatService {
         } catch (err) {
             console.warn('[ChatService] Voice TTS failed:', err);
         }
+    }
+
+    /** Update the user's voice preferences (language, gender, voice, speed).
+     *  Wired by app-chat.js to ChatPanel.onVoiceSettingsChange.
+     *  Takes effect on the next TTS turn (current speech keeps playing). */
+    setVoiceSettings(settings) {
+        this._voiceSettings = { ...(settings || {}) };
     }
 
     /** Hard-stop TTS playback. Called when VAD detects user speech

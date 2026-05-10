@@ -762,6 +762,7 @@
 .chat-stt-btn,
 .chat-send-btn,
 .chat-tts-btn,
+.chat-voice-settings-btn,
 .chat-attach-btn {
     width: 30px;
     height: 30px;
@@ -780,6 +781,7 @@
 .chat-stt-btn:hover,
 .chat-send-btn:hover,
 .chat-tts-btn:hover,
+.chat-voice-settings-btn:hover,
 .chat-attach-btn:hover {
     background: #c8e6c0;
 }
@@ -946,17 +948,25 @@
  * the muted shape on their own; the pill is the second visual channel
  * so OFF reads at a peripheral glance. */
 .chat-stt-btn,
-.chat-tts-btn {
+.chat-tts-btn,
+.chat-voice-settings-btn {
     background-color: #ffe6bd;
     color: #808080;
     font-size: 16px;
 }
 
+/* Voice Settings icon picks up a light-blue tint so it reads as a
+ * "tuning" affordance distinct from the muted gray Mic/Speaker icons
+ * — the pill background and hover stay the same as the other two. */
+.chat-voice-settings-btn { color: #4fc3f7; }
+
 /* Hover overrides for the two toggle buttons so we don't flash the
  * shared green hover over a red/green active pill. Slight darken on
- * the cream-peach OFF pill. */
+ * the cream-peach OFF pill. The voice-settings button is not a toggle
+ * (it always opens the modal) but follows the same resting + hover. */
 .chat-stt-btn:hover { background-color: #f5d7a5; }
 .chat-tts-btn:hover { background-color: #f5d7a5; }
+.chat-voice-settings-btn:hover { background-color: #f5d7a5; }
 
 /* Two-tone icon stack used by the ON state of the mic and speaker
  * buttons. Lays a "filled" SVG (pastel fill) under a "regular" SVG

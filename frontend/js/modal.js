@@ -386,3 +386,206 @@ export function modalSelect(label, options, { title = 'Select', confirmText = 'O
         });
     });
 }
+
+
+/**
+ * Voice Settings modal — chat TTS controls. Returns
+ *   { language, gender, voice, speed }   on Save
+ *   null                                 on Cancel / close
+ *
+ * `language === 'auto'` means: keep current auto-detect behavior; the
+ * gender + voice fields are not used (the TTS layer continues to switch
+ * voice based on detected language).
+ *
+ * @param {object} initial - current settings to pre-populate the form
+ * @param {string} initial.language - 'auto' | language code from SUPPORTED_LANGUAGES
+ * @param {'f'|'m'} initial.gender
+ * @param {string} initial.voice - voice id, e.g. 'af_heart'
+ * @param {number} initial.speed
+ */
+export async function modalVoiceSettings(initial = {}) {
+    const {
+        SUPPORTED_LANGUAGES,
+        filterVoices,
+        defaultVoiceForLanguage,
+        voiceDisplayName,
+        SPEED_MIN, SPEED_MAX, SPEED_STEP, SPEED_DEFAULT,
+    } = await import('./voiceData.js');
+
+    return new Promise((resolve) => {
+        let resolved = false;
+        let curLang = initial.language || 'auto';
+        let curGender = initial.gender || 'f';
+        let curVoice = initial.voice || 'af_heart';
+        let curSpeed = typeof initial.speed === 'number' ? initial.speed : SPEED_DEFAULT;
+
+        jsPanel.modal.create({
+            headerTitle: 'Voice Settings',
+            contentSize: { width: 360, height: 'auto' },
+            position: 'center',
+            dragit: false,
+            resizeit: false,
+            headerControls: 'closeonly',
+            border: '1px solid var(--border-color, #444)',
+            borderRadius: '6px',
+            theme: 'none',
+            boxShadow: 4,
+            onclosed: [() => { _cleanupBackdrops(); if (!resolved) resolve(null); return true; }],
+            footerToolbar: `
+                <div style="display:flex;justify-content:flex-end;gap:8px;padding:8px 16px;width:100%">
+                    <button class="modal-btn modal-cancel">Cancel</button>
+                    <button class="modal-btn modal-confirm">Save</button>
+                </div>`,
+            callback: (panel) => {
+                const root = document.createElement('div');
+                root.style.cssText = 'padding:16px 20px;display:flex;flex-direction:column;gap:14px';
+
+                const labelStyle = 'display:block;font-size:12px;color:var(--text-secondary,#aaa);margin-bottom:6px';
+                const inputStyle = 'width:100%;padding:6px 8px;font-size:13px;border:1px solid var(--border-color,#444);border-radius:4px;background:var(--bg-secondary,#2a2a2a);color:var(--text-primary,#ccc);outline:none;box-sizing:border-box';
+
+                // ── Language ───────────────────────────────────────────
+                const langRow = document.createElement('div');
+                const langLbl = document.createElement('label');
+                langLbl.style.cssText = labelStyle;
+                langLbl.textContent = 'Language';
+                const langSelect = document.createElement('select');
+                langSelect.style.cssText = inputStyle;
+                const autoOpt = document.createElement('option');
+                autoOpt.value = 'auto';
+                autoOpt.textContent = 'Auto (English as default)';
+                langSelect.appendChild(autoOpt);
+                for (const lang of SUPPORTED_LANGUAGES) {
+                    const o = document.createElement('option');
+                    o.value = lang.code;
+                    o.textContent = lang.label;
+                    langSelect.appendChild(o);
+                }
+                langSelect.value = curLang;
+                langRow.append(langLbl, langSelect);
+
+                // ── Gender (radio) ─────────────────────────────────────
+                const genderRow = document.createElement('div');
+                const genderLbl = document.createElement('label');
+                genderLbl.style.cssText = labelStyle;
+                genderLbl.textContent = 'Gender';
+                const genderWrap = document.createElement('div');
+                genderWrap.style.cssText = 'display:flex;gap:16px;align-items:center;font-size:13px;color:var(--text-primary,#ccc)';
+                genderWrap.innerHTML = `
+                    <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+                        <input type="radio" name="vs-gender" value="f"> Female
+                    </label>
+                    <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+                        <input type="radio" name="vs-gender" value="m"> Male
+                    </label>`;
+                const genderRadios = genderWrap.querySelectorAll('input[name="vs-gender"]');
+                genderRadios.forEach(r => { r.checked = (r.value === curGender); });
+                genderRow.append(genderLbl, genderWrap);
+
+                // ── Voice ──────────────────────────────────────────────
+                const voiceRow = document.createElement('div');
+                const voiceLbl = document.createElement('label');
+                voiceLbl.style.cssText = labelStyle;
+                voiceLbl.textContent = 'Voice';
+                const voiceSelect = document.createElement('select');
+                voiceSelect.style.cssText = inputStyle;
+                voiceRow.append(voiceLbl, voiceSelect);
+
+                const refreshVoices = () => {
+                    voiceSelect.innerHTML = '';
+                    if (curLang === 'auto') {
+                        const o = document.createElement('option');
+                        o.value = '';
+                        o.textContent = '— auto-selected per language —';
+                        voiceSelect.appendChild(o);
+                        return;
+                    }
+                    const voices = filterVoices(curLang, curGender);
+                    if (voices.length === 0) {
+                        // e.g. French + Male — fall back to whatever's available for this language.
+                        const fallbackId = defaultVoiceForLanguage(curLang);
+                        const o = document.createElement('option');
+                        o.value = fallbackId;
+                        o.textContent = `${voiceDisplayName(fallbackId)} (no ${curGender === 'f' ? 'female' : 'male'} voices for this language)`;
+                        voiceSelect.appendChild(o);
+                        curVoice = fallbackId;
+                        return;
+                    }
+                    for (const v of voices) {
+                        const o = document.createElement('option');
+                        o.value = v.id;
+                        o.textContent = voiceDisplayName(v.id);
+                        voiceSelect.appendChild(o);
+                    }
+                    // Try to keep current selection if it still fits; else first.
+                    if (voices.some(v => v.id === curVoice)) {
+                        voiceSelect.value = curVoice;
+                    } else {
+                        voiceSelect.value = voices[0].id;
+                        curVoice = voices[0].id;
+                    }
+                };
+
+                const updateLangControlsState = () => {
+                    const isAuto = (curLang === 'auto');
+                    genderRadios.forEach(r => { r.disabled = isAuto; });
+                    voiceSelect.disabled = isAuto;
+                    genderWrap.style.opacity = isAuto ? '0.5' : '1';
+                };
+
+                // ── Speed (slider + value) ─────────────────────────────
+                const speedRow = document.createElement('div');
+                const speedHeader = document.createElement('div');
+                speedHeader.style.cssText = 'display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px';
+                const speedLbl = document.createElement('label');
+                speedLbl.style.cssText = 'font-size:12px;color:var(--text-secondary,#aaa)';
+                speedLbl.textContent = 'Speed';
+                const speedVal = document.createElement('span');
+                speedVal.style.cssText = 'font-size:12px;color:var(--text-primary,#ccc);font-variant-numeric:tabular-nums';
+                speedVal.textContent = `${curSpeed.toFixed(2)}×`;
+                speedHeader.append(speedLbl, speedVal);
+                const speedInput = document.createElement('input');
+                speedInput.type = 'range';
+                speedInput.min = String(SPEED_MIN);
+                speedInput.max = String(SPEED_MAX);
+                speedInput.step = String(SPEED_STEP);
+                speedInput.value = String(curSpeed);
+                speedInput.style.cssText = 'width:100%';
+                speedRow.append(speedHeader, speedInput);
+
+                // ── Wire up live changes ───────────────────────────────
+                langSelect.addEventListener('change', () => {
+                    curLang = langSelect.value;
+                    updateLangControlsState();
+                    refreshVoices();
+                });
+                genderRadios.forEach(r => r.addEventListener('change', () => {
+                    if (r.checked) { curGender = r.value; refreshVoices(); }
+                }));
+                voiceSelect.addEventListener('change', () => { curVoice = voiceSelect.value; });
+                speedInput.addEventListener('input', () => {
+                    curSpeed = parseFloat(speedInput.value);
+                    speedVal.textContent = `${curSpeed.toFixed(2)}×`;
+                });
+
+                // Initial paint
+                root.append(langRow, genderRow, voiceRow, speedRow);
+                panel.content.innerHTML = '';
+                panel.content.appendChild(root);
+                refreshVoices();
+                updateLangControlsState();
+
+                panel.footer.querySelector('.modal-cancel').addEventListener('click', () => panel.close());
+                panel.footer.querySelector('.modal-confirm').addEventListener('click', () => {
+                    resolved = true;
+                    panel.close();
+                    resolve({
+                        language: curLang,
+                        gender: curGender,
+                        voice: curVoice,
+                        speed: curSpeed,
+                    });
+                });
+            }
+        });
+    });
+}
