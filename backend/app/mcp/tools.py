@@ -276,14 +276,31 @@ _READ_TOOLS: list[types.Tool] = [
     types.Tool(
         name="chart",
         description=(
-            "Render a chart in the chat using ECharts — STRUCTURED form. You "
+            "Render a chart in the chat using ECharts - STRUCTURED form. You "
             "ship the data and the chart shape directly; the backend renders "
             "deterministically with NO second LLM in the path. Use this for "
             "ANY chart whose data is in chat (numbers the user typed, values "
             "you computed from prior tool outputs, etc). For data that lives "
             "in a project file (CSV / Parquet / JSON), use `chart_from_file` "
             "instead. Supply `data` as a CSV string (with a header row) OR a "
-            "GitHub-flavoured markdown table — either format is parsed."
+            "GitHub-flavoured markdown table - either format is parsed.\n"
+            "\n"
+            "MULTI-SERIES (multiple lines / grouped bars). Two equivalent "
+            "shapes are accepted - pick whichever matches the data you have:\n"
+            "  WIDE (one column per series): set `x` only; leave `y` and "
+            "`series` unset. Every other numeric column becomes a series "
+            "named after its column header. Best when the data is already "
+            "pivoted (one column per city / category / etc).\n"
+            "    data: 'Date,Oporto,Lisbon,Faro\\n2026-05-10,14,15,16\\n"
+            "2026-05-11,15,15,16'    x: 'Date'\n"
+            "  LONG (one row per observation): set `x`, `y` (the value "
+            "column) AND `series` (the column whose distinct values name "
+            "each line/bar group).\n"
+            "    data: 'date,city,tempC\\n2026-05-10,Oporto,14\\n"
+            "2026-05-10,Lisbon,15\\n...'    x: 'date'  y: 'tempC'  series: 'city'\n"
+            "Do NOT pass a comma-separated list of column names in `series` "
+            "- `series` is always a SINGLE column name (long form) or unset "
+            "(wide form)."
         ),
         inputSchema={
             "type": "object",
@@ -313,8 +330,8 @@ _READ_TOOLS: list[types.Tool] = [
                     ),
                 },
                 "x":         {"type": "string", "description": "Column name for x-axis (bar/line/area/scatter). Required for those types."},
-                "y":         {"type": "string", "description": "Column name for y-axis (bar/line/area/scatter/histogram/box). Required for those types."},
-                "series":    {"type": "string", "description": "Optional column to group/colour by (multi-series chart)."},
+                "y":         {"type": "string", "description": "Column name for y-axis (bar/line/area/scatter/histogram/box). Required EXCEPT in WIDE multi-series mode (omit `y` and `series`; every other numeric column becomes a series)."},
+                "series":    {"type": "string", "description": "Single column name whose distinct values group/colour the data into multiple series (LONG multi-series form). Leave unset for WIDE form. Never a comma-separated list."},
                 "category":  {"type": "string", "description": "Pie/heatmap category column."},
                 "value":     {"type": "string", "description": "Pie/heatmap value column."},
                 "label":     {"type": "string", "description": "Optional column whose value labels each scatter point."},

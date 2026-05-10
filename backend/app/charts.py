@@ -285,15 +285,33 @@ def _maybe_top_n(df, value_col: str, limit: int | None):
 # ── Per-chart-type ECharts builders ──────────────────────────────────────
 
 
+def _wide_series_columns(df, x: str) -> list[str]:
+    """Wide-format helper: every numeric column besides `x`. Used when the
+    caller omits `y` and `series` — each numeric column becomes its own
+    series. Non-numeric columns are silently dropped (treated as
+    metadata)."""
+    import pandas as pd
+    return [c for c in df.columns if c != x and pd.api.types.is_numeric_dtype(df[c])]
+
+
 def _build_bar(intent: dict, df) -> tuple[dict | None, str | None]:
     x, y, agg, series, limit = intent.get("x"), intent.get("y"), intent.get("agg"), intent.get("series"), intent.get("limit")
+    if x and not y and not series:
+        cols = _wide_series_columns(df, x)
+        if x not in df.columns:
+            return None, f"column(s) not in dataset: [{x!r}]; available: {list(df.columns)}"
+        if not cols:
+            return None, f"wide-format detected (no `y`/`series`) but no numeric columns besides {x!r}; available: {list(df.columns)}"
+        x_vals = df[x].astype(str).tolist()
+        ser_list = [{"name": c, "type": "bar", "data": _to_jsonable_list(df[c].tolist())} for c in cols]
+        return _wrap_axis_chart(intent, x_vals, ser_list), None
     err = _validate_columns(df, x, y, series)
     if err:
         return None, err
     df = _apply_agg(df, x, y, agg, series)
     df = _maybe_top_n(df, y, limit)
     if series:
-        # Multi-series: pivot wide, one column per series value.
+        # Long-format multi-series: pivot wide, one column per series value.
         pivoted = df.pivot(index=x, columns=series, values=y).fillna(0)
         x_vals = pivoted.index.astype(str).tolist()
         ser_list = []
@@ -307,6 +325,20 @@ def _build_bar(intent: dict, df) -> tuple[dict | None, str | None]:
 
 def _build_line(intent: dict, df, area: bool = False) -> tuple[dict | None, str | None]:
     x, y, agg, series, limit = intent.get("x"), intent.get("y"), intent.get("agg"), intent.get("series"), intent.get("limit")
+    if x and not y and not series:
+        if x not in df.columns:
+            return None, f"column(s) not in dataset: [{x!r}]; available: {list(df.columns)}"
+        cols = _wide_series_columns(df, x)
+        if not cols:
+            return None, f"wide-format detected (no `y`/`series`) but no numeric columns besides {x!r}; available: {list(df.columns)}"
+        x_vals = df[x].astype(str).tolist()
+        ser_list = []
+        for c in cols:
+            s = {"name": c, "type": "line", "data": _to_jsonable_list(df[c].tolist())}
+            if area:
+                s["areaStyle"] = {}
+            ser_list.append(s)
+        return _wrap_axis_chart(intent, x_vals, ser_list), None
     err = _validate_columns(df, x, y, series)
     if err:
         return None, err
@@ -570,25 +602,37 @@ def _to_jsonable_list(values: list) -> list:
 
 
 def _wrap_axis_chart(intent: dict, x_vals: list, ser_list: list) -> dict:
-    """Common wrapper for category-x charts (bar, line, area, histogram)."""
+    """Common wrapper for category-x charts (bar, line, area, histogram).
+
+    `yAxis.scale: true` for line/area only — auto-fits the axis to the
+    data range so a series that hovers near 14-16 doesn't sit crammed
+    at the top of a 0-y plot. Bar/histogram keep the zero baseline
+    because bar length encodes magnitude — trimming the baseline would
+    visually exaggerate small differences."""
+    multi = len(ser_list) > 1
+    chart_type = intent.get("chart_type")
     return {
-        "title": {"text": intent.get("title", ""), "left": "center"},
+        "title": {"text": intent.get("title", ""), "left": "center", "top": 24},
         "tooltip": {"trigger": "axis"},
-        "legend": {"top": 30, "show": len(ser_list) > 1},
+        "legend": {"top": 54, "show": multi},
+        "grid": {"top": 90 if multi else 70, "left": 50, "right": 30, "bottom": 50, "containLabel": True},
         "xAxis": {"type": "category", "data": x_vals, "name": intent.get("x_label") or ""},
-        "yAxis": {"type": "value", "name": intent.get("y_label") or ""},
+        "yAxis": {"type": "value", "name": intent.get("y_label") or "", "scale": chart_type in ("line", "area")},
         "series": ser_list,
     }
 
 
 def _wrap_value_axis_chart(intent: dict, ser_list: list) -> dict:
-    """Common wrapper for value-x charts (scatter)."""
+    """Common wrapper for value-x charts (scatter). Both axes auto-scale
+    since point position (not bar length) encodes the values."""
+    multi = len(ser_list) > 1
     return {
-        "title": {"text": intent.get("title", ""), "left": "center"},
+        "title": {"text": intent.get("title", ""), "left": "center", "top": 24},
         "tooltip": {"trigger": "item"},
-        "legend": {"top": 30, "show": len(ser_list) > 1},
-        "xAxis": {"type": "value", "name": intent.get("x_label") or ""},
-        "yAxis": {"type": "value", "name": intent.get("y_label") or ""},
+        "legend": {"top": 54, "show": multi},
+        "grid": {"top": 90 if multi else 70, "left": 50, "right": 30, "bottom": 50, "containLabel": True},
+        "xAxis": {"type": "value", "name": intent.get("x_label") or "", "scale": True},
+        "yAxis": {"type": "value", "name": intent.get("y_label") or "", "scale": True},
         "series": ser_list,
     }
 
