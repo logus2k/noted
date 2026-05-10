@@ -419,8 +419,18 @@ export async function modalVoiceSettings(initial = {}) {
         let curVoice = initial.voice || 'af_heart';
         let curSpeed = typeof initial.speed === 'number' ? initial.speed : SPEED_DEFAULT;
 
+        // Same equalizer SVG as the chat-panel button, sized to the
+        // header text and inheriting the header's text color (no pill
+        // background) so the modal reads as the trigger button's home.
+        const headerIcon =
+            '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" '
+            + 'viewBox="0 0 32 32" fill="currentColor" '
+            + 'style="vertical-align:-2px;margin-right:6px">'
+            + '<path d="M3 8a1 1 0 0 1 1-1h6.05a3.5 3.5 0 0 1 6.9 0H28a1 1 0 1 1 0 2H16.95a3.5 3.5 0 0 1-6.9 0H4a1 1 0 0 1-1-1m10.5 1.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3M3 16a1 1 0 0 1 1-1h14.05a3.5 3.5 0 0 1 6.9 0H28a1 1 0 1 1 0 2h-3.05a3.5 3.5 0 0 1-6.9 0H4a1 1 0 0 1-1-1m18.5 1.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3M3 24a1 1 0 0 1 1-1h2.05a3.5 3.5 0 0 1 6.9 0H28a1 1 0 1 1 0 2H12.95a3.5 3.5 0 0 1-6.9 0H4a1 1 0 0 1-1-1m6.5 1.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3"/>'
+            + '</svg>';
+
         jsPanel.modal.create({
-            headerTitle: 'Voice Settings',
+            headerTitle: headerIcon + 'Voice Settings',
             contentSize: { width: 360, height: 'auto' },
             position: 'center',
             dragit: false,
