@@ -917,8 +917,10 @@ class App {
             // it manually (same pattern as ExplorerEnvViews terminal-panel).
             // Needed for the .jsPanel.chart-artifact-panel scoped CSS to
             // suppress the inherited content scrollbar.
+            // NOTE: must be a function (not an array) — the jsPanel.create
+            // wrapper above (~line 113) calls callback as a function.
             callback: panelClass
-                ? [(panel) => { try { panel.classList.add(panelClass); } catch {} }]
+                ? (panel) => { try { panel.classList.add(panelClass); } catch {} }
                 : undefined,
             onclosed: [() => {
                 document.querySelectorAll('.jsPanel-modal-backdrop').forEach((el) => el.remove());
