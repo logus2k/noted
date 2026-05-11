@@ -967,9 +967,12 @@ export class ExplorerPanel {
                     // pattern git/dvc badges use (.git-status-badges in CSS).
                     // Margin-left would flow after title and overflow the
                     // panel's right margin on narrow widths.
-                    activeBadge.style.cssText = 'position:absolute;right:10px;top:50%;transform:translateY(-50%);color:#4caf50;font-size:11px;-webkit-text-stroke:0.5px #2e7d32;paint-order:stroke fill';
+                    activeBadge.style.cssText = 'position:absolute;right:10px;top:50%;transform:translateY(-50%);color:#5b9400;display:inline-flex;align-items:center;justify-content:center';
                     activeBadge.title = 'Active Domain';
-                    activeBadge.innerHTML = '<i class="fa-solid fa-check"></i>';
+                    // Inline `on-tag` SVG (frontend/images/on-tag.svg) — the
+                    // ON tag icon. `stroke="currentColor"` lets the green
+                    // `color` above drive the stroke; one node, no extra HTTP.
+                    activeBadge.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M1 15V9a6 6 0 0 1 6-6h10a6 6 0 0 1 6 6v6a6 6 0 0 1-6 6H7a6 6 0 0 1-6-6Z"/><path d="M9 9a3 3 0 1 1 0 6a3 3 0 0 1 0-6Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M14 15V9l4 6V9"/></svg>';
                     row.appendChild(activeBadge);
                 }
             } else if (activeBadge) {
