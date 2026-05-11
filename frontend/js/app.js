@@ -745,10 +745,14 @@ class App {
         const _esc = (s) => String(s == null ? '' : s)
             .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        const _escHTML = (s) => String(s == null ? '' : s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
         const name = payload.name || (payload.kind === 'image' ? 'image' : 'file');
         let content = '';
         let panelOpts = {};
         let panelClass = '';
+        let headerTitleHtml = _escHTML(name);  // Per-kind branches may prefix an icon.
 
         if (payload.kind === 'image') {
             // Image viewer: full-bleed <img>, contain-fit, dark
@@ -769,6 +773,24 @@ class App {
             // are dropped — actions overlay + hover styling are inherited.
             // Useful here because the panel is resizable: getDataURL() on
             // click captures whatever the user has currently sized to.
+            // Header title gets a Font Awesome chart icon matching the
+            // chart_type (pie, bar, line, etc) so the panel is visually
+            // distinct in a docked stack.
+            const _chartIcons = {
+                pie: 'fa-chart-pie',
+                bar: 'fa-chart-column',
+                line: 'fa-chart-line',
+                area: 'fa-chart-area',
+                scatter: 'fa-braille',
+                histogram: 'fa-chart-simple',
+                box: 'fa-chart-simple',
+                heatmap: 'fa-table-cells',
+            };
+            const _iconClass = _chartIcons[payload.chart_type] || 'fa-chart-simple';
+            // headerTitle accepts HTML (per existing KB Monitor pattern); the
+            // .jsPanel-title's flex layout (display:flex; align-items:center)
+            // handles the icon + text alignment.
+            headerTitleHtml = `<i class="fa-solid ${_iconClass}" style="margin-right:6px;color:#888"></i>${_escHTML(name)}`;
             const containerId = `_chart_artifact_${Date.now().toString(36)}_${Math.floor(Math.random() * 1e6)}`;
             const _copyIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" fill="#ffe6bd"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
             const _saveIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
@@ -870,8 +892,14 @@ class App {
         // defaults without the type clash — drag and resize are then
         // both enabled and behave like the rest of noted's panels.
         jsPanel.create({
-            headerTitle: name,
-            contentSize: panelOpts,
+            headerTitle: headerTitleHtml,
+            // panelSize sets the TOTAL panel dimensions (header + content);
+            // contentSize would set just the content area, making the real
+            // panel taller than expected — and `position: 'center'` would
+            // push the header above the viewport on tighter heights, clipping
+            // the title bar. With panelSize, jsPanel's flex layout splits
+            // header/content within the fixed total height.
+            panelSize: panelOpts,
             content,
             position: 'center',
             dragit: {},
@@ -880,11 +908,18 @@ class App {
             // (Save / Copy live as in-chart hover buttons for charts;
             // images use the browser's native context menu.)
             headerControls: 'closeonly',
-            panelclass: panelClass || undefined,
             border: '1px solid var(--border-color, #444)',
             borderRadius: '6px',
             theme: 'none',
             boxShadow: 4,
+            // jsPanel's `panelclass` option doesn't reliably attach the
+            // class in this version; use the post-create callback to add
+            // it manually (same pattern as ExplorerEnvViews terminal-panel).
+            // Needed for the .jsPanel.chart-artifact-panel scoped CSS to
+            // suppress the inherited content scrollbar.
+            callback: panelClass
+                ? [(panel) => { try { panel.classList.add(panelClass); } catch {} }]
+                : undefined,
             onclosed: [() => {
                 document.querySelectorAll('.jsPanel-modal-backdrop').forEach((el) => el.remove());
                 return true;

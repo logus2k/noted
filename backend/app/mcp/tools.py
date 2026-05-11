@@ -309,12 +309,20 @@ _READ_TOOLS: list[types.Tool] = [
                     "type": "string",
                     "enum": ["bar", "line", "area", "scatter", "pie", "heatmap", "histogram", "box"],
                     "description": (
-                        "bar = categorical x + numeric y · line/area = ordered "
-                        "x + numeric y · scatter = numeric x AND numeric y · "
-                        "histogram = single numeric column (server bins it) · "
-                        "box = single numeric column, optional series for "
-                        "grouping · pie = category + value · heatmap = two "
-                        "categorical/ordered axes + one numeric value."
+                        "Each type requires specific fields below — use the "
+                        "field names exactly as listed:\n"
+                        "  bar       — set `x` (categorical) and `y` (numeric); or "
+                        "wide-format multi-series (set `x` only).\n"
+                        "  line/area — set `x` (ordered/temporal) and `y` (numeric); or "
+                        "wide-format multi-series (set `x` only).\n"
+                        "  scatter   — set `x` (numeric) AND `y` (numeric).\n"
+                        "  histogram — set `y` (single numeric column; server bins it).\n"
+                        "  box       — set `y` (single numeric column); optional `series` "
+                        "to group.\n"
+                        "  pie       — set BOTH `category` (label column) AND `value` "
+                        "(numeric column). Do NOT use `x`/`y` for pie.\n"
+                        "  heatmap   — set `x` AND `y` (categorical/ordered axes) AND "
+                        "`value` (numeric)."
                     ),
                 },
                 "title": {"type": "string", "description": "Short, declarative chart title."},

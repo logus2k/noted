@@ -439,6 +439,13 @@ def _build_scatter(intent: dict, df) -> tuple[dict | None, str | None]:
 
 def _build_pie(intent: dict, df) -> tuple[dict | None, str | None]:
     cat, val, limit = intent.get("category"), intent.get("value"), intent.get("limit")
+    if not cat or not val:
+        return None, (
+            f"pie chart requires BOTH `category` and `value` parameters; "
+            f"received category={cat!r}, value={val!r}. Set `category` to the "
+            f"column name holding the labels and `value` to the column name "
+            f"holding the numbers. Available columns: {list(df.columns)}."
+        )
     err = _validate_columns(df, cat, val)
     if err:
         return None, err
@@ -448,12 +455,18 @@ def _build_pie(intent: dict, df) -> tuple[dict | None, str | None]:
     df = _maybe_top_n(df, val, limit)
     data = [{"name": str(c), "value": _to_jsonable_scalar(v)} for c, v in zip(df[cat], df[val])]
     return {
-        "title": {"text": intent.get("title", ""), "left": "center"},
+        "title": {"text": intent.get("title", ""), "left": "center", "top": 24},
         "tooltip": {"trigger": "item"},
-        "legend": {"orient": "vertical", "left": "left"},
+        # Legend on the left with a small inset from the frame edge.
+        # Vertically centered so it sits at the same eye level as the pie
+        # (instead of anchoring near the top with empty space below).
+        # Pie stays centered horizontally so it aligns with the title;
+        # vertical center nudged to 55% to leave room for the title above.
+        "legend": {"orient": "vertical", "left": 20, "top": "middle"},
         "series": [{
             "type": "pie",
             "radius": "60%",
+            "center": ["50%", "55%"],
             "data": data,
             "emphasis": {"itemStyle": {"shadowBlur": 10, "shadowOffsetX": 0, "shadowColor": "rgba(0, 0, 0, 0.5)"}},
         }],
