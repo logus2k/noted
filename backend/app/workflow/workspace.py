@@ -67,6 +67,14 @@ class WorkspaceState:
     # eventually-completed runs without prompt-level whack-a-mole.
     smoke_rewinds: int = 0
     last_smoke_error: str | None = None
+    # research_topic: user's verdict after the user_review HITL suspend.
+    # Set by POST /api/workflows/<id>/decision before resume is signalled;
+    # the research_session handler reads it on resume to decide between
+    # accepting (workflow completes) and iterating (loops back into the
+    # researcher+reviewer cycle with the user's feedback written into
+    # the doc's Review Notes section).
+    # Values: None (no decision yet) | "accept" | "iterate"
+    user_decision: str | None = None
 
     def to_serializable(self) -> dict[str, Any]:
         return {
@@ -85,6 +93,7 @@ class WorkspaceState:
             "finished_at": self.finished_at,
             "smoke_rewinds": self.smoke_rewinds,
             "last_smoke_error": self.last_smoke_error,
+            "user_decision": self.user_decision,
         }
 
     @classmethod
@@ -106,6 +115,7 @@ class WorkspaceState:
             finished_at=data.get("finished_at"),
             smoke_rewinds=data.get("smoke_rewinds", 0),
             last_smoke_error=data.get("last_smoke_error"),
+            user_decision=data.get("user_decision"),
         )
 
     def serialized_size(self) -> int:

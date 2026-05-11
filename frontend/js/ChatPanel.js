@@ -1198,6 +1198,8 @@ export class ChatPanel {
             this._onSystemNotice({
                 kind,
                 workflow_id: wfId,
+                workflow_type: wfType,
+                reason: info.suspend_reason || info.reason || null,
                 content: `${label}: ${body}`,
             });
         }

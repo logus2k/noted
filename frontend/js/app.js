@@ -694,6 +694,59 @@ class App {
         await this._initStatusBar();
         this._updateStatusProject(this._currentProject);
         this._updateStatusBranch(this._currentProject);
+
+        // Subscribe to backend doc/workflow event stream. Drives live
+        // refresh of doc viewers while background workflows (research_topic
+        // etc.) write into buffers via execute_tool — those writes have
+        // no per-chat-turn SSE channel to fall back on. Connection is
+        // resilient: closes are auto-retried with backoff.
+        this._connectBufferEventStream();
+    }
+
+    /** Open / re-open the SSE stream that carries doc_changed and
+     * workflow_event payloads from the backend. Routes doc_changed events
+     * through `_handleDocBuffer` (the same handler the chat path uses for
+     * its inline `doc` SSE events), so live updates from a background
+     * workflow refresh the same viewer in the same way. */
+    _connectBufferEventStream() {
+        if (this._bufferEventSource) {
+            try { this._bufferEventSource.close(); } catch {}
+            this._bufferEventSource = null;
+        }
+        let backoffMs = 1000;
+        const open = () => {
+            const es = new EventSource('api/buffers/events/stream');
+            this._bufferEventSource = es;
+            es.onopen = () => { backoffMs = 1000; };
+            es.onmessage = (ev) => {
+                try {
+                    const payload = JSON.parse(ev.data);
+                    if (payload?.type === 'doc_changed' && payload.doc) {
+                        this._handleDocBuffer(payload.doc);
+                    } else if (payload?.type === 'workflow_event') {
+                        // Workflow lifecycle (started / suspended /
+                        // completed / aborted). Forwarded to the chat
+                        // panel + workflow monitor if they listen.
+                        if (this._chatPanel?.onWorkflowEvent) {
+                            try { this._chatPanel.onWorkflowEvent(payload); } catch {}
+                        }
+                    }
+                } catch (err) {
+                    console.warn('[BufferEventStream] bad payload', err);
+                }
+            };
+            es.onerror = () => {
+                // EventSource auto-reconnects on transient errors, but
+                // we also handle hard closes by manually reopening with
+                // exponential backoff (capped at 30s) so a long backend
+                // restart doesn't leave us stuck.
+                if (es.readyState === EventSource.CLOSED) {
+                    setTimeout(open, backoffMs);
+                    backoffMs = Math.min(backoffMs * 2, 30000);
+                }
+            };
+        };
+        open();
     }
 
     // Status bar methods extracted to app-status-bar.js

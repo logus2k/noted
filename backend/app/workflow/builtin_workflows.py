@@ -420,6 +420,131 @@ def _register_remove_tool() -> None:
     logger.info("registered workflow: remove_tool (2 steps, 2 outcomes)")
 
 
+# ─── research_topic ───────────────────────────────────────────────
+
+
+_RESEARCH_TOPIC_INPUT_SCHEMA = {
+    "type": "object",
+    "required": ["goal", "acceptance_criteria", "notes_doc_id"],
+    "properties": {
+        "goal": {
+            "type": "string",
+            "minLength": 8,
+            "description": "The user's research question, in their own words.",
+        },
+        "acceptance_criteria": {
+            "type": "array",
+            "minItems": 1,
+            "items": {"type": "string", "minLength": 4},
+            "description": (
+                "Bulleted checklist the final document must satisfy. The "
+                "supervisor (noted) extracts these from the user's request "
+                "during the kick-off chat turn."
+            ),
+        },
+        "notes_doc_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": (
+                "buffer_id of the in-memory document the supervisor created "
+                "via create_doc. The researcher and reviewer read/write to "
+                "this buffer via the standard doc tools (read_doc, "
+                "append_to_doc, replace_doc)."
+            ),
+        },
+    },
+}
+
+
+def _register_research_topic() -> None:
+    registry = get_workflow_registry()
+    if registry.get("research_topic") is not None:
+        return
+    registry.register(WorkflowDefinition(
+        type="research_topic",
+        description=(
+            "Iterative web research into a structured document, supervised "
+            "by noted. The researcher agent runs a tool-calling loop "
+            "(web_search + fetch_url + append_to_doc) to populate the "
+            "Findings section; the reviewer agent emits a JSON verdict "
+            "against the acceptance criteria. The session loops internally "
+            "until verdict=ready_for_user or the iteration cap is reached, "
+            "then suspends for user review. The user accepts (workflow "
+            "completes), provides feedback (writes to the doc's Review "
+            "Notes, then resumes the loop), or aborts."
+        ),
+        outcomes=[
+            WorkflowOutcome(
+                name="research_complete",
+                description="document accepted by the user",
+            ),
+        ],
+        input_schema=_RESEARCH_TOPIC_INPUT_SCHEMA,
+        plan_template=[
+            StepType(
+                name="setup_research_doc",
+                worker="deterministic",
+                description=(
+                    "Pre-fill the doc with canonical sections: Goal, "
+                    "Acceptance Criteria checklist, empty Findings, "
+                    "empty Review Notes."
+                ),
+                handler=step_handlers.setup_research_doc,
+                max_retries=0,
+                output_schema={
+                    "type": "object",
+                    "required": ["notes_doc_id", "criteria_count"],
+                    "properties": {
+                        "notes_doc_id": {"type": "string"},
+                        "criteria_count": {"type": "integer"},
+                        "byte_size": {"type": "integer"},
+                    },
+                },
+            ),
+            StepType(
+                name="research_session",
+                worker="deterministic",
+                description=(
+                    "Composite step: internally runs the researcher + "
+                    "reviewer agent loop up to RESEARCH_ITERATION_CAP "
+                    "passes, then calls _suspend_for_hitl for user review. "
+                    "On resume, branches on state.user_decision (accept / "
+                    "iterate). Loops until accept or abort. Future "
+                    "enhancement: inactivity timeout that nudges the "
+                    "researcher to continue from current doc state when "
+                    "it appears to have stopped prematurely."
+                ),
+                handler=step_handlers.research_session,
+                # Iterations are LLM-driven and inherently non-deterministic.
+                # No bounded-retry here — internal iteration cap is the
+                # bound; failures inside the handler propagate to HITL.
+                max_retries=0,
+                output_schema={
+                    "type": "object",
+                    "required": ["status"],
+                    "properties": {
+                        "status": {
+                            "type": "string",
+                            "enum": ["accepted", "aborted", "cap_reached"],
+                        },
+                        "iterations_run": {"type": "integer"},
+                        "final_verdict": {"type": "string"},
+                    },
+                },
+            ),
+        ],
+        # Generous cap: research sessions can legitimately run minutes per
+        # iteration (web fetches + model thinking) and the HITL pause can
+        # sit overnight if the user steps away. The suspension manager has
+        # its own DEFAULT_SUSPEND_TIMEOUT_S which caps how long the user
+        # has to respond; this cap is the total wallclock budget.
+        max_wallclock_seconds=7200,
+        max_retries_per_step=0,
+    ))
+    logger.info("registered workflow: research_topic (2 steps, 1 outcome)")
+
+
 # Run registrations at import time.
 _register_create_tool()
 _register_remove_tool()
+_register_research_topic()

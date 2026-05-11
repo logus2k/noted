@@ -265,6 +265,54 @@ async def abort(workflow_id: str, request: Request) -> dict[str, Any]:
     return {"aborted": True, "workflow_id": workflow_id}
 
 
+class DecisionRequest(BaseModel):
+    decision: str = Field(
+        ...,
+        description="The user's verdict at a HITL review checkpoint. "
+                    "Currently used by research_topic; one of 'accept' or 'iterate'.",
+    )
+
+
+@router.post("/{workflow_id}/decision")
+async def decision(workflow_id: str, request: Request, body: DecisionRequest) -> dict[str, Any]:
+    """Record the user's decision at a HITL checkpoint and resume.
+
+    Used by `research_topic` user_review pauses. The handler reads
+    `state.user_decision` on resume and branches:
+      - "accept" → workflow completes
+      - "iterate" → loops back into the research+review cycle, picking
+        up any feedback the supervisor wrote into the doc's Review
+        Notes section before signalling resume.
+
+    Single endpoint that sets the field AND signals resume so the
+    handler doesn't race the resume signal against a separate field
+    write.
+    """
+    identity = extract_identity(request.headers)
+    decision_value = (body.decision or "").strip().lower()
+    if decision_value not in ("accept", "iterate"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"decision must be 'accept' or 'iterate'; got {body.decision!r}",
+        )
+
+    suspension = get_suspension_manager()
+    if not suspension.is_suspended(identity.tenant_id, workflow_id):
+        raise HTTPException(status_code=409, detail="workflow not suspended")
+
+    # Resolve and mutate the in-memory state BEFORE signalling resume,
+    # so the handler reads the decision the moment its wait unblocks.
+    state = _resolve_state_or_404(identity.tenant_id, workflow_id)
+    state.user_decision = decision_value
+
+    suspension.resume(identity.tenant_id, workflow_id)
+    return {
+        "ok": True,
+        "workflow_id": workflow_id,
+        "decision": decision_value,
+    }
+
+
 @router.delete("/{workflow_id}")
 async def delete_workflow(workflow_id: str, request: Request) -> dict[str, Any]:
     """Drop a workflow's runtime state — both the in-memory workspace

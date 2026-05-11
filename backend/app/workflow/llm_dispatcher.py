@@ -346,3 +346,177 @@ async def dispatch(
         )
     logger.info("worker %s returned %d top-level keys", preset_name, len(parsed_out))
     return parsed_out
+
+
+# ── Tool-calling dispatch ─────────────────────────────────────────
+
+
+async def dispatch_tool_calling(
+    preset_name: str,
+    user_message: str,
+    tool_names: list[str],
+    *,
+    base_url: str = AGENT_SERVER_URL,
+    timeout_s: float = DEFAULT_TIMEOUT_S,
+    state=None,
+    ctx: dict[str, Any] | None = None,
+    max_turns: int = 12,
+) -> dict[str, Any]:
+    """Multi-turn tool-calling invocation of an agent_server preset.
+
+    Sends an initial user message with a filtered tools schema to the
+    preset (which carries its own system prompt at the agent_server side).
+    If the model responds with `tool_calls`, executes each via the same
+    `execute_tool()` the chat path uses, appends results as `tool`-role
+    messages, and continues. Returns when the model emits a plain content
+    response (final answer) or when `max_turns` is reached.
+
+    Used by workflow handlers that need an agent capable of multi-step
+    tool use (`researcher`) rather than one-shot structured output
+    (`tool_author`, `api_tester`, `skill_author`, ...).
+
+    Returns:
+      {
+        "final_content": str,       # the model's final answer, or "" if cap hit
+        "turns_used": int,          # number of LLM round-trips
+        "tool_call_log": [          # one entry per executed tool call
+          {"turn": int, "name": str, "args": dict, "result_preview": str}
+        ],
+        "hit_cap": bool,            # True if max_turns reached without final
+        "error": str | None,        # transport / parse error if any
+      }
+    """
+    # Lazy imports to avoid circular dependency with routers.llm at module
+    # import time. _managers carries the runtime manager singletons; the
+    # filtered tools schema is built per call so per-tenant additions
+    # (user tools) are reflected.
+    from app.managers.llm_tools import execute_tool
+    from app.mcp.tool_formats import to_openai_tools
+    from app.routers.llm import _managers as router_managers
+
+    import time as _time
+
+    wanted = set(tool_names)
+    all_tools = to_openai_tools()
+    tools = [t for t in all_tools if t.get("function", {}).get("name") in wanted]
+    if not tools:
+        raise ValueError(
+            f"dispatch_tool_calling: none of the requested tool_names "
+            f"{sorted(wanted)} are registered"
+        )
+
+    req_managers = {**router_managers, "_tool_metadata": {}}
+    call_ctx = ctx or {}
+
+    messages: list[dict[str, Any]] = [
+        {"role": "user", "content": user_message},
+    ]
+    tool_call_log: list[dict[str, Any]] = []
+    final_content = ""
+    error: str | None = None
+    turns_used = 0
+    _t0 = _time.perf_counter()
+
+    try:
+        for turn in range(max_turns):
+            turns_used = turn + 1
+            payload = {
+                "model": preset_name,
+                "messages": messages,
+                "tools": tools,
+                "stream": False,
+            }
+            try:
+                async with httpx.AsyncClient(timeout=timeout_s) as client:
+                    resp = await client.post(
+                        f"{base_url}/v1/chat/completions",
+                        json=payload,
+                        headers={"Content-Type": "application/json"},
+                    )
+                    resp.raise_for_status()
+                    data = resp.json()
+            except httpx.RequestError as e:
+                error = f"agent_server unreachable: {type(e).__name__}: {e}"
+                break
+            except httpx.HTTPStatusError as e:
+                error = (
+                    f"agent_server HTTP {e.response.status_code}: "
+                    f"{e.response.text[:300]}"
+                )
+                break
+
+            choices = data.get("choices") or []
+            if not choices:
+                error = "agent_server returned no choices"
+                break
+            msg = choices[0].get("message") or {}
+            calls = msg.get("tool_calls") or []
+
+            if not calls:
+                # Model produced a plain content response — final answer.
+                final_content = msg.get("content") or ""
+                final_content = _strip_thinking(final_content).strip()
+                break
+
+            # Echo the assistant's tool-call message back into the history,
+            # then execute each call and append its result as a `tool`-role
+            # message. Same shape OpenAI / llama-cpp-python expects so the
+            # next round sees the model's own prior actions + the outcomes.
+            messages.append({
+                "role": "assistant",
+                "content": msg.get("content") or "",
+                "tool_calls": calls,
+            })
+
+            for tc in calls:
+                fn = tc.get("function") or {}
+                tool_name = fn.get("name") or ""
+                raw_args = fn.get("arguments") or "{}"
+                try:
+                    tool_args = json.loads(raw_args) if isinstance(raw_args, str) else (raw_args or {})
+                except json.JSONDecodeError:
+                    tool_args = {}
+                tool_call = {"id": tc.get("id", ""), "name": tool_name, "args": tool_args}
+                try:
+                    result = await execute_tool(tool_call, req_managers, call_ctx)
+                    if not isinstance(result, str):
+                        result = json.dumps(result, default=str)
+                except Exception as e:
+                    result = f"tool {tool_name!r} failed: {type(e).__name__}: {e}"
+                tool_call_log.append({
+                    "turn": turn,
+                    "name": tool_name,
+                    "args": tool_args,
+                    "result_preview": result[:200],
+                })
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": tc.get("id", ""),
+                    "content": result,
+                })
+    finally:
+        # Single rolled-up log entry; per-tool detail lives in tool_call_log.
+        _record_llm_call(
+            state,
+            preset=preset_name,
+            backend="gemma",
+            duration_s=_time.perf_counter() - _t0,
+            user_message=user_message,
+            raw_content=final_content,
+            stripped=final_content,
+            parsed={"tool_call_log": tool_call_log, "turns_used": turns_used},
+            parse_error=error,
+        )
+
+    hit_cap = (turns_used >= max_turns and not final_content and error is None)
+    logger.info(
+        "tool-calling preset %s: turns=%d, tool_calls=%d, hit_cap=%s, error=%s",
+        preset_name, turns_used, len(tool_call_log), hit_cap, error,
+    )
+    return {
+        "final_content": final_content,
+        "turns_used": turns_used,
+        "tool_call_log": tool_call_log,
+        "hit_cap": hit_cap,
+        "error": error,
+    }

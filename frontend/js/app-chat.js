@@ -197,24 +197,55 @@ export function initChat(app) {
         // message is hidden (showUserMessage:false), thinking + RAG are
         // disabled (the assistant just acknowledges; no retrieval needed),
         // and tool-calls are suppressed by the prompt itself.
-        app._chatPanel.onSystemNotice(async ({ kind, content, workflow_id }) => {
+        app._chatPanel.onSystemNotice(async ({ kind, content, workflow_id, workflow_type, reason }) => {
             if (!app._chatService) return;
-            const synthetic = (
-                `[system notice] ${content} `
-                + `Briefly acknowledge this to the user in 1–2 short sentences `
-                + `as if the system just informed you. `
-                + (kind === 'completed'
-                    ? `Mention the new capability is now ready to use, and invite them to ask for it.`
-                    : kind === 'failed'
-                        ? `State the failure plainly and point them to the Workflow Monitor.`
-                        : `Note it is paused and tell them they can resume or abort via the Workflow Monitor.`)
-                + ` Do NOT call any tools — just speak.`
+            // Research-topic user-review pauses get a different synthetic
+            // message: the supervisor (this LLM) actively reads the doc,
+            // decides accept/iterate, OR escalates to the user. Tool calls
+            // are ALLOWED here (unlike other suspend notices) because the
+            // supervisor must read the doc and submit the decision.
+            const isResearchReview = (
+                kind === 'suspended'
+                && (reason || '').startsWith('research_user_review')
             );
+            let synthetic;
+            if (isResearchReview) {
+                // Mandatory tool-call-first phrasing. Gemma will narrate
+                // "I am submitting the decision" instead of actually
+                // calling the tool if the prompt reads as a description.
+                // Imperatives + explicit ordering keep the tool call from
+                // being skipped (per the prior "stops at narration" bug).
+                synthetic = (
+                    `[system notice] ${content}\n\n`
+                    + `You are the supervisor for this paused research workflow. Take action IN THIS ORDER:\n\n`
+                    + `STEP 1 (MANDATORY): Call read_doc with the workflow's buffer_id (find it in your earlier chat messages from when you called request_new_research) to see the current document state. Do this even if you remember what you wrote.\n\n`
+                    + `STEP 2 (MANDATORY): Decide your verdict and IMMEDIATELY call submit_research_decision. Do not narrate the decision first — make the tool call, then talk. One of:\n`
+                    + `  - submit_research_decision({"workflow_id":"<id from notice>","decision":"accept"}) when the Findings satisfy the Goal and the Acceptance Criteria.\n`
+                    + `  - submit_research_decision({"workflow_id":"<id from notice>","decision":"iterate"}) when gaps remain. BEFORE making this call, you MUST have written your specific concerns into the doc's ## Review Notes section via replace_doc (read_doc first, append a new ### Iteration N+1 block to Review Notes, then replace_doc with the full updated content).\n\n`
+                    + `STEP 3 (only after the tool call returned): Tell the user in 1-2 sentences what you decided and why. Do NOT promise to do something — your tool call has already done it.\n\n`
+                    + `If you are genuinely uncertain whether to accept or iterate, SKIP step 2 and instead ask the user directly: summarise the document state and ask whether they want to accept or iterate. After the user replies, do step 2 with their choice.`
+                );
+            } else {
+                synthetic = (
+                    `[system notice] ${content} `
+                    + `Briefly acknowledge this to the user in 1–2 short sentences `
+                    + `as if the system just informed you. `
+                    + (kind === 'completed'
+                        ? `Mention the new capability is now ready to use, and invite them to ask for it.`
+                        : kind === 'failed'
+                            ? `State the failure plainly and point them to the Workflow Monitor.`
+                            : `Note it is paused and tell them they can resume or abort via the Workflow Monitor.`)
+                    + ` Do NOT call any tools — just speak.`
+                );
+            }
             try {
                 await app._chatService.sendMessage(synthetic, {
                     showUserMessage: false,
                     overrides: {
-                        thinkEnabled: false,
+                        // Research review needs reasoning to weigh
+                        // criteria against findings; other notices just
+                        // need a sentence of acknowledgement.
+                        thinkEnabled: isResearchReview,
                         vectorRagEnabled: false,
                         graphRagEnabled: false,
                     },
