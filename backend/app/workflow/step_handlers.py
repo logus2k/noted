@@ -79,7 +79,15 @@ def _tenant_archive_dir(tenant_id: str) -> Path:
 
 
 def _skills_dir() -> Path:
-    return Path(DATA_DIR) / "skills"
+    """Where user-created skills land. Defaults to the General domain's
+    skills folder so the new SKILL.md is registered with `domain_id='general'`
+    and shows up under General in the Explorer (paired with the user_tool,
+    which similarly registers under General). The legacy flat data/skills/
+    location is read-only for native bundled skills (airflow-*, mlflow-*,
+    etc); the workflow framework no longer writes there. A future "Move skill
+    to..." action will let the user re-bind a skill to a different domain
+    after creation."""
+    return Path(DATA_DIR) / "domains" / "general" / "skills"
 
 
 def _previous(inputs: dict[str, Any], step_name: str | None = None) -> dict[str, Any]:

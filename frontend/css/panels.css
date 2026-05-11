@@ -16,6 +16,15 @@
 
 .jsPanel .jsPanel-headerbar {
     padding: 0;
+    /* Vendor jsPanel sizes the titlebar to the headerbar (titlebar has
+     * height:100%; overflow:hidden), and the headerbar to its tallest
+     * child. With normal text titles the headerbar is ~28px tall — fine.
+     * But titles that include FA icons with -webkit-text-stroke or
+     * larger glyphs render taller than 28px, get clipped by the
+     * titlebar's overflow:hidden, and look "occluded". Forcing a
+     * minimum height gives those titles room without affecting the
+     * common case. */
+    min-height: 32px;
 }
 
 .jsPanel .jsPanel-title {
@@ -23,7 +32,11 @@
     font-size: 12px !important;
     text-transform: none !important;
     font-variant: normal !important;
-    padding: 9px 20px 6px 1px;
+    padding: 6px 20px 3px 1px;
+    /* align-items:center centers the title CONTENT inside the title
+     * element, so an icon + text stay vertically aligned with each
+     * other and with the close button when the headerbar is taller
+     * than the bare text would need. */
     display: flex;
     align-items: center;
 }

@@ -921,20 +921,33 @@ export class ExplorerPanel {
             if (iconEl) iconEl.className = 'wb-icon ' + node.icon;
         }
 
-        // F6.1 / F6.4: provenance pill for self-authored tools and skills.
-        // Wunderbaum escapes node titles, so the pill must be injected as a
-        // sibling element after the .wb-title rather than embedded in title.
-        const isUserAuthored = (node.data && (node.data.isUserTool || node.data.isUserSkill));
-        const titleEl = row.querySelector('.wb-title');
-        const existingPill = row.querySelector(':scope > .explorer-prov-pill');
-        if (isUserAuthored && titleEl && !existingPill) {
-            const pill = document.createElement('span');
-            pill.className = 'explorer-prov-pill';
-            pill.textContent = 'user';
-            titleEl.insertAdjacentElement('afterend', pill);
-        } else if (!isUserAuthored && existingPill) {
-            existingPill.remove();
+        // F6.1 / F6.4: provenance badge for self-authored tools and skills.
+        // Trailing "U" decoration — same right-edge slot pattern as the
+        // git-decoration-dot, since tool/skill rows never carry git status
+        // (they're not files in the working tree). Replaces the earlier
+        // inline 'user' pill so the trailing-icons region stays the single
+        // source of truth for "this row has a status of some kind".
+        // Lookup is via _userAuthoredKeys (populated by _loadToolsTree /
+        // _loadSkillsTree) rather than node.data — Wunderbaum's `data`
+        // field doesn't reach the render hook reliably for lazy-loaded
+        // children, but `node.key` always does.
+        const isUserAuthored = !!(this._userAuthoredKeys && this._userAuthoredKeys.has(key));
+        let userBadge = row.querySelector(':scope > .user-tool-badge');
+        if (isUserAuthored) {
+            if (!userBadge) {
+                userBadge = document.createElement('span');
+                userBadge.className = 'user-tool-badge';
+                userBadge.textContent = 'U';
+                userBadge.title = 'User-authored';
+                row.appendChild(userBadge);
+            }
+        } else if (userBadge) {
+            userBadge.remove();
         }
+        // Belt-and-suspenders: clean up any stale inline pill from before
+        // the trailing-badge migration (cached DOM nodes from older sessions).
+        const stalePill = row.querySelector(':scope > .explorer-prov-pill');
+        if (stalePill) stalePill.remove();
 
         // Active-Domain indicator: green check appended after the title for
         // any per-Domain row whose domain_id is in the active set. Affects
@@ -2811,6 +2824,15 @@ export class ExplorerPanel {
             if (!skills.length) {
                 return [{ title: 'No skills bound to this Domain', key: `asst-domain:${domainId}:skills:empty`, icon: 'fa-solid fa-info-circle' }];
             }
+            // Side map for _onTreeRender, keyed by the same key the renderer
+            // uses. Wunderbaum's per-node `data` doesn't reach the hook
+            // reliably for lazy-loaded children.
+            this._userAuthoredKeys = this._userAuthoredKeys || new Set();
+            for (const s of skills) {
+                if (s.provenance === 'user') {
+                    this._userAuthoredKeys.add(`skill:${s.name}`);
+                }
+            }
             return skills.map(s => {
                 // F6.4: pill is injected post-render via _onTreeRender (see
                 // tool-tree comment for why HTML can't sit in `title`).
@@ -2823,7 +2845,6 @@ export class ExplorerPanel {
                     lazy: s.has_references,
                     children: s.has_references ? undefined : undefined,
                     tooltip: (isUser ? '[self-authored] ' : '') + (s.description || ''),
-                    data: { isUserSkill: isUser },
                 };
             });
         } catch (e) {
@@ -3442,6 +3463,25 @@ export class ExplorerPanel {
             if (!tools.length) {
                 return [{ title: 'No tools available', key: `asst-domain:${domainId}:tools:empty`, icon: 'fa-solid fa-info-circle' }];
             }
+            // Read tier first (alphabetical), then write tier (alphabetical).
+            // Mirrors the conceptual hierarchy: read is safe-by-default, write
+            // is the privileged subset. User-authored tools sort alongside
+            // native ones — provenance is a badge, not an ordering axis.
+            tools.sort((a, b) => {
+                const aRead = a.tier !== 'write';
+                const bRead = b.tier !== 'write';
+                if (aRead !== bRead) return aRead ? -1 : 1;
+                return (a.name || '').localeCompare(b.name || '');
+            });
+            // Sync lookup map for _onTreeRender. Wunderbaum's `data` field
+            // wasn't reaching the render hook reliably (lazy-load path);
+            // a side map keyed by the same key the renderer sees is robust.
+            this._userAuthoredKeys = this._userAuthoredKeys || new Set();
+            for (const t of tools) {
+                if (t.provenance === 'user') {
+                    this._userAuthoredKeys.add(`mcptool:${t.tier}:${t.name}`);
+                }
+            }
             // Tree node key shape: mcptool:<tier>:<name>
             return tools.map(t => {
                 const isUser = t.provenance === 'user';
@@ -3453,7 +3493,6 @@ export class ExplorerPanel {
                     key: `mcptool:${t.tier}:${t.name}`,
                     icon: 'fa-solid fa-wrench',
                     tooltip: `${t.tier === 'write' ? 'WRITE' : 'READ'}${provTip} - ${t.description || ''}`,
-                    data: { isUserTool: isUser },
                 };
             });
         } catch (e) {

@@ -833,6 +833,25 @@ div.wunderbaum div.wb-node-list div.wb-row.wb-selected {
     z-index: 1;
 }
 
+/* Trailing "U" badge for user-authored tools and skills in the Explorer.
+ * Lives in the same right-edge slot as .git-decoration-dot — tool / skill
+ * rows never carry git status (not files in the working tree), so the slot
+ * is free. Single-letter glyph keeps the visual weight close to the git
+ * dot so rows feel uniformly decorated. */
+.user-tool-badge {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 11px;
+    font-weight: 700;
+    color: #9575cd;
+    line-height: 1;
+    pointer-events: auto;
+    z-index: 1;
+    user-select: none;
+}
+
 /* DVC uses a triangle (delta Δ) to distinguish from git's circle */
 .git-decoration-dot.dvc {
     border-radius: 0;

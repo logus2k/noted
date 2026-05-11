@@ -1121,6 +1121,16 @@
     cursor: zoom-in;
     overflow: hidden;
 }
+/* Floating-viewer variant (jsPanel artifact). Drops the inline-only
+ * border / margin / fixed height / zoom cursor; ECharts fills the
+ * panel content area. Action overlay + hover styling are inherited. */
+.chat-message-chart-frame--floating {
+    height: 100%;
+    margin: 0;
+    border: none;
+    border-radius: 0;
+    cursor: default;
+}
 .chat-message-chart {
     width: 100%;
     height: 100%;
@@ -1144,7 +1154,7 @@
     height: 28px;
     padding: 0;
     background: rgba(255, 255, 255, 0.92);
-    border: 1px solid #bbb;
+    border: none;
     border-radius: 4px;
     color: #1565c0;
     cursor: pointer;
@@ -1156,12 +1166,12 @@
 }
 .chat-chart-action:hover {
     background: #ffffff;
-    border-color: #1565c0;
     color: #0d47a1;
 }
 .chat-chart-action:active {
     background: #f0f0f0;
 }
-.chat-chart-action i {
+.chat-chart-action i,
+.chat-chart-action svg {
     pointer-events: none;
 }

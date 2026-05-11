@@ -762,17 +762,27 @@ class App {
             `;
             panelOpts = { width: 720, height: 560 };
         } else if (payload.kind === 'chart') {
-            // ECharts viewer: container div initialised after the panel
-            // mounts (echarts.init needs a sized DOM element). The
-            // option dict is captured in a closure and applied via
-            // setOption. ResizeObserver keeps it responsive.
-            // White background to match the in-bubble chart and let
-            // ECharts' default dark text/axis colors stay readable.
-            // overflow:hidden contains ECharts' internal canvas (which
-            // can render 1-2px past the wrapper bounds and trigger the
-            // global .jsPanel-content overflow-y:auto scrollbars).
+            // ECharts viewer with the same Copy/Save overlay buttons used
+            // by the inline chat chart (ChatPanel.renderInlineChart). The
+            // frame reuses .chat-message-chart-frame with a --floating
+            // modifier so the inline-specific border/margin/zoom-cursor
+            // are dropped — actions overlay + hover styling are inherited.
+            // Useful here because the panel is resizable: getDataURL() on
+            // click captures whatever the user has currently sized to.
             const containerId = `_chart_artifact_${Date.now().toString(36)}_${Math.floor(Math.random() * 1e6)}`;
-            content = `<div id="${containerId}" style="width:100%;height:100%;background:#ffffff;overflow:hidden"></div>`;
+            const _copyIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" fill="#ffe6bd"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+            const _saveIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
+            const _checkIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22863a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+            const _xIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#c62828" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+            content = `
+                <div class="chat-message-chart-frame chat-message-chart-frame--floating">
+                    <div id="${containerId}" class="chat-message-chart"></div>
+                    <div class="chat-message-chart-actions">
+                        <button type="button" class="chat-chart-action" data-action="copy" title="Copy Image">${_copyIcon}</button>
+                        <button type="button" class="chat-chart-action" data-action="save" title="Save As Image">${_saveIcon}</button>
+                    </div>
+                </div>
+            `;
             panelOpts = { width: 880, height: 600 };
             panelClass = 'chart-artifact-panel';
             // Defer init until the jsPanel mounts the content into the DOM.
@@ -784,6 +794,53 @@ class App {
                     c.setOption(payload.option || {});
                     const ro = new ResizeObserver(() => { try { c.resize(); } catch {} });
                     ro.observe(el);
+
+                    // Wire Copy/Save handlers — same logic as the inline
+                    // chart, but reading from THIS chart instance so a
+                    // resized panel produces a resized capture.
+                    const frame = el.parentElement;
+                    const copyBtn = frame.querySelector('[data-action="copy"]');
+                    const saveBtn = frame.querySelector('[data-action="save"]');
+                    const safeName = ((payload.name || 'chart') + '')
+                        .replace(/[^\w\-]+/g, '_').replace(/^_+|_+$/g, '') || 'chart';
+                    const flash = (btn, replacement, restoreTitle, ms = 1200) => {
+                        const origHTML = btn.innerHTML;
+                        const origTitle = btn.title;
+                        btn.innerHTML = replacement;
+                        if (restoreTitle) btn.title = restoreTitle;
+                        setTimeout(() => { btn.innerHTML = origHTML; btn.title = origTitle; }, ms);
+                    };
+                    copyBtn.addEventListener('click', async (ev) => {
+                        ev.stopPropagation();
+                        try {
+                            const dataUrl = c.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: '#fff' });
+                            const blob = await (await fetch(dataUrl)).blob();
+                            if (!navigator.clipboard || !window.ClipboardItem) {
+                                throw new Error('Clipboard image API unavailable (needs HTTPS or localhost)');
+                            }
+                            await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+                            flash(copyBtn, _checkIcon, 'Copied');
+                        } catch (err) {
+                            console.warn('[app] copy chart artifact failed', err);
+                            flash(copyBtn, _xIcon, 'Copy failed — try Save', 1800);
+                        }
+                    });
+                    saveBtn.addEventListener('click', (ev) => {
+                        ev.stopPropagation();
+                        try {
+                            const dataUrl = c.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: '#fff' });
+                            const a = document.createElement('a');
+                            a.href = dataUrl;
+                            a.download = safeName + '.png';
+                            document.body.appendChild(a);
+                            a.click();
+                            a.remove();
+                            flash(saveBtn, _checkIcon, 'Saved');
+                        } catch (err) {
+                            console.warn('[app] save chart artifact failed', err);
+                            flash(saveBtn, _xIcon, 'Save failed', 1800);
+                        }
+                    });
                 } catch (e) {
                     console.warn('[app] chart artifact render failed', e);
                 }

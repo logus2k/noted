@@ -1715,20 +1715,27 @@ export class ChatPanel {
         wrapper.className = 'chat-message-chart';
         frame.appendChild(wrapper);
 
-        // Hover-revealed action buttons (Copy / Save). Font Awesome to
-        // match the rest of noted's iconography.
+        // Hover-revealed action buttons (Copy / Save). Inline SVG icons
+        // matching noted's stroke-width:1.5 style. The Copy icon is the
+        // same two-document affordance used by the per-message Copy
+        // Answer button (see _createMessageActions).
+        const _copyIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" fill="#ffe6bd"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+        const _saveIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
+        const _checkIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22863a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+        const _xIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#c62828" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+
         const actions = document.createElement('div');
         actions.className = 'chat-message-chart-actions';
         const copyBtn = document.createElement('button');
         copyBtn.type = 'button';
         copyBtn.className = 'chat-chart-action';
         copyBtn.title = 'Copy Image';
-        copyBtn.innerHTML = '<i class="fa-solid fa-copy"></i>';
+        copyBtn.innerHTML = _copyIcon;
         const saveBtn = document.createElement('button');
         saveBtn.type = 'button';
         saveBtn.className = 'chat-chart-action';
         saveBtn.title = 'Save As Image';
-        saveBtn.innerHTML = '<i class="fa-solid fa-download"></i>';
+        saveBtn.innerHTML = _saveIcon;
         actions.appendChild(copyBtn);
         actions.appendChild(saveBtn);
         frame.appendChild(actions);
@@ -1746,13 +1753,12 @@ export class ChatPanel {
 
         const _safeName = ((payload.title || payload.chart_type || 'chart') + '')
             .replace(/[^\w\-]+/g, '_').replace(/^_+|_+$/g, '') || 'chart';
-        const _flashIcon = (btn, glyph, restoreTitle, ms = 1200) => {
-            const i = btn.querySelector('i');
-            const orig = i.className;
+        const _flash = (btn, replacement, restoreTitle, ms = 1200) => {
+            const origHTML = btn.innerHTML;
             const origTitle = btn.title;
-            i.className = `fa-solid ${glyph}`;
+            btn.innerHTML = replacement;
             if (restoreTitle) btn.title = restoreTitle;
-            setTimeout(() => { i.className = orig; btn.title = origTitle; }, ms);
+            setTimeout(() => { btn.innerHTML = origHTML; btn.title = origTitle; }, ms);
         };
 
         copyBtn.addEventListener('click', async (e) => {
@@ -1764,10 +1770,10 @@ export class ChatPanel {
                     throw new Error('Clipboard image API unavailable (needs HTTPS or localhost)');
                 }
                 await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-                _flashIcon(copyBtn, 'fa-check', 'Copied');
+                _flash(copyBtn, _checkIcon, 'Copied');
             } catch (err) {
                 console.warn('[ChatPanel] copy chart failed', err);
-                _flashIcon(copyBtn, 'fa-xmark', 'Copy failed — try Save', 1800);
+                _flash(copyBtn, _xIcon, 'Copy failed — try Save', 1800);
             }
         });
 
@@ -1781,10 +1787,10 @@ export class ChatPanel {
                 document.body.appendChild(a);
                 a.click();
                 a.remove();
-                _flashIcon(saveBtn, 'fa-check', 'Saved');
+                _flash(saveBtn, _checkIcon, 'Saved');
             } catch (err) {
                 console.warn('[ChatPanel] save chart failed', err);
-                _flashIcon(saveBtn, 'fa-xmark', 'Save failed', 1800);
+                _flash(saveBtn, _xIcon, 'Save failed', 1800);
             }
         });
 
