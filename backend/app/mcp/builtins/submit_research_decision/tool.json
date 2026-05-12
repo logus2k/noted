@@ -1,0 +1,20 @@
+{
+  "name": "submit_research_decision",
+  "tier": "read",
+  "description": "Finalise a paused research_topic workflow. Call ONLY when you have received a `workflow_suspended` notice for a research_topic workflow AND you have read the workspace document (via read_doc) and decided your verdict.\n  decision='accept' — document satisfies the goal as-is. Workflow completes with the doc as the final artifact.\n  decision='iterate' — gaps remain; you have already added your concerns into the doc's `## Review Notes` section via replace_doc, and now want the researcher to make another pass. Refused once the global iteration cap is reached.\n  decision='stop' — end the workflow with the doc in its current (partial) state. Use when the user explicitly says to stop, when criteria appear unreachable, or when the user is satisfied with partial findings. Distinct from 'accept' because the doc is recorded as INCOMPLETE.\nReturns immediately; the workflow resumes server-side.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "workflow_id": {
+        "type": "string",
+        "description": "The research_topic workflow_id from the suspend notice."
+      },
+      "decision": {
+        "type": "string",
+        "enum": ["accept", "iterate", "stop"],
+        "description": "Your verdict on the document's current state."
+      }
+    },
+    "required": ["workflow_id", "decision"]
+  }
+}

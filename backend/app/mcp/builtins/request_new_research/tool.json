@@ -1,0 +1,24 @@
+{
+  "name": "request_new_research",
+  "tier": "read",
+  "description": "Start an iterative web-research workflow into a workspace document. Use when the user asks to 'research', 'look up', 'find articles about', or otherwise needs current information from the public web compiled into a structured document. BEFORE calling: (1) call create_doc to create the workspace buffer (the orchestrator pre-fills the canonical sections); (2) extract `goal` (the user's research question, verbatim) and `acceptance_criteria` (2-5 short bullets the document must satisfy — derive these from the user's request, or ask the user if they aren't clear). The workflow then runs a researcher agent (web_search + fetch_url + append_to_doc) and a reviewer agent in a loop until ready, then pauses for your review (you become the supervisor). Returns the workflow_id immediately; subsequent supervision happens via the workflow-suspended notice you'll receive.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "goal": {
+        "type": "string",
+        "description": "The user's research question in their own words (e.g. 'Is there an API for UPS and how to use it?')."
+      },
+      "acceptance_criteria": {
+        "type": "array",
+        "items": {"type": "string"},
+        "description": "2-5 short bullets the final document must satisfy. Extract or ask the user."
+      },
+      "notes_doc_id": {
+        "type": "string",
+        "description": "buffer_id returned by create_doc. The workspace document lives here; the researcher and reviewer read/write to it via the standard doc tools."
+      }
+    },
+    "required": ["goal", "acceptance_criteria", "notes_doc_id"]
+  }
+}

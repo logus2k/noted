@@ -15,6 +15,8 @@ import re
 import time
 from typing import Optional
 
+from app.mcp.builtins import BUILTIN_HANDLERS as _BUILTIN_HANDLERS
+
 logger = logging.getLogger(__name__)
 
 
@@ -977,10 +979,13 @@ async def execute_tool(tool_call: dict, managers: dict, ctx: dict = None) -> str
             return await _tool_graph_and_vector_search(args, managers)
         elif name == "request_new_tool":
             return await _tool_request_new_tool(args)
-        elif name == "request_new_research":
-            return await _tool_request_new_research(args)
-        elif name == "submit_research_decision":
-            return await _tool_submit_research_decision(args)
+        elif name in _BUILTIN_HANDLERS:
+            # Per-tool folder built-ins (app/mcp/builtins/<tool>/). Each
+            # tool ships its own handler.py; the dispatcher just routes
+            # by name. Signature accepts optional managers / ctx so simple
+            # tools can declare `async def handler(args)` and still plug
+            # into the same dispatch path.
+            return await _BUILTIN_HANDLERS[name](args, managers, ctx)
         elif name == "read_doc":
             return await _tool_read_doc(args)
         elif name == "append_to_doc":
@@ -3585,128 +3590,6 @@ async def _tool_request_new_tool(args: dict) -> str:
     )
 
 
-async def _tool_request_new_research(args: dict) -> str:
-    """Kick off a research_topic workflow asynchronously.
-
-    Mirrors the pattern in routers.workflows.run_new: generate the
-    workflow_id up front so the tool result can include it immediately,
-    then fire-and-forget the workflow loop on a background task. The
-    handler suspends for user_review (via the existing HITL mechanism)
-    when the inner research+review loop finishes — the chat-side
-    workflow_suspended notice then nudges the supervisor (this LLM) to
-    read the doc and call submit_research_decision.
-    """
-    import asyncio as _asyncio
-    goal = (args.get("goal") or "").strip()
-    criteria = list(args.get("acceptance_criteria") or [])
-    notes_doc_id = (args.get("notes_doc_id") or "").strip()
-
-    if not goal:
-        return "Error: 'goal' is required (the user's research question)."
-    if not criteria:
-        return (
-            "Error: 'acceptance_criteria' is required (2-5 short bullets "
-            "the document must satisfy). Extract from the user's request, "
-            "or ask the user first."
-        )
-    if not notes_doc_id:
-        return (
-            "Error: 'notes_doc_id' is required. Call create_doc first to "
-            "create the workspace buffer."
-        )
-
-    from app.managers import notes_buffer
-    if notes_buffer.get(notes_doc_id) is None:
-        return (
-            f"Error: notes_doc_id {notes_doc_id!r} not found. Verify the "
-            f"buffer_id returned by create_doc."
-        )
-
-    from app.workflow.loop import _new_workflow_id, run_workflow as _run_wf
-    from app.workflow.registry import get_workflow_registry
-    if get_workflow_registry().get("research_topic") is None:
-        return "Error: research_topic workflow is not registered."
-
-    workflow_id = _new_workflow_id()
-
-    async def _run() -> None:
-        try:
-            await _run_wf(
-                tenant_id="default",
-                workflow_type="research_topic",
-                inputs={
-                    "goal": goal,
-                    "acceptance_criteria": criteria,
-                    "notes_doc_id": notes_doc_id,
-                },
-                actor_id="default",
-                workflow_id=workflow_id,
-            )
-        except Exception:
-            logger.exception(
-                "request_new_research spawned task failed for %s", workflow_id
-            )
-
-    _asyncio.create_task(_run())
-    return json.dumps({
-        "workflow_id": workflow_id,
-        "workflow_type": "research_topic",
-        "status": "pending",
-        "notes_doc_id": notes_doc_id,
-        "goal": goal,
-        "acceptance_criteria": criteria,
-        "next_step": (
-            "Research is running in the background. Tell the user what "
-            "you're researching (the goal + criteria) in 1-2 sentences. "
-            "You will receive a workflow_suspended notice once the "
-            "researcher and reviewer have completed their internal loop "
-            "and the document is ready for your supervisor review."
-        ),
-    })
-
-
-async def _tool_submit_research_decision(args: dict) -> str:
-    """Submit accept / iterate / stop verdict for a paused research_topic
-    workflow. Posts to /api/workflows/<id>/decision (which sets
-    state.user_decision and signals resume in one step).
-
-    `stop` ends the workflow with the doc in its current (partial) state
-    — semantically distinct from `accept` (which means the doc fully
-    satisfies the goal). Use stop when the user says to stop, when
-    criteria appear unreachable, or when partial findings are good enough."""
-    workflow_id = (args.get("workflow_id") or "").strip()
-    decision = (args.get("decision") or "").strip().lower()
-    if not workflow_id:
-        return "Error: 'workflow_id' is required."
-    if decision not in ("accept", "iterate", "stop"):
-        return (
-            f"Error: 'decision' must be 'accept', 'iterate', or 'stop'; got {decision!r}."
-        )
-
-    # In-process call: hit the same code path the HTTP endpoint runs.
-    from app.workflow.suspension import get_suspension_manager
-    from app.workflow.workspace import get_workspace_store
-    suspension = get_suspension_manager()
-    if not suspension.is_suspended("default", workflow_id):
-        return (
-            f"Error: workflow {workflow_id!r} is not currently suspended. "
-            f"submit_research_decision can only be called while a "
-            f"workflow is paused for user review."
-        )
-    state = get_workspace_store().get("default", workflow_id)
-    if state is None:
-        return f"Error: workflow {workflow_id!r} not found."
-    state.user_decision = decision
-    suspension.resume("default", workflow_id)
-    return json.dumps({
-        "ok": True,
-        "workflow_id": workflow_id,
-        "decision": decision,
-        "next_step": (
-            "Decision submitted. If decision='accept', the workflow has "
-            "now completed and the document is the final artifact. If "
-            "decision='iterate', the researcher will pick up your Review "
-            "Notes feedback and run another pass; you'll receive another "
-            "workflow_suspended notice when it's ready."
-        ),
-    })
+# _tool_request_new_research + _tool_submit_research_decision moved to
+# app/mcp/builtins/{request_new_research,submit_research_decision}/handler.py
+# (per-tool folder convention, 2026-05-12). Dispatch via _BUILTIN_HANDLERS.

@@ -14,6 +14,7 @@ from __future__ import annotations
 import logging
 
 from . import step_handlers
+from .handlers.research_topic import research_session, setup_research_doc
 from .registry import get_workflow_registry
 from .types import StepType, WorkflowDefinition, WorkflowOutcome
 
@@ -487,7 +488,7 @@ def _register_research_topic() -> None:
                     "Acceptance Criteria checklist, empty Findings, "
                     "empty Review Notes."
                 ),
-                handler=step_handlers.setup_research_doc,
+                handler=setup_research_doc,
                 max_retries=0,
                 output_schema={
                     "type": "object",
@@ -512,7 +513,7 @@ def _register_research_topic() -> None:
                     "researcher to continue from current doc state when "
                     "it appears to have stopped prematurely."
                 ),
-                handler=step_handlers.research_session,
+                handler=research_session,
                 # Iterations are LLM-driven and inherently non-deterministic.
                 # No bounded-retry here — internal iteration cap is the
                 # bound; failures inside the handler propagate to HITL.
