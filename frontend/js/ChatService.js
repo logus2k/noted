@@ -716,9 +716,22 @@ export class ChatService {
                 if (text) this.chatPanel.setComposingUserMessage(text);
             },
             onFinal: (payload) => {
+                // commitComposingUserMessage() returns the composing
+                // bubble's text and clears it IF a bubble exists. With
+                // Parakeet (v2), partials → bubble → commit → already
+                // rendered → suppress sendMessage's bubble. With Whisper
+                // (v1), no partials, no composing bubble → nothing to
+                // commit → we must let sendMessage render the user
+                // message itself.
                 const committedFromBubble = this.chatPanel.commitComposingUserMessage();
                 const text = (payload?.text || '').trim() || committedFromBubble;
-                if (text) this.sendMessage(text, { showUserMessage: false });
+                if (!text) return;
+                // Suppress sendMessage's bubble ONLY when the composing
+                // bubble already rendered the message (Parakeet path).
+                // Otherwise (Whisper path) we'd silently drop the user
+                // message from the chat UI.
+                const showUserMessage = !committedFromBubble;
+                this.sendMessage(text, { showUserMessage });
             },
         });
 
@@ -1044,13 +1057,17 @@ export class ChatService {
                     }
 
                     if (typeof data.token !== 'string') continue;
-                    console.info(`[turn:${turnId}] CHUNK ${JSON.stringify(data.token)}`);
+                    // Per-token CHUNK / thinking_token / answer_token logs
+                    // were silenced 2026-05-12 — they flood the console at
+                    // streaming rates and made anything else unreadable.
+                    // Lifecycle events (thinking_end, voice, others) still
+                    // log because they fire once per turn.
                     const result = parser.processToken(data.token);
                     if (result.type !== 'pending') {
                         if (result.type === 'thinking_end') {
                             console.info(`[turn:${turnId}] EVENT thinking_end thinking_len=${(result.thinking||'').length} answer=${JSON.stringify(result.answer||'')}`);
                         } else if (result.type === 'thinking_token' || result.type === 'answer_token') {
-                            console.info(`[turn:${turnId}] EVENT ${result.type} ${JSON.stringify(result.token||'')}`);
+                            // per-token; suppressed
                         } else if (result.type === 'voice') {
                             console.info(`[turn:${turnId}] EVENT voice ${JSON.stringify(result.text||'')}`);
                         } else {

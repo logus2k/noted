@@ -3666,16 +3666,21 @@ async def _tool_request_new_research(args: dict) -> str:
 
 
 async def _tool_submit_research_decision(args: dict) -> str:
-    """Submit accept / iterate verdict for a paused research_topic
+    """Submit accept / iterate / stop verdict for a paused research_topic
     workflow. Posts to /api/workflows/<id>/decision (which sets
-    state.user_decision and signals resume in one step)."""
+    state.user_decision and signals resume in one step).
+
+    `stop` ends the workflow with the doc in its current (partial) state
+    — semantically distinct from `accept` (which means the doc fully
+    satisfies the goal). Use stop when the user says to stop, when
+    criteria appear unreachable, or when partial findings are good enough."""
     workflow_id = (args.get("workflow_id") or "").strip()
     decision = (args.get("decision") or "").strip().lower()
     if not workflow_id:
         return "Error: 'workflow_id' is required."
-    if decision not in ("accept", "iterate"):
+    if decision not in ("accept", "iterate", "stop"):
         return (
-            f"Error: 'decision' must be 'accept' or 'iterate'; got {decision!r}."
+            f"Error: 'decision' must be 'accept', 'iterate', or 'stop'; got {decision!r}."
         )
 
     # In-process call: hit the same code path the HTTP endpoint runs.

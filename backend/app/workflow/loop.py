@@ -339,6 +339,84 @@ async def resume_workflow(tenant_id: str, workflow_id: str) -> WorkspaceState:
     return await _execute_plan(state, definition, start_index=state.current_step)
 
 
+async def _classify_smoke_failure(
+    state: WorkspaceState,
+    definition: WorkflowDefinition,
+    err: str,
+) -> tuple[str | None, str | None]:
+    """Call the smoke_failure_classifier LLM agent to decide which agent
+    should be rewound when run_smoke_tests fails. Returns (target_name,
+    actionable_reason) — both None if the classifier itself fails, in
+    which case the caller should not rewind (suspending for HITL is
+    preferable to guessing).
+
+    Replaces the prior keyword-regex classifier. The model reads pytest
+    output + tool.py + smoke.py + acceptance_criteria + (when available)
+    the tool's actual output captured by the probe step, then emits
+    `{target: "tool_author" | "api_tester", reason: "<actionable>"}`.
+    """
+    # Gather context. tool.py and smoke.py come from the last completed
+    # tool_author / api_tester outputs in state. Acceptance criteria
+    # come from workflow inputs. Probed output (when present) comes from
+    # the most recent completed verify_tool_round_trip step.
+    tool_py = ""
+    smoke_py = ""
+    probed_output: Any = None
+    for step in state.steps:
+        if step.status != "completed":
+            continue
+        out = step.output or {}
+        if step.name == "tool_author":
+            files = out.get("files") or {}
+            tool_py = files.get("tool.py") or ""
+        elif step.name == "api_tester":
+            files = out.get("files") or {}
+            smoke_py = files.get("smoke.py") or ""
+        elif step.name == "verify_tool_round_trip":
+            probed_output = out.get("result_parsed")
+            if probed_output is None:
+                probed_output = (out.get("result_full") or "")[:2000]
+
+    criteria = (state.inputs or {}).get("acceptance_criteria") or []
+
+    classifier_inputs: dict[str, Any] = {
+        "pytest_output": err[:6000],  # cap to keep prompt bounded
+        "tool_py": tool_py[:8000],
+        "smoke_py": smoke_py[:4000],
+        "acceptance_criteria": criteria,
+    }
+    if probed_output is not None:
+        classifier_inputs["tool_actual_output"] = probed_output
+
+    try:
+        out = await llm_dispatcher.dispatch(
+            "smoke_failure_classifier",
+            classifier_inputs,
+            state=state,
+        )
+        target = (out.get("target") or "").strip()
+        reason = (out.get("reason") or "").strip()
+        if target not in ("tool_author", "api_tester"):
+            logger.warning(
+                "smoke_failure_classifier returned unrecognised target %r; suspending instead",
+                target,
+            )
+            return None, None
+        if not reason:
+            reason = err[:300]
+        logger.info(
+            "smoke_failure_classifier → %s (reason: %s)",
+            target, reason[:200],
+        )
+        return target, reason
+    except Exception:
+        logger.exception(
+            "smoke_failure_classifier dispatch failed; suspending workflow"
+            " rather than guessing"
+        )
+        return None, None
+
+
 async def _execute_plan(
     state: WorkspaceState,
     definition: WorkflowDefinition,
@@ -365,16 +443,34 @@ async def _execute_plan(
             #   - validate_tool_structure: always tool_author (its files didn't parse / shape wrong)
             #   - validate_smoke_contract: always api_tester (its smoke.py asserts on invented keys)
             target_name: str | None = None
+            rewind_reason: str | None = None
             if state.smoke_rewinds < SMOKE_REWIND_CAP:
                 err = state.steps[index].error or ""
-                if step.name == "run_smoke_tests":
-                    target_name = (
-                        "tool_author" if "AssertionError" in err else "api_tester"
-                    )
-                elif step.name == "validate_tool_structure":
+                if step.name == "validate_tool_structure":
                     target_name = "tool_author"
+                    rewind_reason = err
+                elif step.name == "verify_tool_round_trip":
+                    # New (2026-05-12): probe step runs BEFORE api_tester
+                    # so the tester can write assertions against the
+                    # tool's real output. Failure here = the tool can't
+                    # even respond to a sample call → tool is broken,
+                    # rewind tool_author with the failure as feedback.
+                    target_name = "tool_author"
+                    rewind_reason = err
                 elif step.name == "validate_smoke_contract":
                     target_name = "api_tester"
+                    rewind_reason = err
+                elif step.name == "run_smoke_tests":
+                    # LLM-classified rewind. The `smoke_failure_classifier`
+                    # agent reads the failure + tool.py + smoke.py +
+                    # acceptance_criteria + (when available) the tool's
+                    # actual output captured by the probe step, then
+                    # emits JSON `{target, reason}` saying who's at fault.
+                    # Replaces the prior keyword-regex classifier — a
+                    # reasoning task gets a reasoning tool.
+                    target_name, rewind_reason = await _classify_smoke_failure(
+                        state, definition, err
+                    )
             if target_name is not None:
                 target_idx = next(
                     (i for i, s in enumerate(definition.plan_template) if s.name == target_name),
@@ -382,7 +478,10 @@ async def _execute_plan(
                 )
                 if target_idx is not None:
                     state.smoke_rewinds += 1
-                    state.last_smoke_error = err
+                    # Prefer the classifier's specific actionable reason
+                    # over the raw pytest output when available — it's
+                    # the concrete change the rewound agent needs to make.
+                    state.last_smoke_error = rewind_reason or err
                     # Reset the records for steps we're about to re-run so
                     # the inspector clearly shows them as in-flight again.
                     for j in range(target_idx, index + 1):

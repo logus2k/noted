@@ -241,35 +241,9 @@ def _register_create_tool() -> None:
                 },
             ),
             StepType(
-                name="api_tester",
-                worker="api_tester",
-                description="LLM-author smoke tests covering the acceptance criteria.",
-                output_schema=_API_TESTER_OUTPUT_SCHEMA,
-            ),
-            StepType(
-                name="validate_smoke_contract",
-                worker="deterministic",
-                description="Static check that smoke.py asserts only on keys named in acceptance_criteria.",
-                handler=step_handlers.validate_smoke_contract,
-                # Deterministic — same smoke.py + criteria → same outcome.
-                # Recovery comes from A2 rewinding api_tester, not retry.
-                max_retries=0,
-                output_schema={
-                    "type": "object",
-                    "required": ["ok"],
-                    "properties": {
-                        "ok": {"const": True},
-                        "checked": {"type": "boolean"},
-                        "reason": {"type": "string"},
-                        "asserted_output_keys": {"type": "array"},
-                        "criteria_count": {"type": "integer"},
-                    },
-                },
-            ),
-            StepType(
                 name="publish_tool",
                 worker="deterministic",
-                description="Write files to data/tenants/<tenant>/user_tools/<name>/ + refresh federation.",
+                description="Write files to data/tenants/<tenant>/user_tools/<name>/ + refresh federation. Moved BEFORE api_tester so the next step can probe the tool's real output.",
                 handler=step_handlers.publish_tool,
                 # Deterministic file-writes; if they fail it's an env issue (perms,
                 # disk full) — retrying immediately won't help.
@@ -287,33 +261,10 @@ def _register_create_tool() -> None:
                 },
             ),
             StepType(
-                name="run_smoke_tests",
-                worker="deterministic",
-                description="F3.5: pytest smoke.py inside the tool's venv via noted-tools admin endpoint.",
-                handler=step_handlers.run_smoke_tests,
-                # Deterministic — pytest on identical files yields identical
-                # failure. Bounded improvement comes from A2's regenerate-on-
-                # smoke-failure rewind, not from re-running the same script.
-                max_retries=0,
-                output_schema={
-                    "type": "object",
-                    "required": ["ok", "tool_name"],
-                    "properties": {
-                        "ok": {"const": True},
-                        "tool_name": {"type": "string"},
-                        "skipped": {"type": "boolean"},
-                        "exit_code": {"type": "integer"},
-                    },
-                },
-            ),
-            StepType(
                 name="verify_tool_round_trip",
                 worker="deterministic",
-                description="Call the just-published tool with sample args.",
+                description="Probe step: invoke the just-published tool once with sample args and capture the REAL output (result_full / result_parsed). The next step (api_tester) writes assertions against that real output instead of guessing the shape. Failure here = tool can't run; A2 rewinds tool_author.",
                 handler=step_handlers.verify_tool_round_trip,
-                # Deterministic — calls the published tool with sample args.
-                # Network blips are the only retry-recoverable case; rare
-                # enough that one extra retry doesn't pay for itself.
                 max_retries=0,
                 output_schema={
                     "type": "object",
@@ -323,6 +274,49 @@ def _register_create_tool() -> None:
                         "tool_name": {"type": "string"},
                         "sample_args": {"type": "object"},
                         "result_preview": {"type": "string"},
+                        "result_full": {"type": "string"},
+                        "result_parsed": {"type": ["object", "array", "string", "number", "boolean", "null"]},
+                    },
+                },
+            ),
+            StepType(
+                name="api_tester",
+                worker="api_tester",
+                description="LLM-author smoke tests covering the acceptance criteria, INFORMED BY THE TOOL'S ACTUAL OUTPUT captured in the previous step.",
+                output_schema=_API_TESTER_OUTPUT_SCHEMA,
+            ),
+            StepType(
+                name="validate_smoke_contract",
+                worker="deterministic",
+                description="LLM-validator (smoke_contract_validator agent): does smoke.py cover the acceptance criteria? Reasons about input-vs-output-side criteria; not regex.",
+                handler=step_handlers.validate_smoke_contract,
+                max_retries=0,
+                output_schema={
+                    "type": "object",
+                    "required": ["ok"],
+                    "properties": {
+                        "ok": {"const": True},
+                        "checked": {"type": "boolean"},
+                        "reason": {"type": "string"},
+                        "criteria_count": {"type": "integer"},
+                        "notes": {"type": "string"},
+                    },
+                },
+            ),
+            StepType(
+                name="run_smoke_tests",
+                worker="deterministic",
+                description="pytest smoke.py inside the tool's venv. Failure routes through smoke_failure_classifier (LLM) to decide rewind target.",
+                handler=step_handlers.run_smoke_tests,
+                max_retries=0,
+                output_schema={
+                    "type": "object",
+                    "required": ["ok", "tool_name"],
+                    "properties": {
+                        "ok": {"const": True},
+                        "tool_name": {"type": "string"},
+                        "skipped": {"type": "boolean"},
+                        "exit_code": {"type": "integer"},
                     },
                 },
             ),
@@ -478,6 +472,10 @@ def _register_research_topic() -> None:
                 name="research_complete",
                 description="document accepted by the user",
             ),
+            WorkflowOutcome(
+                name="research_stopped",
+                description="user stopped the research with a partial result",
+            ),
         ],
         input_schema=_RESEARCH_TOPIC_INPUT_SCHEMA,
         plan_template=[
@@ -525,7 +523,7 @@ def _register_research_topic() -> None:
                     "properties": {
                         "status": {
                             "type": "string",
-                            "enum": ["accepted", "aborted", "cap_reached"],
+                            "enum": ["accepted", "stopped", "aborted", "cap_reached"],
                         },
                         "iterations_run": {"type": "integer"},
                         "final_verdict": {"type": "string"},

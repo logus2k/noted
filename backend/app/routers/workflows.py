@@ -269,7 +269,8 @@ class DecisionRequest(BaseModel):
     decision: str = Field(
         ...,
         description="The user's verdict at a HITL review checkpoint. "
-                    "Currently used by research_topic; one of 'accept' or 'iterate'.",
+                    "Currently used by research_topic; one of 'accept', "
+                    "'iterate', or 'stop'.",
     )
 
 
@@ -279,10 +280,15 @@ async def decision(workflow_id: str, request: Request, body: DecisionRequest) ->
 
     Used by `research_topic` user_review pauses. The handler reads
     `state.user_decision` on resume and branches:
-      - "accept" → workflow completes
+      - "accept" → workflow completes; doc is the final artifact.
       - "iterate" → loops back into the research+review cycle, picking
         up any feedback the supervisor wrote into the doc's Review
-        Notes section before signalling resume.
+        Notes section before signalling resume. Refused once the
+        workflow has reached the global iteration cap.
+      - "stop" → workflow ends with the doc in its current (partial)
+        state. Semantically distinct from "accept" — used for graceful
+        exit when criteria can't be met or user is satisfied with
+        partial findings.
 
     Single endpoint that sets the field AND signals resume so the
     handler doesn't race the resume signal against a separate field
@@ -290,10 +296,10 @@ async def decision(workflow_id: str, request: Request, body: DecisionRequest) ->
     """
     identity = extract_identity(request.headers)
     decision_value = (body.decision or "").strip().lower()
-    if decision_value not in ("accept", "iterate"):
+    if decision_value not in ("accept", "iterate", "stop"):
         raise HTTPException(
             status_code=400,
-            detail=f"decision must be 'accept' or 'iterate'; got {body.decision!r}",
+            detail=f"decision must be 'accept', 'iterate', or 'stop'; got {body.decision!r}",
         )
 
     suspension = get_suspension_manager()

@@ -210,6 +210,12 @@ export function initChat(app) {
             );
             let synthetic;
             if (isResearchReview) {
+                // Detect cap_reached suspend reason — iterate is disabled
+                // server-side at that point, so the prompt MUST NOT offer
+                // it as an option. Otherwise Gemma will pick iterate
+                // anyway and the handler will keep re-suspending.
+                const isCapReached = (reason || '').includes('cap_reached');
+
                 // Mandatory tool-call-first phrasing. Gemma will narrate
                 // "I am submitting the decision" instead of actually
                 // calling the tool if the prompt reads as a description.
@@ -219,11 +225,20 @@ export function initChat(app) {
                     `[system notice] ${content}\n\n`
                     + `You are the supervisor for this paused research workflow. Take action IN THIS ORDER:\n\n`
                     + `STEP 1 (MANDATORY): Call read_doc with the workflow's buffer_id (find it in your earlier chat messages from when you called request_new_research) to see the current document state. Do this even if you remember what you wrote.\n\n`
-                    + `STEP 2 (MANDATORY): Decide your verdict and IMMEDIATELY call submit_research_decision. Do not narrate the decision first — make the tool call, then talk. One of:\n`
-                    + `  - submit_research_decision({"workflow_id":"<id from notice>","decision":"accept"}) when the Findings satisfy the Goal and the Acceptance Criteria.\n`
-                    + `  - submit_research_decision({"workflow_id":"<id from notice>","decision":"iterate"}) when gaps remain. BEFORE making this call, you MUST have written your specific concerns into the doc's ## Review Notes section via replace_doc (read_doc first, append a new ### Iteration N+1 block to Review Notes, then replace_doc with the full updated content).\n\n`
+                    + `STEP 2 (MANDATORY): Decide your verdict and IMMEDIATELY call submit_research_decision. Do not narrate the decision first — make the tool call, then talk.\n`
+                    + (isCapReached
+                        ? `  The workflow has reached the global iteration cap. ITERATE IS REFUSED. Only two options remain:\n`
+                          + `  - submit_research_decision({"workflow_id":"<id from notice>","decision":"accept"}) when the Findings are good enough to call this done.\n`
+                          + `  - submit_research_decision({"workflow_id":"<id from notice>","decision":"stop"}) when the doc is partial but the user is satisfied to end the loop.\n`
+                          + `  Do NOT call iterate — it will be refused and the workflow will re-suspend.\n\n`
+                          + `  Recommended: present the current doc state to the user (1-3 sentences), ask whether they want to accept or stop, then call submit_research_decision with their choice.\n\n`
+                        : `  Three valid options:\n`
+                          + `  - submit_research_decision({"workflow_id":"<id from notice>","decision":"accept"}) when the Findings satisfy the Goal and the Acceptance Criteria.\n`
+                          + `  - submit_research_decision({"workflow_id":"<id from notice>","decision":"iterate"}) when gaps remain. BEFORE making this call, you MUST have written your specific concerns into the doc's ## Review Notes section via replace_doc (read_doc first, append a new ### Iteration N+1 block to Review Notes, then replace_doc with the full updated content).\n`
+                          + `  - submit_research_decision({"workflow_id":"<id from notice>","decision":"stop"}) when the user wants to end the loop with the doc in its current state, OR when the reviewer marked a criterion unreachable across multiple iterations.\n\n`
+                          + `  ESCALATION RULE: If the doc's Review Notes already shows 2 or more iterations, you MUST escalate to the user rather than auto-iterating again. Summarise the doc state and ask "Accept, iterate further, or stop?". After the user replies, call submit_research_decision with their choice.\n\n`)
                     + `STEP 3 (only after the tool call returned): Tell the user in 1-2 sentences what you decided and why. Do NOT promise to do something — your tool call has already done it.\n\n`
-                    + `If you are genuinely uncertain whether to accept or iterate, SKIP step 2 and instead ask the user directly: summarise the document state and ask whether they want to accept or iterate. After the user replies, do step 2 with their choice.`
+                    + `Note: the user can also abort this workflow immediately at any time via the Workflow Monitor's Abort button — mention this if the user expresses frustration with the loop or asks how to terminate.`
                 );
             } else {
                 synthetic = (

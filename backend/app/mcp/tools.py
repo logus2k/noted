@@ -727,11 +727,17 @@ _READ_TOOLS: list[types.Tool] = [
             "you have received a `workflow_suspended` notice for a "
             "research_topic workflow AND you have read the workspace "
             "document (via read_doc) and decided your verdict.\n"
-            "  decision='accept' — document satisfies the goal as-is.\n"
+            "  decision='accept' — document satisfies the goal as-is. "
+            "Workflow completes with the doc as the final artifact.\n"
             "  decision='iterate' — gaps remain; you have already added "
             "your concerns into the doc's `## Review Notes` section via "
             "replace_doc, and now want the researcher to make another "
-            "pass.\n"
+            "pass. Refused once the global iteration cap is reached.\n"
+            "  decision='stop' — end the workflow with the doc in its "
+            "current (partial) state. Use when the user explicitly says "
+            "to stop, when criteria appear unreachable, or when the user "
+            "is satisfied with partial findings. Distinct from 'accept' "
+            "because the doc is recorded as INCOMPLETE.\n"
             "Returns immediately; the workflow resumes server-side."
         ),
         inputSchema={
@@ -743,7 +749,7 @@ _READ_TOOLS: list[types.Tool] = [
                 },
                 "decision": {
                     "type": "string",
-                    "enum": ["accept", "iterate"],
+                    "enum": ["accept", "iterate", "stop"],
                     "description": "Your verdict on the document's current state.",
                 },
             },

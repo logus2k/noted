@@ -238,138 +238,107 @@ async def validate_tool_structure(
 
 
 # ─── validate_smoke_contract ──────────────────────────────────────
-
-
-_OUTPUT_VERB = r"(?:contains?|returns?|includes?|produces?|emits?|outputs?|provides?|yields?|has|exposes?)"
-_ARTICLE = r"(?:an?|the|some)"
-_QUAL_WORD = r"[a-z][a-z\-]*"
-_TYPE_WORD = r"(?:array|string|field|object|number|integer|boolean)"
-_TYPE_WORDS_SET = {"array", "string", "field", "object", "number", "integer", "boolean"}
-_CRITERIA_STOPWORDS = {
-    "input", "output", "tool", "argument", "arguments", "fields",
-    "the", "value", "type", "data", "json",
-}
-
-# Quoted keys: 'weather', "days", `extract`. Quoting is the planner's
-# explicit signal that the token is a field name.
-_QUOTED_KEY_RE = re.compile(r"['\"`]([a-zA-Z_][a-zA-Z0-9_]{1,40})['\"`]")
-
-# Typed keys: only when anchored on an output-describing verb so we do
-# not match arbitrary "<adjective> <type>" prose like "with string fields"
-# or "integer field <name>". Pattern allows one optional qualifier word
-# between article and id, and one between id and type.
-_TYPED_KEY_RE = re.compile(
-    # First qualifier slot is RELUCTANT (`??`) so the engine tries id at
-    # the earliest position. Greedy here would eat "temperature" in
-    # "contains a temperature numeric field", leaving id="numeric".
-    rf"\b{_OUTPUT_VERB}\s+{_ARTICLE}\s+(?:{_QUAL_WORD}\s+)??"
-    rf"([a-zA-Z_][a-zA-Z0-9_]{{2,40}})\s+(?:{_QUAL_WORD}\s+)?{_TYPE_WORD}\b",
-    flags=re.IGNORECASE,
-)
-
-
-_OUTPUT_VERB_ANYWHERE_RE = re.compile(rf"\b{_OUTPUT_VERB}\b", flags=re.IGNORECASE)
-
-
-def _extract_pinned_output_keys(criteria: list[Any]) -> set[str]:
-    """Heuristic: pull identifiers that the criteria explicitly tag as
-    output fields. Two patterns:
-    (a) quoted identifiers (`'weather'`, `"days"`, `` `extract` ``)
-    (b) output-verb-anchored typed phrases (`contains a non-empty days
-        array`, `returns a temperature numeric field`).
-
-    Per-criterion gate: only mine criteria whose text contains an
-    output-describing verb anywhere. Otherwise quoted identifiers in
-    INPUT or ERROR-behavior criteria (e.g. "exits if 'city_code' is
-    absent") get falsely pinned as output requirements.
-
-    Filters out matches whose captured id is itself a JSON type word."""
-    pinned: set[str] = set()
-    for criterion in criteria:
-        text = str(criterion)
-        if not _OUTPUT_VERB_ANYWHERE_RE.search(text):
-            continue
-        for m in _QUOTED_KEY_RE.finditer(text):
-            w = m.group(1)
-            if w.lower() in _TYPE_WORDS_SET or w.lower() in _CRITERIA_STOPWORDS:
-                continue
-            pinned.add(w)
-        for m in _TYPED_KEY_RE.finditer(text):
-            w = m.group(1)
-            if w.lower() in _TYPE_WORDS_SET or w.lower() in _CRITERIA_STOPWORDS:
-                continue
-            pinned.add(w)
-    return pinned
+#
+# Coverage check: does smoke.py actually exercise every acceptance
+# criterion the spec pinned? Implemented as a small LLM agent
+# (`smoke_contract_validator`) rather than regex pattern-matching —
+# semantic alignment between natural-language criteria and Python test
+# code is a reasoning task, not a syntactic one. Prior regex
+# implementation falsely conflated input-parameter mentions with
+# output-key requirements; an LLM reasons about each criterion's
+# intent and checks for corresponding evidence in smoke.py.
+#
+# The validator's verdict feeds the existing A2 rewind path:
+# on `covered: false`, the handler raises with the missing criteria as
+# the error message, loop.py rewinds api_tester with that context, and
+# api_tester gets another attempt (bounded by SMOKE_REWIND_CAP=2).
 
 
 async def validate_smoke_contract(
     state: WorkspaceState, inputs: dict[str, Any]
 ) -> dict[str, Any]:
-    """Coverage check: every output key the acceptance_criteria pin MUST be
-    asserted somewhere in smoke.py. Catches the api_tester-asserts-on-
-    WRONG-key class (criteria say `days`, smoke asserts `forecast` →
-    `days` missing). Permissive on extras: smoke.py may assert on keys
-    the criteria mention but don't formally pin (multi-mode tools where
-    a secondary mode's output isn't named in any criterion). Rewinds to
-    api_tester via A2 on failure."""
+    """LLM-based coverage check: pass acceptance criteria + smoke.py to
+    the `smoke_contract_validator` agent, parse its JSON verdict, and
+    raise on uncovered criteria so the A2 rewind path re-invokes
+    api_tester with concrete feedback."""
     api_tester_out = _previous(inputs, "api_tester") or _previous(inputs)
     files: dict[str, str] = api_tester_out.get("files") or {}
     smoke_src = files.get("smoke.py") or ""
     if not smoke_src.strip():
         return {"ok": True, "checked": False, "reason": "no smoke.py to check"}
 
-    workflow_inputs = inputs.get("workflow_inputs") or {}
-    criteria = workflow_inputs.get("acceptance_criteria") or []
+    wf_in = state.inputs or {}
+    criteria = wf_in.get("acceptance_criteria") or []
     if not isinstance(criteria, list) or not criteria:
         return {"ok": True, "checked": False, "reason": "no acceptance_criteria"}
 
-    pinned = _extract_pinned_output_keys(criteria)
-    if not pinned:
+    tool_name = wf_in.get("tool_name") or ""
+
+    # Bounded JSON-parse retry for the validator itself. If it produces
+    # malformed JSON 3x running, fail open with a warning — better to
+    # ship the tool unchecked than to block on validator bugs.
+    from .llm_dispatcher import dispatch
+
+    last_complaint: str | None = None
+    parsed: dict[str, Any] | None = None
+    for attempt in range(3):
+        step_inputs: dict[str, Any] = {
+            "tool_name": tool_name,
+            "acceptance_criteria": criteria,
+            "smoke_py": smoke_src,
+        }
+        if last_complaint:
+            step_inputs["previous_iteration_diagnostics"] = last_complaint
+        try:
+            out = await dispatch(
+                "smoke_contract_validator",
+                step_inputs,
+                state=state,
+            )
+            covered = out.get("covered")
+            if not isinstance(covered, bool):
+                raise ValueError("validator output 'covered' must be a boolean")
+            mc = out.get("missing_criteria")
+            if not isinstance(mc, list):
+                raise ValueError("validator output 'missing_criteria' must be a list")
+            parsed = out
+            break
+        except Exception as e:
+            last_complaint = str(e)[:200]
+            logger.warning(
+                "smoke_contract_validator attempt %d/3 failed: %s",
+                attempt + 1, last_complaint,
+            )
+
+    if parsed is None:
+        logger.error(
+            "smoke_contract_validator failed all 3 attempts; proceeding "
+            "without coverage check"
+        )
         return {
-            "ok": True, "checked": False,
-            "reason": "no pinned output keys extractable from criteria",
+            "ok": True,
+            "checked": False,
+            "reason": "validator produced no usable verdict after 3 attempts",
         }
 
-    try:
-        tree = ast.parse(smoke_src, filename="smoke.py")
-    except SyntaxError as e:
-        # Smoke run will catch the SyntaxError; not our job.
-        return {"ok": True, "checked": False, "reason": f"smoke.py SyntaxError: {e}"}
+    if parsed["covered"]:
+        return {
+            "ok": True,
+            "checked": True,
+            "criteria_count": len(criteria),
+            "notes": parsed.get("notes", "")[:300],
+        }
 
-    asserted: set[str] = set()
-    for node in ast.walk(tree):
-        if (
-            isinstance(node, ast.Subscript)
-            and isinstance(node.value, ast.Name)
-            and node.value.id == "output"
-            and isinstance(node.slice, ast.Constant)
-            and isinstance(node.slice.value, str)
-        ):
-            asserted.add(node.slice.value)
-        if isinstance(node, ast.Compare) and isinstance(node.left, ast.Constant) and isinstance(node.left.value, str):
-            for op, right in zip(node.ops, node.comparators):
-                if (
-                    isinstance(op, ast.In)
-                    and isinstance(right, ast.Name)
-                    and right.id == "output"
-                ):
-                    asserted.add(node.left.value)
-
-    missing = sorted(k for k in pinned if k not in asserted)
-    if missing:
-        raise ValueError(
-            f"validate_smoke_contract: smoke.py is missing asserts for output keys "
-            f"{missing} that the acceptance_criteria pin. Add asserts that check "
-            f"for these keys in the tool's output. asserted={sorted(asserted)} "
-            f"acceptance_criteria={criteria}"
-        )
-
-    return {
-        "ok": True,
-        "checked": True,
-        "pinned_keys": sorted(pinned),
-        "asserted_keys": sorted(asserted),
-    }
+    missing = parsed.get("missing_criteria") or []
+    missing_summary = "; ".join(
+        f"'{(m.get('criterion') or '')[:80]}': {(m.get('reason') or '')[:160]}"
+        for m in missing
+    )
+    raise ValueError(
+        f"validate_smoke_contract: smoke.py does not cover all acceptance "
+        f"criteria per the smoke_contract_validator. Missing coverage: "
+        f"{missing_summary}"
+    )
 
 
 # ─── publish_tool ─────────────────────────────────────────────────
@@ -644,10 +613,23 @@ async def verify_tool_round_trip(
         raise ValueError(
             f"verify_tool_round_trip: tool returned error: {result[:300]}"
         )
+    # Parse the tool's output as JSON when possible, so downstream steps
+    # (notably api_tester) can write assertions against the REAL output
+    # shape rather than guessing from API docs. Falls back to a string
+    # preview if the output isn't JSON-parseable.
+    parsed_output: Any = None
+    try:
+        parsed_output = json.loads(result)
+    except json.JSONDecodeError:
+        parsed_output = None
     return {
         "tool_name": tool_name,
         "sample_args": sample_args,
         "result_preview": result[:300],
+        # Full captured output for api_tester. Truncated to 8000 chars to
+        # avoid bloating the next agent's prompt for verbose APIs.
+        "result_full": result[:8000],
+        "result_parsed": parsed_output,
         "ok": True,
     }
 
@@ -906,8 +888,18 @@ def _render_research_doc(goal: str, criteria: list[str]) -> str:
 
 
 # Cap on inner researcher+reviewer iterations BEFORE forcing user review.
-# Refresh starts fresh after each user iterate feedback.
+# Counter resets on each user iterate feedback (so a fresh review cycle
+# always gets a fresh 5 budget). Combined with GLOBAL_ITERATION_CAP this
+# bounds the total: at most GLOBAL_ITERATION_CAP inner passes across the
+# entire workflow regardless of how many times the user (or supervisor)
+# clicks iterate.
 RESEARCH_ITERATION_CAP = 5
+
+# Total inner-iteration ceiling across ALL user review cycles. After this,
+# `iterate` decisions are refused — only `accept` or `stop` remain valid.
+# Prevents the "supervisor keeps deciding iterate, user can't get out"
+# failure mode observed 2026-05-12.
+GLOBAL_ITERATION_CAP = 10
 
 # Tools each agent is allowed to call inside its tool-call loop. The
 # researcher reads the doc + searches the web + writes findings; the
@@ -1152,6 +1144,64 @@ async def setup_research_doc(
     }
 
 
+def _append_doc_termination_note(
+    notes_doc_id: str,
+    *,
+    kind: str,
+    iteration: int,
+    detail: str,
+) -> None:
+    """Append a final-state record to the doc's Review Notes section so
+    the document carries its own termination audit trail. The doc is the
+    source of truth — anyone reading it later sees how / when the workflow
+    ended regardless of whether they can also reach the workflow inspector.
+
+    `kind` ∈ {"accepted", "stopped", "aborted", "cap_reached"}.
+    """
+    from app.managers import notes_buffer
+
+    buf = notes_buffer.get(notes_doc_id)
+    if buf is None:
+        return
+    content = buf.content or ""
+
+    kind_label = {
+        "accepted": "✓ Accepted",
+        "stopped": "⊘ Stopped (partial)",
+        "aborted": "✗ Aborted",
+        "cap_reached": "⚠ Global iteration cap reached",
+    }.get(kind, kind.title())
+
+    subsection_lines = [
+        f"### Final state ({kind_label}, iteration {iteration})",
+        "",
+        f"- detail: {detail}",
+        "",
+    ]
+    subsection = "\n".join(subsection_lines)
+
+    # Inject into the Review Notes section before the next heading; same
+    # insertion logic _update_doc_with_review uses.
+    review_idx = content.find("\n## Review Notes")
+    if review_idx >= 0:
+        after_heading = review_idx + len("\n## Review Notes")
+        next_h2 = content.find("\n## ", after_heading)
+        insertion_point = len(content) if next_h2 == -1 else next_h2
+        section_body = content[after_heading:insertion_point]
+        section_body = section_body.rstrip("\n") + "\n\n" + subsection
+        content = content[:after_heading] + section_body + content[insertion_point:]
+    else:
+        content = content.rstrip() + "\n\n## Review Notes\n\n" + subsection
+
+    new_buf = notes_buffer.replace(notes_doc_id, content)
+    if new_buf is not None:
+        try:
+            from . import doc_events
+            doc_events.publish_doc_changed(new_buf)
+        except Exception:
+            logger.debug("doc_events broadcast failed in _append_doc_termination_note", exc_info=True)
+
+
 async def research_session(
     state: WorkspaceState, inputs: dict[str, Any]
 ) -> dict[str, Any]:
@@ -1348,17 +1398,35 @@ async def research_session(
             )
 
         state.user_decision = None  # clear any stale value
+        # Suspend reason carries the cycle counter so the chat-side
+        # supervisor prompt can adjust copy (e.g. encouraging
+        # escalation after multiple cycles) without round-trip.
+        cap_reached = overall_iteration >= GLOBAL_ITERATION_CAP
+        suspend_reason = "research_user_review"
+        if cap_reached:
+            suspend_reason = "research_user_review:cap_reached"
         doc_events.publish_workflow_event(
             state.workflow_id,
             "user_review_pending",
             {
                 "iterations_so_far": overall_iteration,
                 "final_verdict": last_verdict or "cap_reached",
+                "global_cap_reached": cap_reached,
+                "global_cap": GLOBAL_ITERATION_CAP,
             },
         )
 
-        resumed = await _suspend_for_hitl(state, "research_user_review", definition)
+        resumed = await _suspend_for_hitl(state, suspend_reason, definition)
         if not resumed:
+            # Aborted via Workflow Monitor (suspension manager returned
+            # False = aborted/timed-out). Capture this in the doc so the
+            # final artifact carries the termination cause as an audit trail.
+            _append_doc_termination_note(
+                notes_doc_id,
+                kind="aborted",
+                iteration=overall_iteration,
+                detail="Workflow aborted via Workflow Monitor or suspend timeout.",
+            )
             return {
                 "status": "aborted",
                 "iterations_run": overall_iteration,
@@ -1372,12 +1440,63 @@ async def research_session(
             doc_events.publish_workflow_event(
                 state.workflow_id, "user_accepted", {"iterations": overall_iteration}
             )
+            _append_doc_termination_note(
+                notes_doc_id,
+                kind="accepted",
+                iteration=overall_iteration,
+                detail="User accepted the research as complete.",
+            )
             return {
                 "status": "accepted",
                 "iterations_run": overall_iteration,
                 "final_verdict": last_verdict or "",
             }
+        if decision == "stop":
+            # User chose to stop with a partial result. Semantically distinct
+            # from "accept" — the doc isn't fully satisfying the criteria,
+            # but the user chose to end the loop. Useful audit trail.
+            doc_events.publish_workflow_event(
+                state.workflow_id, "user_stopped", {"iterations": overall_iteration}
+            )
+            _append_doc_termination_note(
+                notes_doc_id,
+                kind="stopped",
+                iteration=overall_iteration,
+                detail=(
+                    "User stopped the research with the document in its "
+                    "current state. Some acceptance criteria may remain unmet."
+                ),
+            )
+            return {
+                "status": "stopped",
+                "iterations_run": overall_iteration,
+                "final_verdict": last_verdict or "",
+            }
         if decision == "iterate":
+            if cap_reached:
+                # Hard backstop: global iteration cap reached. Refuse
+                # iterate to prevent runaway loops. The doc records the
+                # event; the next suspend will inform the supervisor only
+                # accept/stop are valid.
+                logger.warning(
+                    "research_session: iterate refused at global cap "
+                    "(%d iterations) for workflow %s — re-suspending.",
+                    overall_iteration, state.workflow_id,
+                )
+                _append_doc_termination_note(
+                    notes_doc_id,
+                    kind="cap_reached",
+                    iteration=overall_iteration,
+                    detail=(
+                        f"Global iteration cap ({GLOBAL_ITERATION_CAP}) reached. "
+                        "Further iteration is refused. Choose accept (keep "
+                        "the document as-is) or stop (end with partial result)."
+                    ),
+                )
+                # Loop back to suspend again with the cap_reached reason.
+                # The supervisor prompt for that reason hides the iterate
+                # option, leaving accept/stop only.
+                continue
             doc_events.publish_workflow_event(
                 state.workflow_id, "user_iterate", {}
             )
@@ -1392,6 +1511,15 @@ async def research_session(
         logger.warning(
             "research_session: unexpected user_decision %r, accepting",
             decision,
+        )
+        _append_doc_termination_note(
+            notes_doc_id,
+            kind="accepted",
+            iteration=overall_iteration,
+            detail=(
+                "Workflow ended with no recognised user decision; "
+                "defaulting to accept."
+            ),
         )
         return {
             "status": "accepted",
