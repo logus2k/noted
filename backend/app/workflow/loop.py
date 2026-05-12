@@ -388,33 +388,48 @@ async def _classify_smoke_failure(
     if probed_output is not None:
         classifier_inputs["tool_actual_output"] = probed_output
 
-    try:
-        out = await llm_dispatcher.dispatch(
-            "smoke_failure_classifier",
-            classifier_inputs,
-            state=state,
-        )
-        target = (out.get("target") or "").strip()
-        reason = (out.get("reason") or "").strip()
-        if target not in ("tool_author", "api_tester"):
-            logger.warning(
-                "smoke_failure_classifier returned unrecognised target %r; suspending instead",
-                target,
+    # Bounded retry for the same reason the validator has one: Gemma's
+    # `<think>` budget occasionally consumes max_tokens with no JSON
+    # emitted afterwards, so the dispatcher raises a parse error.
+    # Suspending the workflow on a transient one-off LLM hiccup is too
+    # punishing — give it 3 attempts before bailing, same pattern as
+    # validate_smoke_contract.
+    last_err: str | None = None
+    for attempt in range(3):
+        try:
+            out = await llm_dispatcher.dispatch(
+                "smoke_failure_classifier",
+                classifier_inputs,
+                state=state,
             )
-            return None, None
-        if not reason:
-            reason = err[:300]
-        logger.info(
-            "smoke_failure_classifier → %s (reason: %s)",
-            target, reason[:200],
-        )
-        return target, reason
-    except Exception:
-        logger.exception(
-            "smoke_failure_classifier dispatch failed; suspending workflow"
-            " rather than guessing"
-        )
-        return None, None
+            target = (out.get("target") or "").strip()
+            reason = (out.get("reason") or "").strip()
+            if target not in ("tool_author", "api_tester"):
+                logger.warning(
+                    "smoke_failure_classifier returned unrecognised target %r on attempt %d/3",
+                    target, attempt + 1,
+                )
+                last_err = f"unrecognised target: {target!r}"
+                continue
+            if not reason:
+                reason = err[:300]
+            logger.info(
+                "smoke_failure_classifier → %s (reason: %s)",
+                target, reason[:200],
+            )
+            return target, reason
+        except Exception as e:  # noqa: BLE001
+            last_err = f"{type(e).__name__}: {e}"
+            logger.warning(
+                "smoke_failure_classifier dispatch attempt %d/3 failed: %s",
+                attempt + 1, last_err,
+            )
+    logger.error(
+        "smoke_failure_classifier failed all 3 attempts (%s); suspending workflow"
+        " rather than guessing",
+        last_err,
+    )
+    return None, None
 
 
 async def _execute_plan(

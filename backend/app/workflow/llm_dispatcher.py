@@ -60,6 +60,21 @@ def _strip_code_fence(content: str) -> str:
     return content
 
 
+# Top-level keys with dedicated rendering. Anything not in this set is
+# rendered through the generic pass-through at the end of
+# _build_user_message — that's how direct handler dispatch calls
+# (validate_smoke_contract, _classify_smoke_failure, ...) get their
+# custom inputs in front of the model. Without that pass-through, the
+# LLM receives an empty user message and hallucinates a verdict.
+_RESERVED_INPUT_KEYS = frozenset({
+    "workflow_inputs",
+    "previous_step",
+    "validator_complaint",
+    "previous_smoke_failure",
+    "_backend",
+})
+
+
 def _build_user_message(step_inputs: dict[str, Any]) -> str:
     """Render the loop's per-step `inputs` dict into a single user-message
     string the worker preset can read.
@@ -106,6 +121,21 @@ def _build_user_message(step_inputs: dict[str, Any]) -> str:
             "shape divergence, wrong expected output key). Failure "
             f"tail:\n{tail}"
         )
+
+    # Pass-through for any other top-level keys callers passed in. This is
+    # how handler-side dispatch (smoke_contract_validator,
+    # smoke_failure_classifier, ...) gets their custom fields in front of
+    # the model — they don't use the workflow_inputs/previous_step
+    # convention. Skipping this branch silently strips those fields and
+    # the LLM sees an empty user message.
+    for k in sorted(step_inputs.keys()):
+        if k in _RESERVED_INPUT_KEYS:
+            continue
+        v = step_inputs[k]
+        if v is None or v == "" or v == [] or v == {}:
+            continue
+        parts.append("")
+        parts.append(_format_field(k, v))
 
     return "\n".join(parts)
 

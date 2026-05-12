@@ -416,31 +416,10 @@ async def publish_tool(
     for fname, content in files.items():
         (tool_dir / fname).write_text(content)
 
-    # F3.5: also write api_tester's smoke.py + merge additional_requirements
-    # into requirements.txt so the run_smoke_tests step can `pytest smoke.py`
-    # against the published tool's venv.
-    api_tester_out: dict[str, Any] | None = None
-    for step in reversed(state.steps):
-        if step.status != "completed":
-            continue
-        out = step.output or {}
-        if "smoke.py" in (out.get("files") or {}) or "smoke.js" in (out.get("files") or {}):
-            api_tester_out = out
-            break
-    if api_tester_out:
-        smoke_files = api_tester_out.get("files") or {}
-        for fname, content in smoke_files.items():
-            (tool_dir / fname).write_text(content)
-        # Merge additional_requirements (pytest etc.) into requirements.txt.
-        extras = api_tester_out.get("additional_requirements") or []
-        if extras and isinstance(extras, list):
-            req_path = tool_dir / "requirements.txt"
-            existing = req_path.read_text() if req_path.is_file() else ""
-            existing_lines = {ln.strip() for ln in existing.splitlines() if ln.strip()}
-            additions = [r for r in extras if isinstance(r, str) and r.strip() and r.strip() not in existing_lines]
-            if additions:
-                merged = existing.rstrip() + ("\n" if existing.strip() else "") + "\n".join(additions) + "\n"
-                req_path.write_text(merged)
+    # NOTE: api_tester now runs AFTER publish_tool (probe-before-test
+    # reorder, 2026-05-12) so smoke.py + additional_requirements are not
+    # available here. `run_smoke_tests` materializes them just before
+    # invoking pytest. See step_handlers.run_smoke_tests.
 
     # Hand ownership to noted-tools so its UID-1000 executor can build the venv.
     _chown_tree_to_noted_tools(tool_dir)
@@ -502,6 +481,40 @@ async def run_smoke_tests(state: WorkspaceState, inputs: dict[str, Any]) -> dict
         raise ValueError("run_smoke_tests: publish_tool did not record tool_name")
 
     tool_dir = Path(prev_publish.get("tool_dir") or "")
+
+    # Materialize api_tester's smoke files + additional_requirements to
+    # disk EVERY TIME this step runs. After the probe-before-test
+    # reorder, publish_tool runs BEFORE api_tester, so smoke.py only
+    # lives in api_tester's step output. On a smoke-failure rewind the
+    # freshly-authored smoke.py also lives only in the latest step
+    # output — an "only write when absent" guard makes pytest run the
+    # stale first attempt forever. Always overwrite with the most recent
+    # api_tester output so each rewind cycle actually exercises new code.
+    api_tester_out: dict[str, Any] | None = None
+    for step in reversed(state.steps):
+        if step.status != "completed":
+            continue
+        out = step.output or {}
+        if "smoke.py" in (out.get("files") or {}) or "smoke.js" in (out.get("files") or {}):
+            api_tester_out = out
+            break
+    if api_tester_out:
+        smoke_files = api_tester_out.get("files") or {}
+        for fname, content in smoke_files.items():
+            (tool_dir / fname).write_text(content)
+        extras = api_tester_out.get("additional_requirements") or []
+        if extras and isinstance(extras, list):
+            req_path = tool_dir / "requirements.txt"
+            existing = req_path.read_text() if req_path.is_file() else ""
+            existing_lines = {ln.strip() for ln in existing.splitlines() if ln.strip()}
+            additions = [r for r in extras if isinstance(r, str) and r.strip() and r.strip() not in existing_lines]
+            if additions:
+                merged = existing.rstrip() + ("\n" if existing.strip() else "") + "\n".join(additions) + "\n"
+                req_path.write_text(merged)
+        # Re-apply ownership for the freshly written files — noted-tools
+        # runs as UID 1000 and reads them when launching pytest.
+        _chown_tree_to_noted_tools(tool_dir)
+
     if not (tool_dir / "smoke.py").is_file():
         return {
             "tool_name": tool_name,
