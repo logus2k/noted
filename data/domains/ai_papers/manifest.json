@@ -33,6 +33,26 @@
       "added_at": "2026-05-06T19:15:30.924367+00:00",
       "category": "Whitepapers/Transformers",
       "display_name": "A Comprehensive Survey On Applications Of Transformers for Deep Learning Tasks"
+    },
+    {
+      "path": "train_short_test_long.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-13T13:01:29.571630+00:00",
+      "category": "Whitepapers/Transformers",
+      "display_name": "Tran Short, Test Long"
+    },
+    {
+      "path": "impact_of_positional_encoding.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-13T13:47:56.580870+00:00",
+      "category": "Whitepapers/Transformers",
+      "display_name": ""
+    },
+    {
+      "path": "rotary_position_embedding.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-13T13:47:56.651984+00:00",
+      "category": "Whitepapers/Transformers"
     }
   ],
   "arcadedb_database": "ai_papers",

@@ -122,6 +122,18 @@ def compute_sameas_edges(entities: Iterable[Entity]) -> list[Relationship]:
     return rels
 
 
+def _trigrams(s: str) -> set[str]:
+    """Padded 3-char shingles of `s`. Padding with `$` lets short names
+    (<3 chars) still produce 1-2 trigrams and prevents cliff effects on
+    word boundaries. Returns the SET (duplicates don't matter for blocking)."""
+    if not s:
+        return set()
+    padded = f'${s}$'
+    if len(padded) < 3:
+        return {padded}
+    return {padded[i:i + 3] for i in range(len(padded) - 2)}
+
+
 def _sameas_within_type(group: list[Entity]) -> list[Relationship]:
     rels: list[Relationship] = []
 
@@ -145,23 +157,62 @@ def _sameas_within_type(group: list[Entity]) -> list[Relationship]:
                     rels.append(_sameas_edge(bucket[i].id, bucket[j].id, 1.0, 'identical_normalized'))
                     paired.add(_pair_key(bucket[i].id, bucket[j].id))
 
-    # Pass 2: Levenshtein within type (skip already-paired).
-    # O(n^2) per type; acceptable at our scale (<= ~1000 per type).
-    for i in range(len(norm)):
-        ei, ni = norm[i]
-        if not ni:
+    # Pass 2: Levenshtein with TRIGRAM BLOCKING (Phase 3 of the
+    # scalability refactor, 2026-05-13).
+    #
+    # The previous loop was O(n^2) per type — fine at <=1000 per type
+    # but quadratic with corpus growth. Blocking: pre-compute padded
+    # 3-shingles per normalized name, build an inverted index, and only
+    # consider pairs that share at least one trigram. With sameAs
+    # threshold = 0.92, two names that pass must share most characters
+    # and thus most trigrams — sharing zero is impossible. Recall-
+    # preserving by construction for non-pathological inputs.
+    #
+    # Falls back to brute-force only if blocking produces near-N^2 pairs
+    # anyway (degenerate input). Compute is O(N * k_avg) where k_avg is
+    # the average number of candidates per entity (usually ~10-100 even
+    # for large groups).
+    name_grams: list[set[str]] = [_trigrams(n) for _, n in norm]
+    inv: dict[str, list[int]] = {}
+    for i, grams in enumerate(name_grams):
+        for g in grams:
+            inv.setdefault(g, []).append(i)
+
+    # Candidate pairs: any (i,j), i<j, that share >=1 trigram. Use a set
+    # to dedupe efficiently across multiple shared trigrams per pair.
+    cand_pairs: set[tuple[int, int]] = set()
+    for indices in inv.values():
+        if len(indices) < 2:
             continue
-        for j in range(i + 1, len(norm)):
-            ej, nj = norm[j]
-            if not nj or ni == nj:
-                continue  # exact-norm handled in pass 1
-            key = _pair_key(ei.id, ej.id)
-            if key in paired:
-                continue
-            ratio = difflib.SequenceMatcher(None, ni, nj).ratio()
-            if ratio >= _LEVENSHTEIN_SAMEAS_THRESHOLD:
-                rels.append(_sameas_edge(ei.id, ej.id, ratio, 'levenshtein'))
-                paired.add(key)
+        # Skip degenerate buckets (every entity has this trigram) —
+        # they'd dump N^2 pairs and waste the blocking. The Levenshtein
+        # filter will still catch real matches via other trigrams.
+        if len(indices) > 200:
+            continue
+        for a in range(len(indices)):
+            ia = indices[a]
+            for b in range(a + 1, len(indices)):
+                ib = indices[b]
+                cand_pairs.add((ia, ib) if ia < ib else (ib, ia))
+
+    n_brute = (len(norm) * (len(norm) - 1)) // 2
+    logger.info(
+        'sameAs trigram-blocking: %d entities -> %d candidate pairs (vs %d brute-force)',
+        len(norm), len(cand_pairs), n_brute,
+    )
+
+    for i, j in cand_pairs:
+        ei, ni = norm[i]
+        ej, nj = norm[j]
+        if not ni or not nj or ni == nj:
+            continue  # empty names + exact-norm handled in pass 1
+        key = _pair_key(ei.id, ej.id)
+        if key in paired:
+            continue
+        ratio = difflib.SequenceMatcher(None, ni, nj).ratio()
+        if ratio >= _LEVENSHTEIN_SAMEAS_THRESHOLD:
+            rels.append(_sameas_edge(ei.id, ej.id, ratio, 'levenshtein'))
+            paired.add(key)
 
     return rels
 

@@ -18,6 +18,34 @@ MOUNTS_DIR = os.environ.get('MOUNTS_DIR', '/app/mounts')
 HOST = os.environ.get('GRAPH_HOST', '0.0.0.0')
 PORT = int(os.environ.get('GRAPH_PORT', '5523'))
 
+# When True, the per-Domain doc-add worker auto-runs recluster() after
+# draining its add_queue. When False (the new default), doc-add just
+# writes the per-doc layer + sets pending_recluster; the user (or a
+# scheduled job) triggers the expensive whole-graph analytics pass via
+# POST /research/{domain_id}/recluster. See the scalability refactor
+# plan: recluster cost grows super-linearly with corpus size, so making
+# it explicit decouples per-doc latency from corpus size.
+GRAPH_AUTO_RECLUSTER = os.environ.get('GRAPH_AUTO_RECLUSTER', 'false').lower() == 'true'
+
+# Analytics backend (PageRank + Leiden community detection):
+#   - "arcadedb" (default): server-side via `CALL algo.pagerank` +
+#     `CALL algo.leiden` against the persisted graph. Requires
+#     ArcadeDB >= 26.4 (we upgraded to 26.5.1 on 2026-05-13 for this).
+#     Runs over the whole project graph in O(native code) rather than
+#     pulling all entities + edges into Python.
+#   - "python": the historical fallback — pulls the project graph into
+#     Python and runs networkx PageRank + leidenalg via weighted
+#     RBConfigurationVertexPartition over `_ANALYTICS_EDGE_TYPES` only.
+#     Kept as a knob in case the ArcadeDB-side results regress on a
+#     specific corpus and we need to rollback without a redeploy.
+#
+# Note: the two backends produce DIFFERENT community assignments because
+# `algo.leiden` does not accept edge weights (sameAs=2.0 / similar_to-band
+# weighting is lost) and runs over all `RELATES` edges (cannot filter by
+# `r.type` property at the algo level). Different is not wrong — a Full
+# Rebuild after switching settles the new assignments.
+GRAPH_ANALYTICS_BACKEND = os.environ.get('GRAPH_ANALYTICS_BACKEND', 'arcadedb').lower()
+
 CACHE_TTL_SECONDS = int(os.environ.get('GRAPH_CACHE_TTL', '300'))
 
 # ArcadeDB (GraphRAG persistence)

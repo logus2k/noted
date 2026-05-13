@@ -66,7 +66,7 @@ import threading
 from datetime import datetime, timezone
 from queue import Empty
 
-from app.config import DOMAIN_HOME_DIR, GENERAL_DOMAIN_ID
+from app.config import DOMAIN_HOME_DIR, GENERAL_DOMAIN_ID, GRAPH_AUTO_RECLUSTER
 
 logger = logging.getLogger(__name__)
 
@@ -174,7 +174,7 @@ def _doc_add_worker(ctx: 'DomainContext') -> None:
                         failed_at=datetime.now(timezone.utc).isoformat(),
                         failed_op='doc_add',
                         failed_doc=rel_path,
-                        error=f'{type(e).__name__}: {str(e)[:200]}',
+                        error=f'{type(e).__name__}: {e}',
                     )
                 except Exception:
                     pass
@@ -191,11 +191,30 @@ def _doc_add_worker(ctx: 'DomainContext') -> None:
             pass
 
         # Settle phase: queue has been empty for the idle timeout.
-        # Auto-recluster only if (a) at least one doc actually succeeded
-        # AND (b) no doc failed AND (c) the marker is set. Skipping when
-        # any doc failed prevents the marker from being permanently stuck
-        # (recluster would also fail and never clear it).
-        if any_success and not any_failure and domain_state.get_recluster_pending(ctx.domain_id):
+        # Auto-recluster only if:
+        #   (a) GRAPH_AUTO_RECLUSTER is enabled (default OFF — see config.py).
+        #       When disabled, doc-add finishes immediately; the user (or a
+        #       scheduled job) hits POST /research/{domain_id}/recluster
+        #       explicitly when they want analytics refreshed.
+        #   (b) at least one doc actually succeeded
+        #   (c) no doc failed (skipping when any failed prevents the marker
+        #       from being permanently stuck — recluster would also fail
+        #       and never clear it).
+        #   (d) the pending_recluster marker is set.
+        if any_failure:
+            logger.warning('doc-add-worker[%s]: skipping auto-recluster '
+                           '(at least one doc-add failed in this batch)',
+                           ctx.domain_id)
+        elif not GRAPH_AUTO_RECLUSTER:
+            if any_success and domain_state.get_recluster_pending(ctx.domain_id):
+                logger.info(
+                    'doc-add-worker[%s]: queue drained; auto-recluster '
+                    'disabled (GRAPH_AUTO_RECLUSTER=false). pending_recluster '
+                    'marker is set; user must trigger Recluster Now to refresh '
+                    'analytics for this Domain.',
+                    ctx.domain_id,
+                )
+        elif any_success and domain_state.get_recluster_pending(ctx.domain_id):
             try:
                 with ctx.rebuild_lock:
                     logger.info('doc-add-worker[%s]: auto-recluster after queue drain',
@@ -210,14 +229,10 @@ def _doc_add_worker(ctx: 'DomainContext') -> None:
                         'failed',
                         failed_at=datetime.now(timezone.utc).isoformat(),
                         failed_op='auto_recluster',
-                        error=f'{type(e).__name__}: {str(e)[:200]}',
+                        error=f'{type(e).__name__}: {e}',
                     )
                 except Exception:
                     pass
-        elif any_failure:
-            logger.warning('doc-add-worker[%s]: skipping auto-recluster '
-                           '(at least one doc-add failed in this batch)',
-                           ctx.domain_id)
 
         # Exit phase: check the queue under the worker lock so that any
         # /doc/add racing with us either (a) sees us alive and skips spawn,

@@ -13,6 +13,7 @@ retrieval surface yet.
 from __future__ import annotations
 
 import logging
+import time
 from typing import Iterable
 
 import igraph as ig
@@ -175,6 +176,161 @@ def _community_sizes(communities: dict[str, int]) -> dict[int, int]:
     for cid in communities.values():
         out[cid] = out.get(cid, 0) + 1
     return out
+
+
+def compute_pagerank_and_communities_arcadedb(
+    entities: list[Entity],
+    sameas_rels: list[Relationship],
+    similar_rels: list[Relationship],
+    arcadedb_client,
+    project_id: str,
+) -> tuple[dict[str, float], dict[str, int]]:
+    """Server-side PageRank + Louvain via ArcadeDB's algo.* Cypher procedures.
+
+    Default analytics backend when GRAPH_ANALYTICS_BACKEND=arcadedb (Phase 4
+    of the 2026-05-13 scalability refactor).
+
+    Edge-weight scheme (materialized into `r.weight` before the algos run):
+      - sameAs                  -> 2.0   (strongest pull — true identity)
+      - similar_to high band    -> 1.0
+      - similar_to medium band  -> 0.5
+      - similar_to low band     -> 0.2
+      - mentions / chunked_into / defines / documents / default -> 0.5
+      - member_of / summarizes  -> 0.0   (structural; shouldn't pull clusters)
+
+    Picks `algo.louvain` (not `algo.leiden`) because Louvain accepts a
+    `weightProperty` parameter in ArcadeDB. Unweighted Leiden produces
+    over-fragmented communities (130 singletons + 3 mega-clusters seen
+    on ai_and_jobs at resolution=0.5); weighted Louvain matches the
+    Python path's RBConfiguration weighted partition more closely.
+
+    Pre-condition: caller must have written sameAs + similar_to edges
+    to the graph BEFORE invoking this; otherwise the algos see stale
+    state. (The normal recluster flow writes them in
+    replace_analytics_layer AFTER this function returns, so the FIRST
+    recluster after this code lands will see the PRIOR recluster's
+    edges — converges on subsequent reclusters.)
+
+    Returns:
+      ranks: {entity_id: rank_score} for thematic entities only.
+      communities: {entity_id: community_id} for thematic entities only.
+    """
+    thematic_ids = {e.id for e in entities}
+    if not thematic_ids:
+        logger.info('arcadedb analytics: no thematic entities; returning empty.')
+        return {}, {}
+
+    logger.info(
+        'arcadedb analytics: running weighted CALL algo.pagerank + CALL algo.louvain '
+        'against the persisted graph (project=%s, thematic_entities=%d)',
+        project_id, len(thematic_ids),
+    )
+
+    # Pre-step: materialize r.weight per RELATES edge type. Four passes
+    # for clarity; each is a single bulk SET keyed by edge type +
+    # (for similar_to) confidence band found in properties_json.
+    # Cost: linear in edge count, but a single transaction per pass.
+    _t0 = time.perf_counter()
+    pid = project_id
+    # Pass 1 — base: 0.5 for everything in the project. Covers mentions,
+    # chunked_into, defines, documents, and any other unenumerated type.
+    arcadedb_client.command(
+        '''MATCH (a:Entity)-[r:RELATES]->(b:Entity)
+           WHERE $pid IN a.project_ids AND $pid IN b.project_ids
+           SET r.weight = 0.5''',
+        {'pid': pid},
+    )
+    # Pass 2 — sameAs: 2.0 (strongest pull).
+    arcadedb_client.command(
+        '''MATCH (a:Entity)-[r:RELATES]->(b:Entity)
+           WHERE $pid IN a.project_ids AND $pid IN b.project_ids
+             AND r.type = "sameAs"
+           SET r.weight = 2.0''',
+        {'pid': pid},
+    )
+    # Pass 3 — similar_to bands. Confidence band is stored inside
+    # properties_json (a serialized JSON blob). Match via CONTAINS on
+    # the exact Python json.dumps formatting ('"confidence": "<band>"'
+    # — note the space after the colon; verified live 2026-05-13).
+    for band, weight in (('high', 1.0), ('medium', 0.5), ('low', 0.2)):
+        arcadedb_client.command(
+            '''MATCH (a:Entity)-[r:RELATES]->(b:Entity)
+               WHERE $pid IN a.project_ids AND $pid IN b.project_ids
+                 AND r.type = "similar_to"
+                 AND r.properties_json CONTAINS $needle
+               SET r.weight = $w''',
+            {'pid': pid, 'needle': f'"confidence": "{band}"', 'w': weight},
+        )
+    # Pass 4 — structural edges shouldn't pull clusters.
+    arcadedb_client.command(
+        '''MATCH (a:Entity)-[r:RELATES]->(b:Entity)
+           WHERE $pid IN a.project_ids AND $pid IN b.project_ids
+             AND r.type IN ["member_of", "summarizes"]
+           SET r.weight = 0.0''',
+        {'pid': pid},
+    )
+    logger.info('arcadedb analytics: edge weights materialized (%.2fs)',
+                time.perf_counter() - _t0)
+
+    # algo.pagerank with weightProperty so high-weight edges (sameAs)
+    # contribute more transition probability than low-weight ones.
+    pagerank_rows = arcadedb_client.query(
+        '''CALL algo.pagerank({dampingFactor: 0.85, maxIterations: 30, tolerance: 0.0001, weightProperty: "weight"})
+           YIELD node, score
+           RETURN node.id AS entity_id, score''',
+        {},
+    ) or []
+    ranks: dict[str, float] = {}
+    for row in pagerank_rows:
+        eid = row.get('entity_id')
+        if eid is not None:
+            ranks[eid] = float(row.get('score') or 0.0)
+    logger.info('arcadedb analytics: weighted PageRank returned %d node scores', len(ranks))
+
+    # algo.louvain (not leiden — louvain accepts weightProperty). Default
+    # max-iterations and tolerance are reasonable; weight-property is the
+    # whole point of this pass.
+    louvain_rows = arcadedb_client.query(
+        '''CALL algo.louvain({maxIterations: 30, tolerance: 0.0001, weightProperty: "weight"})
+           YIELD node, communityId, modularity
+           RETURN node.id AS entity_id, communityId, modularity''',
+        {},
+    ) or []
+    full_communities: dict[str, int] = {}
+    final_modularity: float | None = None
+    for row in louvain_rows:
+        eid = row.get('entity_id')
+        cid = row.get('communityId')
+        if eid is not None and cid is not None:
+            full_communities[eid] = int(cid)
+        if row.get('modularity') is not None and final_modularity is None:
+            final_modularity = float(row['modularity'])
+    logger.info(
+        'arcadedb analytics: weighted Louvain returned %d node assignments (modularity=%s)',
+        len(full_communities),
+        f'{final_modularity:.4f}' if final_modularity is not None else 'n/a',
+    )
+
+    # Filter communities to thematic entities only (drop bridge nodes —
+    # chunks + docs participated in the partition but aren't first-class
+    # community members in our model).
+    communities: dict[str, int] = {
+        eid: cid for eid, cid in full_communities.items() if eid in thematic_ids
+    }
+
+    # Renumber communities to be 0-indexed and contiguous (after bridge
+    # filtering, some Leiden communities may have only bridge members
+    # and disappear from the thematic-only view).
+    used = sorted(set(communities.values()))
+    remap = {old: new for new, old in enumerate(used)}
+    communities = {eid: remap[cid] for eid, cid in communities.items()}
+
+    sizes = _community_sizes(communities)
+    logger.info(
+        'arcadedb analytics: %d thematic entities -> %d communities; size hist %s',
+        len(communities), len(sizes), sizes,
+    )
+    return ranks, communities
 
 
 def apply_metrics_to_entities(

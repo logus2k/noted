@@ -291,9 +291,12 @@ services:
 
   # ===================== ArcadeDB (Graph Persistence) =====================
   noted-arcadedb:
-    # 26.3.2 is the current stable release (2026-03-21). Avoid :latest —
-    # on Docker Hub it points at a SNAPSHOT nightly build.
-    image: arcadedata/arcadedb:26.3.2
+    # Avoid :latest — on Docker Hub it points at a SNAPSHOT nightly build.
+    # 26.5.1 is the current stable release (2026-05-11); upgraded from
+    # 26.3.2 on 2026-05-13 to unlock the algo.* Cypher procedures
+    # (algo.pagerank, algo.leiden, etc.) which our 26.3.2 build did not
+    # ship. See https://docs.arcadedb.com/arcadedb/reference/graph-algorithms/.
+    image: arcadedata/arcadedb:26.5.1
     container_name: noted-arcadedb
     networks:
       - noted-network
@@ -328,6 +331,30 @@ services:
     networks:
       - noted-network
     environment:
+      # Unbuffered Python stdout so logger output reaches `docker logs`
+      # immediately. Without this, full-buffering (default when stdout
+      # is a pipe) was hiding all post-startup app logs — incl. the
+      # auto_recluster traceback for ai_papers on 2026-05-13.
+      PYTHONUNBUFFERED: "1"
+      # Phase 1 of the ingestion scalability refactor (2026-05-13):
+      # When "true", the per-Domain doc-add worker auto-runs recluster()
+      # after draining its queue (the historical behavior). When "false"
+      # (the new default), doc-add writes the per-doc layer and sets
+      # pending_recluster, and the user (or a scheduled job) triggers
+      # the heavy analytics pass via POST /research/{domain_id}/recluster
+      # (also exposed as the "Recluster Now" CTA in the KB Monitor).
+      # Decoupling the recluster from doc-add keeps per-doc ingest time
+      # roughly constant even as the corpus grows — the recluster cost
+      # is super-linear in corpus size today.
+      GRAPH_AUTO_RECLUSTER: "false"
+      # Phase 4 of the ingestion scalability refactor (2026-05-13):
+      # "arcadedb" (default) runs PageRank + Leiden server-side via
+      # `CALL algo.pagerank` + `CALL algo.leiden` against the persisted
+      # graph (requires ArcadeDB >= 26.4; we upgraded noted-arcadedb
+      # to 26.5.1 the same day). "python" keeps the networkx +
+      # leidenalg fallback (slower, but supports edge weights). See
+      # config.py for the trade-offs.
+      GRAPH_ANALYTICS_BACKEND: "arcadedb"
       MLFLOW_TRACKING_URI: http://mlflow:5000
       AIRFLOW_API_URL: http://noted-airflow-apiserver:8080
       AIRFLOW_BASE_PATH: /airflow

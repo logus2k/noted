@@ -27,12 +27,14 @@ from app.analytics.graph_metrics import (
     apply_metrics_to_entities,
     build_community_entities,
     compute_pagerank_and_communities,
+    compute_pagerank_and_communities_arcadedb,
 )
 from app.analytics.sameas import compute_sameas_edges, compute_similar_to_edges
 from app.arcadedb_client import ArcadeDBError
 from app.config import (
     ENTITY_EXTRACT_PARALLELISM,
     GLOBAL_PROJECT_ID,
+    GRAPH_ANALYTICS_BACKEND,
     USE_GRAPHBATCH_V2,
 )
 from app.extractors.gemma_community_summarizer import summarize_communities
@@ -600,8 +602,16 @@ class ResearchBuilder:
             return (sameas_rels, similar_rels, community_entities,
                     community_member_rels, summary_entities, summary_rels)
 
+        # Phase 0 instrumentation: per-step timing breakdown so we can
+        # see which sub-step of the analytics pass dominates the recluster
+        # wall-clock. Logged as a single summary line at the end.
+        phase_t0 = _now()
+        timings: dict[str, float] = {}
+
         self._set_phase('sameas')
+        t0 = _now()
         sameas_rels = compute_sameas_edges(thematic_entities)
+        timings['sameas'] = _now() - t0
 
         # Collapse sameAs equivalence classes BEFORE PageRank/Leiden so the
         # rank score for "AI agent" / "AI agents" lands on a single node
@@ -610,6 +620,7 @@ class ResearchBuilder:
         # see the redirected data when assembling the persist payload.
         if merge_sameas_identity:
             self._set_phase('merge_identity')
+            t0 = _now()
             survivors, sameas_rels, redirected_mentions = (
                 _merge_sameas_identity_classes(
                     thematic_entities, sameas_rels, mention_rels,
@@ -621,25 +632,46 @@ class ResearchBuilder:
             thematic_entities.extend(survivors)
             mention_rels.clear()
             mention_rels.extend(redirected_mentions)
+            timings['merge_identity'] = _now() - t0
             logger.info(
                 'sameAs merge: absorbed %d entities into canonicals, redirected mention edges (%d duplicates dropped)',
                 n_absorbed, n_mention_drops,
             )
 
         self._set_phase('similar_to')
+        t0 = _now()
         sameas_pairs = [(r.source, r.target) for r in sameas_rels]
         similar_rels = compute_similar_to_edges(thematic_entities, sameas_pairs=sameas_pairs)
+        timings['similar_to'] = _now() - t0
 
         self._set_phase('analytics')
+        t0 = _now()
         chunk_and_doc_entities = [
             e for e in md_entities if e.type in ('markdown_chunk', 'markdown_doc')
         ]
-        working_rels = mention_rels + other_rels + sameas_rels + similar_rels
-        ranks, communities_dict = compute_pagerank_and_communities(
-            thematic_entities,
-            working_rels,
-            bridge_entities=chunk_and_doc_entities,
-        )
+        # Phase 4 dispatcher: server-side ArcadeDB algo.pagerank +
+        # algo.leiden (default), or the legacy Python networkx +
+        # leidenalg path. Choice is via GRAPH_ANALYTICS_BACKEND env
+        # (see config.py). The arcadedb path reads from the persisted
+        # graph (so it sees PRIOR-recluster sameAs/similar_to edges,
+        # not the freshly-computed ones from this run — these get
+        # persisted via replace_analytics_layer afterwards and
+        # contribute to the NEXT recluster).
+        if GRAPH_ANALYTICS_BACKEND == 'arcadedb':
+            ranks, communities_dict = compute_pagerank_and_communities_arcadedb(
+                thematic_entities,
+                sameas_rels,
+                similar_rels,
+                self._storage._c,
+                self._storage.project_id,
+            )
+        else:
+            working_rels = mention_rels + other_rels + sameas_rels + similar_rels
+            ranks, communities_dict = compute_pagerank_and_communities(
+                thematic_entities,
+                working_rels,
+                bridge_entities=chunk_and_doc_entities,
+            )
         apply_metrics_to_entities(thematic_entities, ranks, communities_dict)
 
         entity_by_id = {e.id: e for e in thematic_entities}
@@ -647,13 +679,31 @@ class ResearchBuilder:
             communities_dict, entity_by_id,
         )
         self.progress['communities_total'] = len(community_entities)
+        timings['analytics'] = _now() - t0
 
         if not skip_community_summaries:
             self._set_phase('summarizing')
+            t0 = _now()
             summary_entities, summary_rels = summarize_communities(
                 community_entities, communities_dict, entity_by_id,
             )
             self.progress['communities_summarized'] = len(summary_entities)
+            timings['summarizing'] = _now() - t0
+
+        total = _now() - phase_t0
+        # Single summary line for easy log-grep. Format: key=Xs key=Ys ...
+        breakdown = ' '.join(f'{k}={v:.1f}s' for k, v in timings.items())
+        logger.info(
+            'analytics_and_summaries.timing: total=%.1fs (thematic=%d, sameas_edges=%d, similar_edges=%d, communities=%d) | %s',
+            total, len(thematic_entities), len(sameas_rels), len(similar_rels),
+            len(community_entities), breakdown,
+        )
+        # Stash on self.progress so /status (and the KB Monitor UI) can
+        # display the per-phase breakdown without parsing docker logs.
+        self.progress['analytics_timings_seconds'] = {
+            k: round(v, 3) for k, v in timings.items()
+        }
+        self.progress['analytics_total_seconds'] = round(total, 3)
 
         return (sameas_rels, similar_rels, community_entities,
                 community_member_rels, summary_entities, summary_rels)

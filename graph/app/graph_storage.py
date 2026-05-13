@@ -1068,6 +1068,11 @@ class GraphStorage:
                     len(thematic_entities), len(community_entities), len(summary_entities),
                     len(member_of_rels), len(summary_rels), len(sameas_rels), len(similar_rels))
 
+        # Phase 0 instrumentation: per-step durations collected here, emitted
+        # as one summary line at the end and returned to the caller so
+        # research_builder can stash them on self.progress for /status.
+        step_t: dict[str, float] = {}
+
         # 1. Drop old communities + community_summary nodes (DETACH DELETE
         #    removes member_of / summarizes edges automatically). sameAs +
         #    similar_to edges connect thematic entities directly so we drop
@@ -1081,19 +1086,72 @@ class GraphStorage:
                DETACH DELETE n''',
             {'pid': project_id},
         )
-        logger.info('writing.step1a: end (%.2fs)', time.perf_counter() - t0)
+        step_t['step1a_drop_communities'] = time.perf_counter() - t0
+        logger.info('writing.step1a: end (%.2fs)', step_t['step1a_drop_communities'])
 
+        # step1b: instead of unconditionally dropping ALL sameAs/similar_to
+        # edges (the historical behavior — wasteful when most edges are
+        # stable across reclusters), DIFF the existing edge set against
+        # the freshly-computed one and only DELETE removals + CREATE
+        # additions (Phase 5 of the scalability refactor, 2026-05-13).
+        #
+        # Property drift (e.g. cosine recomputed slightly differently for
+        # the same pair) is handled correctly: a pair that appears in
+        # both old and new with the *same* (source, target, type) key
+        # keeps its existing edge — properties don't get updated. This
+        # is acceptable because sameAs ratio + similar_to cosine depend
+        # only on entity names/descriptions, which are stable across
+        # reclusters of the same corpus. If entity descriptions DO
+        # change, the next Full Rebuild propagates fresh properties.
         t0 = time.perf_counter()
-        logger.info('writing.step1b: drop old sameAs/similar_to edges — start')
-        self._c.command(
+        new_keys: set[tuple[str, str, str]] = {
+            (r.source, r.target, r.type)
+            for r in sameas_rels + similar_rels
+        }
+        logger.info(
+            'writing.step1b: edge-set diff — start (new analytics edges to consider: %d unique keys)',
+            len(new_keys),
+        )
+        # Read existing analytics-edge keys for this project.
+        existing_rows = self._c.query(
             '''MATCH (a:Entity)-[r:RELATES]->(b:Entity)
                WHERE $pid IN a.project_ids
                  AND $pid IN b.project_ids
                  AND r.type IN ["sameAs", "similar_to"]
-               DELETE r''',
+               RETURN a.id AS source, b.id AS target, r.type AS type''',
             {'pid': project_id},
+        ) or []
+        existing_keys: set[tuple[str, str, str]] = {
+            (row['source'], row['target'], row['type'])
+            for row in existing_rows
+        }
+        keys_to_delete = existing_keys - new_keys
+        keys_to_create_set = new_keys - existing_keys
+        logger.info(
+            'writing.step1b: diff: %d existing, %d new, %d to delete, %d to create',
+            len(existing_keys), len(new_keys), len(keys_to_delete),
+            len(keys_to_create_set),
         )
-        logger.info('writing.step1b: end (%.2fs)', time.perf_counter() - t0)
+        # Delete only the removed analytics edges. Chunked UNWIND keeps
+        # ArcadeDB transactions bounded.
+        if keys_to_delete:
+            del_rows = [{'source': s, 'target': t, 'type': ty}
+                        for (s, t, ty) in keys_to_delete]
+            n_chunks_del = (len(del_rows) + _CHUNK_EDGES - 1) // _CHUNK_EDGES
+            for ci, chunk in enumerate(_chunks(del_rows, _CHUNK_EDGES), 1):
+                ct0 = time.perf_counter()
+                self._c.command(
+                    '''UNWIND $rows AS row
+                       MATCH (a:Entity {id: row.source})-[r:RELATES {type: row.type}]->(b:Entity {id: row.target})
+                       DELETE r''',
+                    {'rows': chunk},
+                )
+                logger.info('writing.step1b.delete: chunk %d/%d (%d rows) %.2fs',
+                            ci, n_chunks_del, len(chunk), time.perf_counter() - ct0)
+        step_t['step1b_drop_analytics_edges'] = time.perf_counter() - t0
+        logger.info('writing.step1b: end (%.2fs)', step_t['step1b_drop_analytics_edges'])
+        # Cache the create-set so step4 knows which sameAs+similar edges to skip.
+        self._sameas_similar_to_skip_keys = existing_keys & new_keys
 
         # 2. Update thematic entities with refreshed rank + community_id.
         rows = []
@@ -1123,7 +1181,8 @@ class GraphStorage:
             _report('writing.thematic_update', ci, n_chunks_2)
             logger.info('writing.step2: chunk %d/%d (%d rows) %.2fs',
                         ci, n_chunks_2, len(chunk), time.perf_counter() - ct0)
-        logger.info('writing.step2: end (%.2fs)', time.perf_counter() - t0)
+        step_t['step2_thematic_update'] = time.perf_counter() - t0
+        logger.info('writing.step2: end (%.2fs)', step_t['step2_thematic_update'])
 
         # 3. Insert new community + community_summary nodes.
         new_nodes = list(community_entities) + list(summary_entities)
@@ -1166,12 +1225,29 @@ class GraphStorage:
             _report('writing.community_nodes', ci, n_chunks_3)
             logger.info('writing.step3: chunk %d/%d (%d rows) %.2fs',
                         ci, n_chunks_3, len(chunk), time.perf_counter() - ct0)
-        logger.info('writing.step3: end (%.2fs)', time.perf_counter() - t0)
+        step_t['step3_community_nodes'] = time.perf_counter() - t0
+        logger.info('writing.step3: end (%.2fs)', step_t['step3_community_nodes'])
 
         # 4. Insert new edges (member_of, summarizes, sameAs, similar_to).
+        # Phase 5 (edge-set diff): sameAs + similar_to edges whose
+        # (source, target, type) already exists in the graph (from step1b's
+        # diff) are skipped here. member_of + summary edges are always
+        # written because their endpoint nodes were just (re-)inserted
+        # in step3 by way of the community wipe in step1a.
+        skip = getattr(self, '_sameas_similar_to_skip_keys', set()) or set()
+        kept_sameas = [r for r in sameas_rels if (r.source, r.target, r.type) not in skip]
+        kept_similar = [r for r in similar_rels if (r.source, r.target, r.type) not in skip]
+        if skip:
+            logger.info(
+                'writing.step4: edge-set diff kept %d/%d sameAs + %d/%d similar_to '
+                '(skipped %d already-present)',
+                len(kept_sameas), len(sameas_rels),
+                len(kept_similar), len(similar_rels),
+                len(sameas_rels) + len(similar_rels) - len(kept_sameas) - len(kept_similar),
+            )
         all_new_edges = (
             list(member_of_rels) + list(summary_rels)
-            + list(sameas_rels) + list(similar_rels)
+            + kept_sameas + kept_similar
         )
         n_edges = 0
         t0 = time.perf_counter()
@@ -1197,15 +1273,24 @@ class GraphStorage:
             _report('writing.analytics_edges', ci, n_chunks_4)
             logger.info('writing.step4: chunk %d/%d (%d rows) %.2fs',
                         ci, n_chunks_4, len(chunk), time.perf_counter() - ct0)
-        logger.info('writing.step4: end (%.2fs)', time.perf_counter() - t0)
-        logger.info('writing.replace_analytics_layer: complete (%.2fs total)',
-                    time.perf_counter() - phase_t0)
+        step_t['step4_analytics_edges'] = time.perf_counter() - t0
+        logger.info('writing.step4: end (%.2fs)', step_t['step4_analytics_edges'])
+
+        total = time.perf_counter() - phase_t0
+        breakdown = ' '.join(f'{k}={v:.1f}s' for k, v in step_t.items())
+        logger.info(
+            'writing.replace_analytics_layer.timing: total=%.1fs (thematic=%d, communities=%d, summaries=%d, analytics_edges=%d) | %s',
+            total, len(thematic_entities), len(community_entities),
+            len(summary_entities), n_edges, breakdown,
+        )
 
         return {
             'thematic_updated': len(thematic_entities),
             'community_entities_written': len(community_entities),
             'summary_entities_written': len(summary_entities),
             'analytics_edges_written': n_edges,
+            'writing_timings_seconds': {k: round(v, 3) for k, v in step_t.items()},
+            'writing_total_seconds': round(total, 3),
         }
 
     # ── Read helpers (used by later phases) ──────────────────────────

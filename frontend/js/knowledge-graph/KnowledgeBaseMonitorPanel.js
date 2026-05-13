@@ -23,11 +23,26 @@ function _corpusCollection(domainId) {
     return `${domainId}__corpus`;
 }
 
-// Manual rebuild action. Auto-recluster runs after every doc-add queue
-// drain (see `_doc_add_worker` in graph/app/domain_registry.py), so users
-// no longer need to fire a manual "Recluster Now" - the only legitimate
-// manual escape hatch is a Full Rebuild (full re-extraction, ~25 min)
-// for a graph that's drifted irrecoverably.
+// Manual analytics-refresh actions.
+//
+// As of the 2026-05-13 scalability refactor, auto-recluster is OPT-IN
+// via GRAPH_AUTO_RECLUSTER (default OFF on noted-graph). The doc-add
+// worker drain writes the per-doc layer + sets `pending_recluster`,
+// then EXITS — refreshing analytics (sameAs / similar_to / PageRank /
+// Leiden / communities) is now an explicit user action. Recluster runs
+// over the persisted entities and is cheaper than Full Rebuild.
+//
+// Two actions exist:
+//   - RECLUSTER_ACTION: the cheap path; recomputes analytics over the
+//     existing graph. Used for the "Knowledge graph is behind" banner
+//     CTA (the most common case after a doc add).
+//   - REBUILD_ACTION: the heavyweight escape hatch. Re-extracts every
+//     doc from scratch (~25 min for ai_papers today). Used by the
+//     "build failed" retry button when the failure scope is broader
+//     than analytics, and via the explorer's advanced affordances.
+const RECLUSTER_ACTION = {
+    path: 'recluster', label: 'Recluster Now', running: 'Reclustering...',
+};
 const REBUILD_ACTION = {
     path: 'rebuild', label: 'Full Rebuild', running: 'Rebuilding...',
 };
@@ -255,6 +270,15 @@ export class KnowledgeBaseMonitorPanel {
                 <pre id="grm-last-build-json" style="margin:0;font-size:11px;color:var(--text-color);overflow:auto;max-height:120px"></pre>
             </div>
 
+            <div id="grm-last-timings" class="grm-card" style="display:none">
+                <div style="font-size:10px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Last recluster timings</div>
+                <div id="grm-last-timings-total" class="grm-row"><span class="grm-k">total</span><span class="grm-v">-</span></div>
+                <div id="grm-last-timings-analytics" style="margin-top:4px;font-size:11px;color:var(--text-secondary)">analytics:</div>
+                <div id="grm-last-timings-analytics-rows"></div>
+                <div id="grm-last-timings-writing" style="margin-top:6px;font-size:11px;color:var(--text-secondary)">writing:</div>
+                <div id="grm-last-timings-writing-rows"></div>
+            </div>
+
             <div id="grm-error-card" class="grm-card" style="display:none;background:var(--error-bg, #3a2020);color:var(--error-fg, #e57373)">
                 <span id="grm-error-msg"></span>
             </div>
@@ -275,7 +299,10 @@ export class KnowledgeBaseMonitorPanel {
             'stepper-row', 'stepper',
             'pictures-row', 'pictures', 'tables-row', 'tables',
             'entities', 'md-docs', 'communities', 'db-entities', 'db-rels',
-            'last-build', 'last-build-json', 'error-card', 'error-msg',
+            'last-build', 'last-build-json',
+            'last-timings', 'last-timings-total',
+            'last-timings-analytics-rows', 'last-timings-writing-rows',
+            'error-card', 'error-msg',
             'svc-health-mount',
             'doc-counter-row', 'doc-counter',
         ]) {
@@ -470,16 +497,28 @@ export class KnowledgeBaseMonitorPanel {
             } else if (this._reclusterInFlight) {
                 this._els['recluster-banner'].style.display = '';
                 this._els['recluster-reason'].textContent =
-                    `${REBUILD_ACTION.running} - ${_runningProgressText(progress)}`;
+                    `${RECLUSTER_ACTION.running} - ${_runningProgressText(progress)}`;
                 this._els['recluster-btn'].disabled = true;
                 this._els['recluster-btn'].textContent = 'Running...';
             } else if (pending && !inProgress) {
                 this._els['recluster-banner'].style.display = '';
                 const setAt = pending.set_at ? new Date(pending.set_at).toLocaleString() : 'unknown time';
                 const reason = pending.reason ? ` - ${pending.reason}` : '';
-                this._els['recluster-reason'].textContent = `Marked at ${setAt}${reason}`;
+                // ETA hint: if the previous recluster recorded timings in the
+                // progress dict, surface a rough "expect ~Xm" estimate so the
+                // user knows the cost before clicking. We use the LAST run's
+                // analytics + writing totals; absent any history the hint
+                // is omitted.
+                let etaHint = '';
+                const analyticsTot = Number(progress.analytics_total_seconds || 0);
+                const writingTot = Number(progress.writing_total_seconds || 0);
+                if (analyticsTot > 0 || writingTot > 0) {
+                    const totMin = Math.round((analyticsTot + writingTot) / 60);
+                    if (totMin >= 1) etaHint = ` - last run took ~${totMin} min`;
+                }
+                this._els['recluster-reason'].textContent = `Marked at ${setAt}${reason}${etaHint}`;
                 this._els['recluster-btn'].disabled = false;
-                this._els['recluster-btn'].textContent = REBUILD_ACTION.label;
+                this._els['recluster-btn'].textContent = RECLUSTER_ACTION.label;
             } else {
                 this._els['recluster-banner'].style.display = 'none';
             }
@@ -653,6 +692,39 @@ export class KnowledgeBaseMonitorPanel {
             this._els['last-build-json'].textContent = JSON.stringify(graph.last_build, null, 2);
         }
 
+        // Last recluster timings: surface analytics + writing per-step
+        // breakdown from the progress dict when the most recent op
+        // recorded them (set by Phase 0 instrumentation in graph-side
+        // research_builder._run_analytics_and_summaries and
+        // graph_storage.replace_analytics_layer).
+        const aTimings = progress.analytics_timings_seconds;
+        const wTimings = progress.writing_timings_seconds;
+        const aTotal = Number(progress.analytics_total_seconds || 0);
+        const wTotal = Number(progress.writing_total_seconds || 0);
+        const hasTimings = (aTimings && Object.keys(aTimings).length) ||
+                           (wTimings && Object.keys(wTimings).length);
+        if (hasTimings) {
+            this._els['last-timings'].style.display = '';
+            const totSec = aTotal + wTotal;
+            const totMin = totSec >= 60 ? `${(totSec / 60).toFixed(1)} min` : `${totSec.toFixed(1)} s`;
+            this._els['last-timings-total'].querySelector('.grm-v').textContent =
+                `${totMin} (analytics ${aTotal.toFixed(1)}s + writing ${wTotal.toFixed(1)}s)`;
+            const renderRows = (containerEl, timings) => {
+                containerEl.innerHTML = '';
+                if (!timings) return;
+                Object.entries(timings).forEach(([k, v]) => {
+                    const row = document.createElement('div');
+                    row.className = 'grm-row';
+                    row.innerHTML = `<span class="grm-k" style="font-size:11px;color:var(--text-secondary)">${k}</span><span class="grm-v" style="font-size:11px">${Number(v).toFixed(2)}s</span>`;
+                    containerEl.appendChild(row);
+                });
+            };
+            renderRows(this._els['last-timings-analytics-rows'], aTimings);
+            renderRows(this._els['last-timings-writing-rows'], wTimings);
+        } else {
+            this._els['last-timings'].style.display = 'none';
+        }
+
         this._els['error-card'].style.display = 'none';
         this._els['poll-state'].textContent = 'live';
         this._els['poll-state'].className = 'grm-pill grm-pill-on';
@@ -676,10 +748,13 @@ export class KnowledgeBaseMonitorPanel {
         this._els['recluster-btn'].textContent = 'Starting...';
         // Fire-and-forget. The next /status tick after the op completes
         // will clear _reclusterInFlight via _applyStatus's auto-clear.
-        fetch(this._rebuildUrl(), { method: 'POST' })
+        // Phase-1 default: the banner CTA runs the cheap recluster path,
+        // not Full Rebuild. Full Rebuild is reachable via the failed-state
+        // retry button (when the failure scope warrants it).
+        fetch(this._reclusterUrl(), { method: 'POST' })
             .catch((e) => {
                 this._reclusterInFlight = false;
-                this._applyError(`${REBUILD_ACTION.label} failed to start: ` + e.message);
+                this._applyError(`${RECLUSTER_ACTION.label} failed to start: ` + e.message);
             });
     }
 
