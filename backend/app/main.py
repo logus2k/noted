@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse
 
 import os
 from app.config import FRONTEND_DIR, PROJECTS_DIR, MOUNTS_DIR
-from app.routers import notebooks, venvs, documents, git, files, dvc, minio, projects, mlflow, export, hydra, airflow, snapshots, registry, serving, reports, graph_proxy, llm, lsp, dap, evidently, rag, kb, citations, models as models_router, buffers, health
+from app.routers import notebooks, venvs, documents, git, files, dvc, minio, projects, mlflow, export, hydra, airflow, snapshots, registry, serving, reports, graph_proxy, llm, lsp, dap, evidently, rag, kb, citations, models as models_router, buffers, health, vault
 from app.managers.kernel_manager import KernelManagerService
 from app.managers.execution_bridge import ExecutionBridge
 from app.managers.auto_instrumentation import AutoInstrumentation
@@ -186,6 +186,7 @@ app.include_router(registry.router)
 app.include_router(serving.router)
 app.include_router(reports.router)
 app.include_router(graph_proxy.router)
+app.include_router(vault.router)
 app.include_router(llm.router)
 app.include_router(lsp.router)
 lsp.set_lsp_manager(lsp_mgr)

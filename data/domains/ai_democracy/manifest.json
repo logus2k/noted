@@ -1,0 +1,90 @@
+{
+  "domain_id": "ai_democracy",
+  "name": "AI and Democracy",
+  "description": "AI and Democracy",
+  "created_at": "2026-05-13T18:10:57.859277+00:00",
+  "embeddings_model": "bge-m3",
+  "pinned": false,
+  "included_files": [
+    {
+      "path": "psychopolitics.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-13T18:14:52.549168+00:00",
+      "category": "Democracy",
+      "display_name": ""
+    },
+    {
+      "path": "01. Neo-reactionaries head for the exit_N_Land_2013.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-13T19:12:04.637236+00:00",
+      "category": "Democracy",
+      "display_name": ""
+    },
+    {
+      "path": "02_The Crisis of Freedom In Psychopolitics_B_C_Han_2017.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-13T19:12:04.681341+00:00",
+      "category": "Democracy",
+      "display_name": ""
+    },
+    {
+      "path": "03_The Science and Technology of Lie Machines_P_N_Howard_2020.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-13T19:12:06.765056+00:00",
+      "category": "Democracy",
+      "display_name": ""
+    },
+    {
+      "path": "04_01_Definitions and Variations of Political Communication_Klinger_Kreiss__Mutsvairo_2023.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-13T19:12:07.549804+00:00",
+      "category": "Democracy",
+      "display_name": ""
+    },
+    {
+      "path": "04_02_Platforms and their power_2023_Klinger_Kreiss__Mutsvairo.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-13T19:12:08.261343+00:00",
+      "category": "Democracy",
+      "display_name": ""
+    },
+    {
+      "path": "04_03_Platforms and Strategical Political Communication_Klinger_Kreiss__Mutsvairo__2023.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-13T19:12:08.997623+00:00",
+      "category": "Democracy",
+      "display_name": ""
+    },
+    {
+      "path": "04_04_Platforms, Misinformation, Disinformation, and Propaganda_Klinger_Kreiss__Mutsvairo_2023.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-13T19:12:09.895393+00:00",
+      "category": "Democracy",
+      "display_name": ""
+    },
+    {
+      "path": "04_05_Refer\u00eancias_Platforms, power, and politics_Klinger_Kreiss__Mutsvairo__2023.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-13T19:12:11.858475+00:00",
+      "category": "Democracy",
+      "display_name": ""
+    },
+    {
+      "path": "05_01_O capital-n\u00favem_Y_Varoufakis_2025.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-13T19:12:11.915122+00:00",
+      "category": "Democracy",
+      "display_name": ""
+    },
+    {
+      "path": "06_Totalitarianism Propaganda_H_Harendt_1951.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-13T19:12:13.923697+00:00",
+      "category": "Democracy"
+    }
+  ],
+  "arcadedb_database": "ai_democracy",
+  "corpus_collection": "ai_democracy__corpus",
+  "entity_cache_collection": "ai_democracy__gr_entities",
+  "summary_cache_collection": "ai_democracy__gr_summaries"
+}

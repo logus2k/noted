@@ -28,7 +28,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from . import venv_manager
+from . import secret_resolver, venv_manager
 from .registry import ToolEntry
 
 logger = logging.getLogger(__name__)
@@ -88,6 +88,27 @@ async def execute(entry: ToolEntry, arguments: dict[str, Any]) -> ExecResult:
     loop = asyncio.get_running_loop()
     started = loop.time()
 
+    # Phase H3: resolve declared secrets into env-var dict. Tools opt into
+    # secrets by listing names in `tool.json._meta.allowed_secrets`; the
+    # executor only injects those names. A tool that lists a name but the
+    # vault doesn't have it fails BEFORE the subprocess spawns so the
+    # operator gets a clear "secret X is missing" message instead of an
+    # opaque tool-side KeyError.
+    allowed_secrets = entry.meta.get("allowed_secrets") or []
+    try:
+        secret_env = secret_resolver.resolve(allowed_secrets)
+    except secret_resolver.SecretNotFound as e:
+        logger.warning("tool %s blocked: %s", entry.name, e)
+        return ExecResult(
+            ok=False,
+            stdout="",
+            stderr=f"Error: {e}",
+            exit_code=2,
+            elapsed_s=0.0,
+            timed_out=False,
+            oom_killed=False,
+        )
+
     proc = await asyncio.create_subprocess_exec(
         *cmd,
         stdin=asyncio.subprocess.PIPE,
@@ -100,6 +121,7 @@ async def execute(entry: ToolEntry, arguments: dict[str, Any]) -> ExecResult:
             "TOOL_NAME": entry.name,
             "TOOL_DIR": str(tool_dir),
             "ACTOR_ID": "system",
+            **secret_env,
         },
         preexec_fn=_make_preexec(mem_bytes, nproc),
     )

@@ -119,6 +119,34 @@ _CREATE_TOOL_INPUT_SCHEMA = {
                 "freshly-published tool to verify round-trip callability."
             ),
         },
+        "authentication": {
+            "type": "object",
+            "description": (
+                "Auth method + structural details extracted from the "
+                "spec's ## Authentication section by the planner. "
+                "Drives tool_author's choice of `_auth` helper at codegen "
+                "time and the runtime allowed_secrets set the executor "
+                "injects. See agent_server/data/prompts/noted_system_prompt.txt "
+                "(spec template) for the canonical shape per method."
+            ),
+            "required": ["method"],
+            "properties": {
+                "method": {
+                    "type": "string",
+                    "enum": ["anonymous", "api_key", "oauth2_client_credentials"],
+                },
+                # api_key fields
+                "secret_name": {"type": "string"},
+                "header_name": {"type": "string"},
+                "prefix": {"type": "string"},
+                # oauth2_client_credentials fields
+                "client_id_secret": {"type": "string"},
+                "client_secret_secret": {"type": "string"},
+                "token_url": {"type": "string"},
+                "scope": {"type": "string"},
+            },
+            "additionalProperties": True,
+        },
     },
 }
 

@@ -87,7 +87,8 @@
       "path": "ai_and_the_future_of_work.pdf",
       "mode": "read_store",
       "added_at": "2026-05-13T16:46:36.834656+00:00",
-      "category": "Job Market"
+      "category": "Job Market",
+      "display_name": "AI and The Future of Work"
     }
   ],
   "arcadedb_database": "ai_and_jobs",

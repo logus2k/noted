@@ -24,6 +24,7 @@ service.
 from __future__ import annotations
 
 import logging
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -56,6 +57,37 @@ def _node_marker(tool_dir: Path) -> Path:
     return tool_dir / "node_modules" / ".req_mtime"
 
 
+_AUTH_HELPER_SRC = Path(
+    os.environ.get("AUTH_HELPER_SRC", "/app/data/auth_lib/_auth.py")
+)
+
+
+def _vendor_auth_helper(venv_dir: Path) -> None:
+    """Copy the canonical `_auth.py` helper into the new venv's
+    site-packages so user tools can `import _auth` (Phase I2 of the
+    auth workstream). Idempotent — copying over an existing file is
+    fine. Non-fatal if missing in the image (anonymous tools still
+    work); a warning is logged so the operator notices.
+    """
+    if not _AUTH_HELPER_SRC.is_file():
+        logger.warning(
+            "_auth helper missing at %s; user-tools using api_key / oauth2 "
+            "will fail to import. Did the noted-tools image build COPY "
+            "data/auth_lib/?", _AUTH_HELPER_SRC,
+        )
+        return
+    sp_dirs = list(venv_dir.glob("lib/python*/site-packages"))
+    if not sp_dirs:
+        logger.warning(
+            "_auth helper not vendored: no site-packages found under %s",
+            venv_dir,
+        )
+        return
+    target = sp_dirs[0] / "_auth.py"
+    shutil.copyfile(_AUTH_HELPER_SRC, target)
+    logger.debug("vendored _auth helper into %s", target)
+
+
 def _build_python_venv(tool_dir: Path, req_file: Path | None) -> Path:
     venv_dir = tool_dir / "venv"
     if venv_dir.exists():
@@ -84,6 +116,9 @@ def _build_python_venv(tool_dir: Path, req_file: Path | None) -> Path:
                 f"uv pip install failed for {tool_dir.name}: "
                 f"{install.stderr.strip() or install.stdout.strip()}"
             )
+    # Phase I2: drop the vendored _auth.py into the venv's site-packages
+    # AFTER pip install so it's importable as `_auth` from tool.py.
+    _vendor_auth_helper(venv_dir)
     mtime = _mtime(req_file) if req_file else 0.0
     _venv_marker(venv_dir).write_text(str(mtime))
     return py

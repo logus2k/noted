@@ -29,6 +29,10 @@ RUN pip install --no-cache-dir -r /tmp/requirements.txt
 WORKDIR /app
 
 COPY app/ ./app/
+# Vendored _auth helper. Copied into every user-tool venv's
+# site-packages at venv-build time by app/venv_manager.py
+# (`_vendor_auth_helper`).
+COPY data/auth_lib/ ./data/auth_lib/
 
 # Run as a non-root UID so per-tool venvs created on the bind-mounted
 # data/user_tools/ are owned by the host user (UID 1000) instead of root.

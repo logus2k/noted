@@ -46,13 +46,21 @@
       "mode": "read_store",
       "added_at": "2026-05-13T13:47:56.580870+00:00",
       "category": "Whitepapers/Transformers",
-      "display_name": ""
+      "display_name": "The Impact of Positional Encoding on Length Generalization in Transformers"
     },
     {
       "path": "rotary_position_embedding.pdf",
       "mode": "read_store",
       "added_at": "2026-05-13T13:47:56.651984+00:00",
-      "category": "Whitepapers/Transformers"
+      "category": "Whitepapers/Transformers",
+      "display_name": "RoFormer: Enhanced Transformer With Rotary Position Embedding"
+    },
+    {
+      "path": "rms_normalization.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-13T21:01:19.232795+00:00",
+      "category": "Whitepapers/Transformers",
+      "display_name": ""
     }
   ],
   "arcadedb_database": "ai_papers",

@@ -1,0 +1,27 @@
+{
+  "name": "set_secret",
+  "tier": "write",
+  "description": "Store a credential value in this tenant's vault so user-tools can read it at runtime. Use when a tool's `_meta.allowed_secrets` references a NAME the user hasn't pasted a value for yet — typically the first time the user runs an api_key or oauth2 tool. Example flow: user says 'use the UPS API', Diana drafts a spec with `authentication.method = oauth2_client_credentials` and `client_id_secret = UPS_CLIENT_ID` / `client_secret_secret = UPS_CLIENT_SECRET`, after the tool is built the user is prompted to set both secrets via this tool. The value is stored in noted's per-tenant vault and never echoed back; the frontend renders the `value` input MASKED. Returns a one-line confirmation that does NOT include the value.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "pattern": "^[A-Z][A-Z0-9_]{0,63}$",
+        "description": "UPPERCASE secret identifier the tool's `allowed_secrets` references (e.g. NEWSAPI_KEY, UPS_CLIENT_ID). Letters/digits/underscores, starts with a letter, max 64 chars."
+      },
+      "value": {
+        "type": "string",
+        "minLength": 1,
+        "format": "password",
+        "writeOnly": true,
+        "description": "The secret VALUE the user pastes. The frontend MUST render this input masked. Never logged, never echoed in the tool's response."
+      },
+      "tenant_id": {
+        "type": "string",
+        "description": "Tenant scope; omit unless the deployment supports multi-tenant. Defaults to 'default'."
+      }
+    },
+    "required": ["name", "value"]
+  }
+}
