@@ -1,0 +1,21 @@
+{
+  "name": "run_draft_tool",
+  "tier": "write",
+  "description": "Execute a tool-under-construction once and return what happened. Used by the tool_builder agent loop after write_tool_files. Builds (or reuses) the tool's venv, runs `python tool.py` with `args` as stdin JSON, and returns exit code + stdout + stderr. This is the 'run it and analyze the result' step: read the returned stdout/stderr, compare against the spec's acceptance criteria, and if it's wrong, fix tool.py and call write_tool_files + run_draft_tool again. Secrets the tool declares in _meta.allowed_secrets are injected automatically when set in the vault.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "tool_name": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_]*$",
+        "description": "Snake_case name of the draft tool (must already be written via write_tool_files)."
+      },
+      "args": {
+        "type": "object",
+        "description": "Sample input passed to the tool as stdin JSON. Use a realistic value from the spec's Inputs / acceptance criteria.",
+        "additionalProperties": true
+      }
+    },
+    "required": ["tool_name"]
+  }
+}

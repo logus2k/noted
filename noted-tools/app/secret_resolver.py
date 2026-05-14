@@ -83,3 +83,22 @@ def resolve(allowed: list[str], tenant_id: str | None = None) -> dict[str, str]:
     for name in allowed:
         out[f'SECRET_{name}'] = _read_value(tid, name)
     return out
+
+
+def missing_secrets(allowed: list[str], tenant_id: str | None = None) -> list[str]:
+    """Non-raising counterpart to resolve(): return the subset of
+    `allowed` whose secret files are absent for the tenant. Used by the
+    smoke-test endpoint to decide between (a) inject + run pytest for
+    real, or (b) skip with a conditional pass when a credential simply
+    hasn't been pasted yet — a missing secret is NOT a tool-author
+    defect."""
+    if not allowed:
+        return []
+    tid = tenant_id or _TENANT_DEFAULT
+    out: list[str] = []
+    for name in allowed:
+        try:
+            _read_value(tid, name)
+        except SecretNotFound:
+            out.append(name)
+    return out

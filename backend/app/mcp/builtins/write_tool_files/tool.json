@@ -1,0 +1,34 @@
+{
+  "name": "write_tool_files",
+  "tier": "write",
+  "description": "Write the files of a tool-under-construction to its directory on disk. Used by the tool_builder agent loop. Pass the snake_case `tool_name` and a `files` list, where each item is an object with `name` (the flat filename) and `content` (the full file text), e.g. [{\"name\": \"tool.py\", \"content\": \"...\"}, {\"name\": \"requirements.txt\", \"content\": \"...\"}, {\"name\": \"tool.json\", \"content\": \"...\"}]. Files are written to data/tenants/<tenant>/user_tools/<tool_name>/ and chowned so the runtime can build a venv inside. Overwrites existing files. Returns a one-line summary of what was written.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "tool_name": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_]*$",
+        "description": "Snake_case tool name. Lowercase, digits, underscores; starts with a letter."
+      },
+      "files": {
+        "type": "array",
+        "description": "List of files to write. Each item is an object with `name` (flat filename, e.g. tool.py) and `content` (full file text). Typically tool.py, requirements.txt, tool.json. No subdirectories.",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Flat filename, e.g. tool.py or requirements.txt."
+            },
+            "content": {
+              "type": "string",
+              "description": "Full text content of the file."
+            }
+          },
+          "required": ["name", "content"]
+        }
+      }
+    },
+    "required": ["tool_name", "files"]
+  }
+}

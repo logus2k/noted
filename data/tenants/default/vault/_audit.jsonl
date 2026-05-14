@@ -4,3 +4,4 @@
 {"ts": "2026-05-13T21:10:49.329490+00:00", "tenant": "default", "actor": "smoke", "op": "delete", "name": "K1_SMOKE", "ok": false, "detail": "not_found"}
 {"ts": "2026-05-13T21:11:03.072404+00:00", "tenant": "default", "actor": "user", "op": "set", "name": "K1_SMOKE", "ok": true}
 {"ts": "2026-05-13T21:11:03.302853+00:00", "tenant": "default", "actor": "smoke", "op": "delete", "name": "K1_SMOKE", "ok": true}
+{"ts": "2026-05-14T13:23:32.275967+00:00", "tenant": "default", "actor": "user", "op": "set", "name": "NEWSAPI_KEY", "ok": true}

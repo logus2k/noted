@@ -536,6 +536,33 @@ async def run_smoke_tests(state: WorkspaceState, inputs: dict[str, Any]) -> dict
     except httpx.HTTPError as e:
         raise ValueError(f"run_smoke_tests: noted-tools call failed: {type(e).__name__}: {e}") from e
 
+    # Secret-gated conditional pass: noted-tools returns ok=True +
+    # skipped=True + reason="secrets_not_set" when the tool declares
+    # secrets in `_meta.allowed_secrets` that the vault doesn't have.
+    # smoke.py runs the tool via a direct subprocess that can't
+    # authenticate without those — but a missing credential is NOT a
+    # tool-author / api_tester defect. Pass the step (no rewind, no
+    # mis-classification) and carry the pending list forward.
+    if verdict.get("ok") and verdict.get("reason") == "secrets_not_set":
+        pending = verdict.get("pending_secrets") or []
+        logger.info(
+            "run_smoke_tests: tool %r — smoke skipped, declared secrets %s "
+            "not set for tenant %s. Set them via set_secret before first use.",
+            tool_name, pending, state.tenant_id,
+        )
+        return {
+            "tool_name": tool_name,
+            "ok": True,
+            "skipped": True,
+            "reason": "secrets_not_set",
+            "pending_secrets": pending,
+            "note": (
+                "smoke tests skipped — the tool declares secrets that are "
+                "not yet set in the vault; run set_secret then re-run the "
+                "workflow (or call the tool) to exercise them for real."
+            ),
+        }
+
     if not verdict.get("ok"):
         # Pytest's stdout has the actual failure messages; stderr typically
         # carries the warning summary. Truncate both for the validator
@@ -582,29 +609,75 @@ async def verify_tool_round_trip(
     if not tool_name:
         raise ValueError("verify_tool_round_trip: publish_tool did not record tool_name")
 
+    # Read the published tool.json ONCE — used both for the secret-gating
+    # check below and (when verify_inputs is absent) the sample-args
+    # fallback.
+    tool_dir = Path(prev_publish.get("tool_dir") or "")
+    tool_json: dict[str, Any] = {}
+    try:
+        tool_json = json.loads((tool_dir / "tool.json").read_text())
+    except (OSError, json.JSONDecodeError) as e:
+        raise ValueError(
+            f"verify_tool_round_trip: cannot read published tool.json: {e}"
+        ) from e
+
+    # Secret-gating: an api_key / oauth2 tool declares its required
+    # secrets in `_meta.allowed_secrets`. The round-trip call literally
+    # cannot succeed until those secrets are set in the vault — and a
+    # missing secret is NOT a tool-author defect (the codegen is fine;
+    # the credential just hasn't been pasted yet). So before doing the
+    # round-trip, check the vault: if any declared secret is unset, SKIP
+    # the live call and return a conditional pass. The workflow still
+    # completes as tool_published; api_tester degrades to docs-based
+    # assertions (its pre-2026-05-12 behaviour). This prevents the
+    # smoke-rewind loop from misattributing "secret not set" to
+    # tool_author and regenerating perfectly-good code.
+    allowed_secrets = list(
+        (tool_json.get("_meta") or {}).get("allowed_secrets") or []
+    )
+    if allowed_secrets:
+        from app.managers.vault_manager import VaultManager, VaultError
+        try:
+            have = {
+                s["name"] for s in VaultManager(state.tenant_id).list_secrets()
+            }
+        except VaultError:
+            have = set()
+        missing = [s for s in allowed_secrets if s not in have]
+        if missing:
+            logger.info(
+                "verify_tool_round_trip: tool %r declares secrets %s but %s "
+                "are not set for tenant %s — skipping the live round-trip "
+                "(conditional pass). Set them via set_secret before first use.",
+                tool_name, allowed_secrets, missing, state.tenant_id,
+            )
+            return {
+                "tool_name": tool_name,
+                "sample_args": {},
+                "result_preview": "",
+                "result_full": "",
+                "result_parsed": None,
+                "round_trip_skipped": "secrets_not_set",
+                "pending_secrets": missing,
+                "ok": True,
+            }
+
     sample_args = (state.inputs or {}).get("verify_inputs") or {}
     if not sample_args:
-        # Try to derive from the published tool.json's input_schema.
-        tool_dir = Path(prev_publish.get("tool_dir") or "")
-        try:
-            tool_json = json.loads((tool_dir / "tool.json").read_text())
-            schema = tool_json.get("input_schema") or {}
-            required = schema.get("required") or []
-            props = schema.get("properties") or {}
-            for req in required:
-                t = (props.get(req) or {}).get("type")
-                sample_args[req] = {
-                    "string": "test",
-                    "integer": 1,
-                    "number": 1.0,
-                    "boolean": True,
-                    "array": [],
-                    "object": {},
-                }.get(t, "test")
-        except (OSError, json.JSONDecodeError) as e:
-            raise ValueError(
-                f"verify_tool_round_trip: cannot derive sample args from tool.json: {e}"
-            ) from e
+        # Derive from the published tool.json's input_schema.
+        schema = tool_json.get("input_schema") or {}
+        required = schema.get("required") or []
+        props = schema.get("properties") or {}
+        for req in required:
+            t = (props.get(req) or {}).get("type")
+            sample_args[req] = {
+                "string": "test",
+                "integer": 1,
+                "number": 1.0,
+                "boolean": True,
+                "array": [],
+                "object": {},
+            }.get(t, "test")
 
     # Federation has a small grace window where the just-refreshed cache
     # might not yet reflect the new tool. Retry briefly.
@@ -867,5 +940,129 @@ async def archive_skill(state: WorkspaceState, inputs: dict[str, Any]) -> dict[s
 
 # research_topic handlers moved to app.workflow.handlers.research_topic
 # (per-workflow folder convention, 2026-05-12).
+
+
+# ─── build_tool (agentic, single-step) ────────────────────────────
+
+
+async def build_tool_agentic(state: WorkspaceState, inputs: dict[str, Any]) -> dict[str, Any]:
+    """Single-step agentic tool builder.
+
+    Hands the raw spec markdown straight to the `tool_builder` agent,
+    which loops: fetch docs -> write files -> run the draft -> read the
+    result -> fix -> repeat, until the tool satisfies the spec or it
+    hits a real external blocker.
+
+    No planner, no separate api_tester / validate_* / smoke pipeline.
+    The builder writes the tool's files directly into
+    user_tools/<name>/ via the write_tool_files MCP tool; noted-tools'
+    watcher registers it. The "run it and analyse the result" step is
+    the run_draft_tool MCP tool, in the builder's own loop.
+    """
+    from .llm_dispatcher import dispatch_tool_calling
+
+    spec_markdown = (state.inputs or {}).get("spec_markdown") or ""
+    if not spec_markdown.strip():
+        raise ValueError("build_tool_agentic: no spec_markdown in workflow inputs")
+
+    # Fresh-build hygiene: if the spec declares a tool_name that already
+    # has a directory on disk (from a prior build attempt), archive it
+    # first so the builder's run_draft_tool can't accidentally execute a
+    # stale tool.py. Same archive pattern as publish_tool.
+    name_match = re.search(
+        r"(?im)^\*{0,2}tool_name:\*{0,2}\s*([a-z][a-z0-9_]*)", spec_markdown
+    )
+    if name_match:
+        declared = name_match.group(1)
+        existing = _tenant_user_tools_dir(state.tenant_id) / declared
+        if existing.is_dir():
+            archive_root = _tenant_archive_dir(state.tenant_id)
+            archive_root.mkdir(parents=True, exist_ok=True)
+            dest = archive_root / f"{declared}_{int(time.time() * 1000)}"
+            shutil.move(str(existing), str(dest))
+            logger.info(
+                "build_tool_agentic: archived prior %s -> %s", declared, dest
+            )
+
+    # Termination control: the moment a run_draft_tool call comes back
+    # PASS, the build is done. The builder model demonstrably will NOT
+    # self-stop on success - it loops write/run on an already-passing
+    # tool until the turn cap - so the framework enforces the exit. The
+    # agent still does all the reasoning (fetch / write / fix); this
+    # only bounds the loop.
+    def _draft_passed(tool_name: str, tool_result: str) -> bool:
+        if tool_name != "run_draft_tool":
+            return False
+        first_line = (tool_result or "").split("\n", 1)[0]
+        return first_line.startswith("run-draft ") and ": PASS " in first_line
+
+    result = await dispatch_tool_calling(
+        "tool_builder",
+        spec_markdown,
+        ["fetch_url", "write_tool_files", "run_draft_tool"],
+        state=state,
+        max_turns=20,
+        stop_when=_draft_passed,
+    )
+
+    if result.get("error"):
+        raise ValueError(f"build_tool_agentic: dispatch failed: {result['error']}")
+
+    # The tool_name is whatever the builder last wrote files for.
+    tool_name = None
+    for entry in result.get("tool_call_log") or []:
+        if entry.get("name") == "write_tool_files":
+            tn = (entry.get("args") or {}).get("tool_name")
+            if tn:
+                tool_name = tn
+    if not tool_name:
+        raise ValueError(
+            "build_tool_agentic: builder never called write_tool_files - no "
+            f"tool produced. Builder final message: "
+            f"{(result.get('final_content') or '')[:500]}"
+        )
+
+    # Did a draft run actually PASS? stopped_early means the stop_when
+    # predicate fired on a PASS. If the loop ended any other way (final
+    # message, cap, error) without a PASS, the build did not converge.
+    stopped_early = result.get("stopped_early", False)
+    last_run_passed = False
+    for entry in result.get("tool_call_log") or []:
+        if entry.get("name") == "run_draft_tool":
+            preview = (entry.get("result_preview") or "")
+            last_run_passed = preview.startswith("run-draft ") and ": PASS " in preview.split("\n", 1)[0]
+
+    if not (stopped_early or last_run_passed):
+        raise ValueError(
+            "build_tool_agentic: builder finished without a passing draft run "
+            f"(turns_used={result.get('turns_used')}, hit_cap={result.get('hit_cap')}). "
+            f"Builder final message: {(result.get('final_content') or '')[:500]}"
+        )
+
+    refreshed = await _refresh_user_tools_federation()
+
+    summary = (result.get("final_content") or "").strip()
+    if not summary:
+        summary = (
+            f"{tool_name} built: a run_draft_tool call returned PASS "
+            f"(exit 0). Loop terminated on the passing run."
+        )
+
+    logger.info(
+        "build_tool_agentic: %s built in %s turn(s) (stopped_early=%s, "
+        "hit_cap=%s, federation_refreshed=%s)",
+        tool_name, result.get("turns_used"), stopped_early,
+        result.get("hit_cap"), refreshed,
+    )
+    return {
+        "tool_name": tool_name,
+        "ok": True,
+        "turns_used": result.get("turns_used"),
+        "stopped_early": stopped_early,
+        "hit_cap": result.get("hit_cap", False),
+        "federation_refreshed": refreshed,
+        "builder_summary": summary[:2000],
+        "tool_call_log": result.get("tool_call_log") or [],
+    }
 
 

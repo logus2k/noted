@@ -842,9 +842,10 @@ def entity_neighborhood(
                    WHERE a.id IN $front
                      AND r.type IN $rtypes
                      AND NOT b.id IN $seen
-                   RETURN DISTINCT b.id AS id, b.rank AS rank
-                   ORDER BY b.rank DESC
-                   LIMIT $cap''',
+                   WITH DISTINCT b.id AS id, b.rank AS rank
+                   ORDER BY rank DESC
+                   LIMIT $cap
+                   RETURN id, rank''',
                 {'front': frontier, 'rtypes': TRAVERSAL_EDGE_TYPES,
                  'seen': list(reached), 'cap': HOP_FRONTIER_CAP},
             )

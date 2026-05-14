@@ -3509,30 +3509,33 @@ async def _tool_graph_and_vector_search(args: dict, managers: dict) -> str:
 
 
 async def _tool_request_new_tool(args: dict) -> str:
-    """Spec-driven capability request → planner → create_tool workflow.
+    """Spec-driven capability request → build_tool agentic workflow.
 
     Reads the approved tool spec from the in-memory doc buffer (created
-    by the Assistant via create_doc) and submits its markdown to the
-    planner as the contract. Mirrors POST /api/workflows/from-request.
-    The handler returns immediately with the workflow_id; the workflow
-    runs asynchronously. The new tool will federate into the MCP
-    namespace once the workflow finishes.
+    by the Assistant via create_doc) and hands its markdown VERBATIM to
+    the `build_tool` workflow - a single agentic step where the
+    tool_builder agent fetches the API docs, writes the tool, runs it,
+    reads the result, and fixes until it satisfies the spec.
 
-    Identity: tenant_id and actor_id come from the chat request's
-    X-Forwarded-User threading when available; for now we default to
-    "default" since chat→MCP identity threading isn't wired through the
-    execute_tool signature yet.
+    There is no planner step: Diana + the user already produced the
+    validated spec, so re-parsing it into planner-JSON added nothing.
+    The handler returns immediately with the workflow_id; the build
+    runs asynchronously and the tool federates into the MCP namespace
+    when it finishes.
+
+    Identity defaults to "default" - chat→MCP identity threading isn't
+    wired through the execute_tool signature yet.
     """
     spec_doc_id = (args.get("spec_doc_id") or "").strip()
     if not spec_doc_id:
         return (
             "Error: 'spec_doc_id' is required. Spec-driven flow: first "
             "use create_doc to draft a tool specification (template "
-            "sections: Description, Source documentation, Inputs, "
-            "Outputs, Acceptance criteria; with `**status:** draft` at "
-            "the top). Iterate with the user via replace_doc until they "
-            "approve (set `**status:** approved`), then call this tool "
-            "with the buffer_id returned by create_doc."
+            "sections: Description, Source documentation, Authentication, "
+            "Inputs, Outputs, Acceptance criteria; with `**status:** "
+            "draft` at the top). Iterate with the user via replace_doc "
+            "until they approve, then call this tool with the buffer_id "
+            "returned by create_doc."
         )
 
     from app.managers import notes_buffer
@@ -3546,45 +3549,43 @@ async def _tool_request_new_tool(args: dict) -> str:
     if not spec_markdown:
         return (
             f"Error: spec doc {spec_doc_id!r} is empty. Populate the "
-            f"spec template (Description, Source documentation, Inputs, "
-            f"Outputs, Acceptance criteria) before submitting."
+            f"spec template (Description, Source documentation, "
+            f"Authentication, Inputs, Outputs, Acceptance criteria) "
+            f"before submitting."
         )
 
-    from app.workflow.from_request import (
-        FromRequestError,
-        dispatch_from_request,
-    )
-    try:
-        result = await dispatch_from_request(
-            spec_markdown,
-            tenant_id="default",
-            actor_id="default",
-        )
-    except FromRequestError as e:
-        return (
-            f"Error: capability request rejected at stage {e.stage!r}. "
-            f"{e.detail.get('error', '')} "
-            f"(planner reasoning: {e.detail.get('reasoning', '')})"
-        )
+    from app.workflow.loop import _new_workflow_id, run_workflow
+    import asyncio as _asyncio
 
-    planner = result.get("planner") or {}
-    inputs = planner.get("inputs") or {}
+    workflow_id = _new_workflow_id()
+
+    async def _run() -> None:
+        try:
+            await run_workflow(
+                tenant_id="default",
+                workflow_type="build_tool",
+                inputs={"spec_markdown": spec_markdown},
+                actor_id="default",
+                workflow_id=workflow_id,
+            )
+        except Exception:
+            logger.exception("request_new_tool: build_tool task failed for %s", workflow_id)
+
+    _asyncio.create_task(_run())
+
     return json.dumps(
         {
-            "workflow_id": result.get("workflow_id"),
-            "workflow_type": result.get("workflow_type"),
-            "status": result.get("status"),
+            "workflow_id": workflow_id,
+            "workflow_type": "build_tool",
+            "status": "pending",
             "spec_doc_id": spec_doc_id,
-            "planner_reasoning": planner.get("reasoning"),
-            "planned_tool_name": inputs.get("tool_name"),
-            "planned_language": inputs.get("language"),
-            "planned_acceptance_criteria": inputs.get("acceptance_criteria") or [],
             "next_step": (
-                "The capability-extension workflow is now running in the "
-                "background. Tell the user what is being built (use "
-                "planned_tool_name + the spec's acceptance criteria), "
-                "and let them know the new tool will be callable on the "
-                "next turn once the workflow completes."
+                "The build_tool workflow is now running in the background: "
+                "the tool_builder agent is writing the tool, running it, "
+                "and fixing it until it matches the spec. Tell the user "
+                "what is being built (from the spec's tool_name + "
+                "acceptance criteria); the new tool will be callable once "
+                "the workflow completes."
             ),
         }
     )

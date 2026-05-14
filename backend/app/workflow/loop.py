@@ -465,11 +465,18 @@ async def _execute_plan(
                     target_name = "tool_author"
                     rewind_reason = err
                 elif step.name == "verify_tool_round_trip":
-                    # New (2026-05-12): probe step runs BEFORE api_tester
-                    # so the tester can write assertions against the
-                    # tool's real output. Failure here = the tool can't
-                    # even respond to a sample call → tool is broken,
-                    # rewind tool_author with the failure as feedback.
+                    # The probe step runs BEFORE api_tester so the tester
+                    # can write assertions against the tool's real output.
+                    # A genuine failure here = the tool can't respond to a
+                    # sample call → tool is broken → rewind tool_author.
+                    #
+                    # NOTE (2026-05-14): the "secret not set" case is NOT
+                    # a genuine failure and never reaches here — the
+                    # handler short-circuits to a conditional pass when a
+                    # declared `_meta.allowed_secrets` entry is missing
+                    # from the vault. So a failure that DOES reach this
+                    # branch is a real codegen defect; rewinding
+                    # tool_author is the right call.
                     target_name = "tool_author"
                     rewind_reason = err
                 elif step.name == "validate_smoke_contract":

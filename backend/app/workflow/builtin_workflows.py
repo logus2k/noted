@@ -571,7 +571,79 @@ def _register_research_topic() -> None:
     logger.info("registered workflow: research_topic (2 steps, 1 outcome)")
 
 
+# ─── build_tool (agentic, single-step) ────────────────────────────
+
+
+_BUILD_TOOL_INPUT_SCHEMA = {
+    "type": "object",
+    "required": ["spec_markdown"],
+    "properties": {
+        "spec_markdown": {
+            "type": "string",
+            "minLength": 20,
+            "description": (
+                "The full tool specification markdown, authored by Diana "
+                "and the user. Passed verbatim to the tool_builder agent - "
+                "no planner, no field extraction in between."
+            ),
+        },
+    },
+}
+
+
+def _register_build_tool() -> None:
+    registry = get_workflow_registry()
+    if registry.get("build_tool") is not None:
+        return
+    registry.register(WorkflowDefinition(
+        type="build_tool",
+        description=(
+            "Builds an MCP tool from a spec via a single agentic loop: the "
+            "tool_builder agent fetches the API docs, writes tool.py + "
+            "requirements + tool.json, runs the draft, reads the result, and "
+            "fixes until it satisfies the spec. Replaces the planner + "
+            "multi-step create_tool pipeline."
+        ),
+        outcomes=[
+            WorkflowOutcome(
+                name="tool_built",
+                description="tool written to user_tools/ and registered",
+            ),
+        ],
+        input_schema=_BUILD_TOOL_INPUT_SCHEMA,
+        plan_template=[
+            StepType(
+                name="build",
+                worker="deterministic",
+                description=(
+                    "tool_builder agentic loop: fetch_url + write_tool_files "
+                    "+ run_draft_tool, iterating until the tool passes."
+                ),
+                handler=step_handlers.build_tool_agentic,
+                max_retries=0,
+                output_schema={
+                    "type": "object",
+                    "required": ["tool_name", "ok"],
+                    "properties": {
+                        "tool_name": {"type": "string"},
+                        "ok": {"type": "boolean"},
+                        "turns_used": {"type": ["integer", "null"]},
+                        "hit_cap": {"type": "boolean"},
+                        "federation_refreshed": {"type": "boolean"},
+                        "builder_summary": {"type": "string"},
+                        "tool_call_log": {"type": "array"},
+                    },
+                },
+            ),
+        ],
+        max_wallclock_seconds=3600,
+        max_retries_per_step=0,
+    ))
+    logger.info("registered workflow: build_tool (1 step, 1 outcome)")
+
+
 # Run registrations at import time.
 _register_create_tool()
 _register_remove_tool()
 _register_research_topic()
+_register_build_tool()

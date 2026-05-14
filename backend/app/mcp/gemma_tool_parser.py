@@ -243,6 +243,47 @@ def parse_gemma_tool_calls(text: str) -> list[dict]:
     return calls
 
 
+_GEMMA_STRING_MARKERS = ('<|"|>', '<|"', '"|>')
+
+
+def _strip_gemma_string_markers(s: str) -> str:
+    for marker in _GEMMA_STRING_MARKERS:
+        s = s.replace(marker, '')
+    return s
+
+
+def sanitize_tool_args(value):
+    """Strip leaked Gemma `<|"|>` string-delimiter artifacts from a parsed
+    tool-call argument structure (the output of `json.loads` on the
+    structured `tool_calls[].function.arguments` string).
+
+    Gemma 4 emits `<|"|>`-wrapped dict KEYS in multi-turn tool-calling
+    loops (verified 2026-05-14: single-shot calls are clean, but inside an
+    agentic loop with tool-call history the model wraps nested-dict keys -
+    e.g. `<|"|>tool.py<|"|>` - deterministically, breaking write_tool_files
+    and any tool with object-typed args). It is NOT a chat-template-version
+    or llama.cpp-version artifact: reproduced on the official gemma4
+    template + llama.cpp b9128. llama-server's PEG parser passes the
+    markers through verbatim because `gemma4-dict-key-name` is `[^:}]+`.
+    Cleaning here, at the parse boundary, fixes it for every tool (chat
+    path + agentic dispatcher) so no downstream handler needs its own
+    workaround.
+
+    Recurses dicts/lists; cleans dict keys and string values; non-string
+    scalars pass through unchanged."""
+    if isinstance(value, dict):
+        return {
+            (_strip_gemma_string_markers(k) if isinstance(k, str) else k):
+                sanitize_tool_args(v)
+            for k, v in value.items()
+        }
+    if isinstance(value, list):
+        return [sanitize_tool_args(v) for v in value]
+    if isinstance(value, str):
+        return _strip_gemma_string_markers(value)
+    return value
+
+
 def _strip_tool_output_bracketed(text: str) -> str:
     """Remove `tool_output [...]` blocks via balanced-bracket scan, including
     string-quoting awareness so brackets inside JSON strings don't confuse

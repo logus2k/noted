@@ -130,15 +130,21 @@ def anonymous_session(*, timeout: float = DEFAULT_TIMEOUT_S,
 
 
 def api_key_session(*, secret_name: str, header_name: str = 'Authorization',
-                    prefix: str = 'Bearer ',
+                    prefix: str = '',
                     timeout: float = DEFAULT_TIMEOUT_S,
                     max_retries: int = DEFAULT_MAX_RETRIES) -> httpx.Client:
     """API-key session. Reads the key from `SECRET_<secret_name>` and
     sets `header_name: <prefix><key>` on every outgoing request.
 
+    `prefix` defaults to '' (the key is sent raw). Pass `prefix='Bearer '`
+    ONLY when the API documents an `Authorization: Bearer <key>` scheme.
+    A non-empty default was a footgun: forgetting to override it on a
+    custom header (X-Api-Key etc.) silently prepended `Bearer ` and the
+    upstream rejected the key.
+
     Common patterns:
+      - Custom-header (most APIs): `api_key_session(secret_name='X', header_name='X-Api-Key')`
       - Bearer-style: `api_key_session(secret_name='X', header_name='Authorization', prefix='Bearer ')`
-      - Custom-header: `api_key_session(secret_name='X', header_name='X-API-Key', prefix='')`
     """
     key = _read_secret_env(secret_name)
     return _base_client(

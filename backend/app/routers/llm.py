@@ -49,7 +49,7 @@ from app.managers.llm_tools import parse_tool_call, parse_all_tool_calls, execut
 from app.managers.llm_debug import get_debug_log
 from app.mcp.tools import is_write_tier
 from app.mcp.tool_formats import to_anthropic_tools, to_openai_tools
-from app.mcp.gemma_tool_parser import strip_gemma_tokens, strip_gemma_tokens_streaming, translate_gemma_thinking
+from app.mcp.gemma_tool_parser import strip_gemma_tokens, strip_gemma_tokens_streaming, translate_gemma_thinking, sanitize_tool_args
 from app.mcp.context_router import select_tools, expand_tools_for_retry
 from app.managers.notebook_manager import NotebookManager
 from app.managers.mlflow_manager import MlflowManager
@@ -1023,6 +1023,7 @@ async def llm_chat(request: ChatRequest):
                     except json.JSONDecodeError:
                         logger.warning("Failed to parse local tool args: %s", args_str[:200])
                         args = {}
+                    args = sanitize_tool_args(args)
                     calls.append({"id": tc["id"], "name": tc["name"], "args": args})
                 # Duplicate-call diagnostic (Phase 1E debugging): flag any turn
                 # where the same tool name appears more than once so we can

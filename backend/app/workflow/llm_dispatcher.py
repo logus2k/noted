@@ -29,9 +29,11 @@ import json
 import logging
 import os
 import re
-from typing import Any
+from typing import Any, Callable
 
 import httpx
+
+from app.mcp.gemma_tool_parser import sanitize_tool_args
 
 logger = logging.getLogger(__name__)
 
@@ -391,6 +393,7 @@ async def dispatch_tool_calling(
     state=None,
     ctx: dict[str, Any] | None = None,
     max_turns: int = 12,
+    stop_when: Callable[[str, str], bool] | None = None,
 ) -> dict[str, Any]:
     """Multi-turn tool-calling invocation of an agent_server preset.
 
@@ -405,14 +408,22 @@ async def dispatch_tool_calling(
     tool use (`researcher`) rather than one-shot structured output
     (`tool_author`, `api_tester`, `skill_author`, ...).
 
+    `stop_when(tool_name, result)` is an optional predicate evaluated
+    after each executed tool call. When it returns True the loop ends
+    immediately - the framework enforcing a terminal state the model
+    cannot be relied on to self-enforce (e.g. a tool-build loop that
+    has already produced a passing draft). The agent still does all the
+    reasoning; this only bounds the loop.
+
     Returns:
       {
-        "final_content": str,       # the model's final answer, or "" if cap hit
+        "final_content": str,       # the model's final answer, or "" if cap/stop
         "turns_used": int,          # number of LLM round-trips
         "tool_call_log": [          # one entry per executed tool call
           {"turn": int, "name": str, "args": dict, "result_preview": str}
         ],
         "hit_cap": bool,            # True if max_turns reached without final
+        "stopped_early": bool,      # True if stop_when fired
         "error": str | None,        # transport / parse error if any
       }
     """
@@ -445,6 +456,7 @@ async def dispatch_tool_calling(
     final_content = ""
     error: str | None = None
     turns_used = 0
+    stopped_early = False
     _t0 = _time.perf_counter()
 
     try:
@@ -506,6 +518,7 @@ async def dispatch_tool_calling(
                     tool_args = json.loads(raw_args) if isinstance(raw_args, str) else (raw_args or {})
                 except json.JSONDecodeError:
                     tool_args = {}
+                tool_args = sanitize_tool_args(tool_args)
                 tool_call = {"id": tc.get("id", ""), "name": tool_name, "args": tool_args}
                 try:
                     result = await execute_tool(tool_call, req_managers, call_ctx)
@@ -524,6 +537,17 @@ async def dispatch_tool_calling(
                     "tool_call_id": tc.get("id", ""),
                     "content": result,
                 })
+                if stop_when is not None:
+                    try:
+                        if stop_when(tool_name, result):
+                            stopped_early = True
+                            break
+                    except Exception:
+                        logger.exception(
+                            "dispatch_tool_calling: stop_when predicate raised"
+                        )
+            if stopped_early:
+                break
     finally:
         # Single rolled-up log entry; per-tool detail lives in tool_call_log.
         _record_llm_call(
@@ -538,15 +562,22 @@ async def dispatch_tool_calling(
             parse_error=error,
         )
 
-    hit_cap = (turns_used >= max_turns and not final_content and error is None)
+    hit_cap = (
+        turns_used >= max_turns
+        and not final_content
+        and error is None
+        and not stopped_early
+    )
     logger.info(
-        "tool-calling preset %s: turns=%d, tool_calls=%d, hit_cap=%s, error=%s",
-        preset_name, turns_used, len(tool_call_log), hit_cap, error,
+        "tool-calling preset %s: turns=%d, tool_calls=%d, hit_cap=%s, "
+        "stopped_early=%s, error=%s",
+        preset_name, turns_used, len(tool_call_log), hit_cap, stopped_early, error,
     )
     return {
         "final_content": final_content,
         "turns_used": turns_used,
         "tool_call_log": tool_call_log,
         "hit_cap": hit_cap,
+        "stopped_early": stopped_early,
         "error": error,
     }

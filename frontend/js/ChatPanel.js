@@ -1943,6 +1943,15 @@ export class ChatPanel {
                 this._liveThinkingBody.innerHTML = this._renderMarkdown(
                     this._liveThinkingRaw.replace(/^\s+/, '')
                 );
+                // Render citation tags as badges on every reasoning frame,
+                // same as appendToken does for the answer body. Without
+                // this, the thinking body only gets a citation pass at
+                // thinking_end / finalize - and since this rAF render is
+                // deferred, the last streaming frame can fire AFTER
+                // setLiveThinkingContent and clobber its badges back to
+                // raw `[markdown_chunk:hex]` text. _renderCitations is
+                // idempotent and node-scoped, so a re-pass is cheap.
+                this._renderCitations(this._liveThinkingBody);
                 this._updateLiveThinkingLabel();
                 this._messagesArea.scrollTop = this._messagesArea.scrollHeight;
             });
