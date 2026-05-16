@@ -1,10 +1,17 @@
 # PIAAP — Plano de Inteligência Artificial para a Administração Pública
 
-*Draft operational layer for Portugal's National AI Agenda (ANIA).*
+*Draft operational layer that consolidates ANIA's distributed Public-Administration thread into a single document for the Portuguese civil service.*
 
-**Document status:** Draft v0.1 — synthesis-stage proposal for stakeholder review.
-**Anchor:** ANIA Pillar III (Public Administration) + Pillar IV (Governance).
-**Companion artefacts:** [portugal_ania_synthesis.md](portugal_ania_synthesis.md) and [comparator_matrix.md](comparator_matrix.md).
+**Document status:** Draft v0.2 — synthesis-stage proposal for stakeholder review.
+
+**Positioning.** The PIAAP **does not introduce a parallel strategy**. It consolidates and operationalises the PA-AI initiatives already committed in PAANIA (the 32-initiative Action Plan inside ANIA) and cross-references the broader 2026-27 Action Plan of the Portugal Digital Strategy (EDN), of which ANIA is Action #20. Every deliverable below maps to a named PAANIA initiative (extends it) or to a named cross-cutting EDN deliverable (complements it). New deliverables — i.e. those not currently in PAANIA or EDN — are explicitly marked **[NEW]** and justified.
+
+**Anchoring initiatives in PAANIA:** **II.11** (Centro de Excelência IA na AP), **II.12** (Concursos nacionais IA para AP), **II.13** (Guia de interpretação CCP para aquisição de IA), **III.1** (Plano acelerado de formação de IA na AP / Doutor AP), **IV.3** (Centro para a IA Responsável), **IV.4** (Implementação do EU AI Act), **IV.5** (Sandboxes regulatórias), **IV.6** (Guia de implementação do EU AI Act + ferramentas de avaliação de risco), **IV.7** (Cooperação internacional e diplomacia tecnológica). Plus the foundational Eixo I infrastructure that PIAAP relies on: **I.1** (EuroHPC/Deucalion), **I.3** (Espaços de dados em áreas críticas), **I.4** (Plano Nacional de Centros de Dados).
+
+**Cross-references to EDN action plans:** the 2026-27 Action Plan of the Portugal Digital Strategy contains additional PA-digital deliverables (eGov, Cartão de Cidadão / Chave Móvel Digital, eFatura, SIMPLEX, ESPap shared services, Base.gov procurement portal, ENSC cybersecurity framework). PIAAP defers to those existing instruments where they cover the same ground rather than duplicating.
+
+**Companion artefacts:** [portugal_ania_synthesis.md](portugal_ania_synthesis.md) (the 25-recommendation strategic critique that elevates PIAAP as R12) and [comparator_matrix.md](comparator_matrix.md) (the 17-country evidence base).
+
 **Reference frameworks:** UK *AI Playbook for the UK Government* (Feb 2025, 118 pp, mandatory for UK Civil Service); Australia *AI Plan for the Australian Public Service* (Nov 2025, 30 pp, Trust/People/Tools).
 
 ---
@@ -96,7 +103,8 @@ Estes três pilares são **interdependentes**: ferramentas sem pessoas capacitad
 | Lead | AMA + Centro para a IA Responsável + Secretaria-Geral da Presidência do Conselho de Ministros |
 | Deliverable | Política Portuguesa para o Uso Responsável de IA no Governo (publicação) |
 | Target | Q4 2026 |
-| Status | Por iniciar |
+| Anchor | PAANIA **IV.4** (Implementação do EU AI Act — definição de autoridades competentes e modelo de coordenação) + **IV.3** (Centro para a IA Responsável) |
+| Status | Por iniciar; depende da entrada em vigor de IV.4 |
 
 A política substitui orientações ad-hoc atualmente em vigor. Incorpora:
 
@@ -114,6 +122,7 @@ Modelos de referência: APS AI Plan (Austrália) "AI in government policy and gu
 | Lead | AMA + Centro para a IA Responsável (secretaria) |
 | Deliverable | CRIA constituído + reuniões a cada 6 semanas + 12 casos avaliados em 12 meses |
 | Target | Estabelecimento Q1 2027; primeira reunião Q2 2027; maturidade plena final de 2027 |
+| Anchor | PAANIA **IV.3** (Centro para a IA Responsável — funções de coordenação ecossistémica) + **IV.4** (autoridades competentes) — adiciona fórum recorrente multi-watchdog **[NEW operational mechanism]** |
 | Status | Por iniciar |
 
 O CRIA é o **órgão pan-watchdog de revisão de casos de uso de alto risco** na Administração Pública portuguesa. Composição:
@@ -142,7 +151,8 @@ Modelo: AI Review Committee, APS AI Plan (Austrália) — cadência de 6 semanas
 | Lead | AMA + DGAEP + IMPIC (Instituto dos Mercados Públicos, do Imobiliário e da Construção) |
 | Deliverable | Cláusulas-tipo para contratos públicos relativas ao uso de IA por prestadores |
 | Target | Q1 2027 |
-| Status | Por iniciar |
+| Anchor | PAANIA **II.13** (Guia prático de interpretação do Código dos Contratos Públicos para aquisição de IA pela AP) — esta iniciativa **já cobre o âmbito**; PIAAP fornece o template de cláusulas operacionais |
+| Status | A integrar diretamente no entregável de II.13 |
 
 Cláusulas a incorporar no Código dos Contratos Públicos (CCP) e nos modelos de cadernos de encargos:
 
@@ -160,6 +170,7 @@ Modelo: APS AI Plan (Austrália) — "Digital Sourcing ClauseBank" + Commonwealt
 | Lead | AMA + GAVE + Secretaria-Geral PCM |
 | Deliverable | Plano de comunicação interno + materiais + canais |
 | Target | Q4 2026 (lançamento); contínuo |
+| Anchor | EDN cross-reference (canais SIMPLEX + intranet AMA + comunicação institucional do XXV Governo); apoia a difusão de III.6 (National AI Week) **[NEW operational layer]** |
 | Status | Por iniciar |
 
 Mensagens consistentes para funcionários públicos sobre:
@@ -183,7 +194,8 @@ Canais: intranet AMA, formação INA, masterclasses periódicas, briefings minis
 | Lead | INA + DGAEP + Universidade Aberta |
 | Deliverable | Módulo "Fundamentos de IA na Administração Pública" — completado por 100% dos funcionários em 18 meses |
 | Target | Q4 2026 (lançamento); 100% conclusão Q4 2028 |
-| Status | Por iniciar |
+| Anchor | PAANIA **III.1** (Plano acelerado de formação de IA na AP / Doutor AP) — **estende** III.1 da coorte avançada (especialistas + lideranças) para mandato universal de fundamentos para todos os funcionários da AP Central |
+| Status | III.1 a iniciar 1S 2026; PIAAP propõe escalada universal a partir de Q4 2026 |
 
 **Mandato:** todos os funcionários da Administração Pública Central (estimado 700.000 pessoas) completam formação de fundamentos de IA dentro de 18 meses da publicação do PIAAP.
 
@@ -213,6 +225,7 @@ Modelo de referência: APS AI Plan (Austrália) — mandatory foundational AI li
 | Lead | DGAEP + Sindicatos (FESAP, STE, SINTAP) + INA |
 | Deliverable | Circular DGAEP com normas de consulta sindical em mudanças relacionadas com IA |
 | Target | Q1 2027 |
+| Anchor | EDN cross-reference (Acordo de Concertação Social + ACT — Autoridade para as Condições do Trabalho); complementa IV.1 (linha "AI Economics and Work Impact") **[NEW operational mechanism]** |
 | Status | Por iniciar |
 
 Normas de consulta para todas as mudanças relacionadas com IA que afetem o trabalho dos funcionários públicos:
@@ -231,7 +244,8 @@ Modelo: APS AI Plan (Austrália) — "Circular setting out clear standards for c
 | Lead | AMA + INA + Centro para a IA Responsável |
 | Deliverable | CEIAP estabelecido com equipa multidisciplinar (técnica + jurídica + UX + transformação organizacional) |
 | Target | Q1 2027 |
-| Status | Inicia-se sob ANIA II.11 (PA Centre of Excellence) |
+| Anchor | PAANIA **II.11** (AI Centre of Excellence in PA) — esta iniciativa **é** o CEIAP; PIAAP fornece o desenho operacional (composição, mandato, função de aceleração AIDE-PT) |
+| Status | II.11 a iniciar 1S 2026 (entidade responsável: ARTE) |
 
 CEIAP funciona como **função central de aceleração de adoção**: identifica casos de uso de alto valor, resolve bloqueios sistémicos, partilha lições, e captura conhecimento institucional. Modelo: AI delivery and enablement (AIDE), APS AI Plan (Austrália).
 
@@ -250,6 +264,7 @@ Atividades:
 | Lead | AMA + Secretaria-Geral PCM (designações) |
 | Deliverable | Todos os Ministérios + agências centrais com DIA designado |
 | Target | Q4 2026 |
+| Anchor | PAANIA **II.11** (CEIAP fornece coordenação central) — adiciona figura por ministério **[NEW governance layer]** |
 | Status | Por iniciar |
 
 **Designação de DIA por cada Ministério e agência central da Administração Pública** (modelo Australia APS AI Plan + USA OMB M-25-21):
@@ -271,6 +286,7 @@ Atividades:
 | Lead | AMA + IPN + INCM |
 | Deliverable | Plataforma central onshore com brokerage multi-modelo |
 | Target | Piloto Q3 2027; rollout pleno Q1 2028 |
+| Anchor | PAANIA **II.11** (CEIAP) — adiciona entregável de plataforma vendor-agnostic + **I.4** (Plano Nacional de Centros de Dados) para alojamento + **I.1** (Deucalion/EuroHPC) para cargas pesadas **[NEW platform deliverable within Centre of Excellence]** |
 | Status | Por iniciar |
 
 **GovIA Portugal** é a plataforma vendor-agnostic para o Governo português. Características:
@@ -293,6 +309,7 @@ Modelo: GovAI, APS AI Plan (Austrália) — centralised AI hosting service com o
 | Lead | AMA + IPN |
 | Deliverable | Interface de chat seguro universalmente acessível para todos os funcionários da Administração Pública |
 | Target | Beta Q1 2027; rollout pleno Q3 2027 |
+| Anchor | PAANIA **II.11** (CEIAP) — front-end consumer-friendly da plataforma GovIA Portugal (3.1); integra com Cartão de Cidadão / Chave Móvel Digital (EDN identity layer) **[NEW universal-access deliverable]** |
 | Status | Por iniciar |
 
 GovIA Chat é a versão consumer-friendly do GovIA Portugal — uma interface de chat que cada funcionário público pode usar para tarefas rotineiras dentro dos limites OFICIAL/Reservado. Características:
@@ -311,6 +328,7 @@ Modelo: GovAI Chat, APS AI Plan (Austrália) — secure generative AI for everyo
 | Lead | AMA + Centro Nacional de Cibersegurança (CNCS) |
 | Deliverable | Orientações claras sobre uso de ChatGPT, Claude, Gemini (e equivalentes) com informação OFICIAL |
 | Target | Q4 2026 (revisão completa) |
+| Anchor | PAANIA **IV.6** (Guia de implementação do EU AI Act, normas, ferramentas de avaliação de risco) — adiciona camada operacional específica para a AP + EDN ENSC (Estratégia Nacional de Segurança no Ciberespaço) classificação de informação |
 | Status | Inicia-se com orientações atuais AMA |
 
 Orientações específicas sobre quando funcionários públicos podem (e quando não podem) usar serviços públicos de IA generativa (ChatGPT, Claude, Gemini, etc.):
@@ -329,7 +347,8 @@ Modelo: PSPF Policy Advisory 1 — OFFICIAL Information Use with Generative AI (
 | Lead | IMPIC + ESPap + AMA |
 | Deliverable | Subcategorias específicas de IA no Portal Base.gov.pt + contratos-modelo |
 | Target | Q3 2027 |
-| Status | Por iniciar |
+| Anchor | PAANIA **II.13** (Guia de interpretação do CCP para aquisição de IA) — esta iniciativa já cobre a interpretação; PIAAP adiciona infra-estrutura no Portal Base.gov.pt (EDN procurement layer) |
+| Status | A coordenar com cronograma de II.13 (1S 2026) |
 
 Caminhos de aquisição simplificados para produtos e serviços de IA:
 
@@ -347,7 +366,8 @@ Modelo: BuyICT AI subcategories + AI Model Contract, APS AI Plan (Austrália).
 | Lead | AMA + ESPap |
 | Deliverable | GovIA Use Case Library — biblioteca pesquisável de casos de uso + IP reutilizável |
 | Target | Beta Q2 2027 |
-| Status | Por iniciar |
+| Anchor | PAANIA **II.12** (Concursos nacionais de IA para AP — produz casos de uso anualmente) + **II.11** (CEIAP curadoria); EDN ESPap shared-services framework para a camada de partilha entre ministérios |
+| Status | Por iniciar; depende dos primeiros ciclos de II.12 (1S 2026 onwards) |
 
 Plataforma onde Ministérios e agências:
 
@@ -364,6 +384,7 @@ Reduz duplicação de gastos. Modelo: GovAI Use Case Library (Austrália) — 20
 | Lead | AMA + CNPD + Centro para a IA Responsável |
 | Deliverable | RCAIA operacional + obrigatório para casos de uso de alto risco |
 | Target | Q3 2027 |
+| Anchor | PAANIA **IV.6** (Guia de implementação do EU AI Act + ferramentas de avaliação de risco) — adiciona registo central reutilizável; integra com AIPD existentes (RGPD Art. 35) **[NEW central-register deliverable]** |
 | Status | Por iniciar |
 
 Registo centralizado de avaliações de impacto completadas para sistemas de IA na Administração Pública:
@@ -384,7 +405,8 @@ Modelo: Central register of generative AI assessments, APS AI Plan (Austrália).
 | Lead | AMA + Conselho para as Tecnologias de Informação na Administração Pública (CTIC) |
 | Deliverable | Política de Cloud da Administração Pública revista + alinhada com IA |
 | Target | Q4 2026 (revisão) |
-| Status | Inicia-se com política existente |
+| Anchor | PAANIA **I.4** (Plano Nacional de Centros de Dados) + EDN cross-reference (política de cloud existente para a AP, ESPap data-centre framework) |
+| Status | Inicia-se com política existente; alinhamento com cronograma de I.4 (2S 2025) |
 
 Política de cloud da Administração Pública atualizada para:
 
@@ -409,25 +431,27 @@ Modelo: APS AI Plan (Austrália) "New whole-of-government cloud policy" (Dec 202
 
 ---
 
-## Appendix A — Deliverables consolidados
+## Appendix A — Deliverables consolidados + ancoragem PAANIA/EDN
 
-| Pilar | # | Deliverable | Lead | Target |
-|---|---|---|---|---|
-| **Confiança** | 1.1 | Política de IA no Governo | AMA + CIR | Q4 2026 |
-| **Confiança** | 1.2 | Comité de Revisão de IA (CRIA) | AMA + CIR (sec.) | Q1 2027 (estab.); Q4 2027 (maturidade) |
-| **Confiança** | 1.3 | Cláusulas CCP para prestadores externos | AMA + DGAEP + IMPIC | Q1 2027 |
-| **Confiança** | 1.4 | Estratégia de comunicação IA | AMA + GAVE | Q4 2026 |
-| **Pessoas** | 2.1 | Formação fundamental obrigatória | INA + DGAEP + UA | Q4 2026 (lançamento); Q4 2028 (100%) |
-| **Pessoas** | 2.2 | Consulta sindical (Circular DGAEP) | DGAEP + Sindicatos | Q1 2027 |
-| **Pessoas** | 2.3 | CEIAP + AIDE-PT | AMA + INA + CIR | Q1 2027 |
-| **Pessoas** | 2.4 | DIAs + ORIAs designados | AMA + SGPCM | Q4 2026 |
-| **Ferramentas** | 3.1 | GovIA Portugal (plataforma) | AMA + IPN + INCM | Q3 2027 (piloto); Q1 2028 (pleno) |
-| **Ferramentas** | 3.2 | GovIA Chat | AMA + IPN | Q1 2027 (beta); Q3 2027 (pleno) |
-| **Ferramentas** | 3.3 | Orientações Public AI | AMA + CNCS | Q4 2026 |
-| **Ferramentas** | 3.4 | Aquisição IA simplificada | IMPIC + ESPap + AMA | Q3 2027 |
-| **Ferramentas** | 3.5 | Biblioteca de Casos de Uso + IP | AMA + ESPap | Q2 2027 (beta) |
-| **Ferramentas** | 3.6 | RCAIA | AMA + CNPD + CIR | Q3 2027 |
-| **Ferramentas** | 3.7 | Política Cloud revista | AMA + CTIC | Q4 2026 |
+| Pilar | # | Deliverable | Lead | Target | Âncora PAANIA / EDN |
+|---|---|---|---|---|---|
+| **Confiança** | 1.1 | Política de IA no Governo | AMA + CIR | Q4 2026 | PAANIA IV.4 + IV.3 |
+| **Confiança** | 1.2 | Comité de Revisão de IA (CRIA) | AMA + CIR (sec.) | Q1 2027 (estab.); Q4 2027 (maturidade) | PAANIA IV.3 + IV.4 — adiciona fórum multi-watchdog **[NEW]** |
+| **Confiança** | 1.3 | Cláusulas CCP para prestadores externos | AMA + DGAEP + IMPIC | Q1 2027 | PAANIA **II.13** (entregável central) |
+| **Confiança** | 1.4 | Estratégia de comunicação IA | AMA + GAVE | Q4 2026 | EDN comunicação institucional + apoia III.6 **[NEW]** |
+| **Pessoas** | 2.1 | Formação fundamental obrigatória | INA + DGAEP + UA | Q4 2026 (lançamento); Q4 2028 (100%) | PAANIA **III.1** — estende para mandato universal |
+| **Pessoas** | 2.2 | Consulta sindical (Circular DGAEP) | DGAEP + Sindicatos | Q1 2027 | EDN Concertação Social + ACT **[NEW]** |
+| **Pessoas** | 2.3 | CEIAP + AIDE-PT | AMA + INA + CIR | Q1 2027 | PAANIA **II.11** (desenho operacional desta iniciativa) |
+| **Pessoas** | 2.4 | DIAs + ORIAs designados | AMA + SGPCM | Q4 2026 | PAANIA II.11 + camada per-ministério **[NEW]** |
+| **Ferramentas** | 3.1 | GovIA Portugal (plataforma) | AMA + IPN + INCM | Q3 2027 (piloto); Q1 2028 (pleno) | PAANIA II.11 + I.4 + I.1 **[NEW platform within II.11]** |
+| **Ferramentas** | 3.2 | GovIA Chat | AMA + IPN | Q1 2027 (beta); Q3 2027 (pleno) | PAANIA II.11 + EDN identity layer **[NEW]** |
+| **Ferramentas** | 3.3 | Orientações Public AI | AMA + CNCS | Q4 2026 | PAANIA IV.6 + EDN ENSC |
+| **Ferramentas** | 3.4 | Aquisição IA simplificada | IMPIC + ESPap + AMA | Q3 2027 | PAANIA **II.13** + EDN Base.gov.pt |
+| **Ferramentas** | 3.5 | Biblioteca de Casos de Uso + IP | AMA + ESPap | Q2 2027 (beta) | PAANIA II.12 + II.11 + EDN ESPap shared-services |
+| **Ferramentas** | 3.6 | RCAIA | AMA + CNPD + CIR | Q3 2027 | PAANIA IV.6 + RGPD AIPD existente **[NEW central register]** |
+| **Ferramentas** | 3.7 | Política Cloud revista | AMA + CTIC | Q4 2026 | PAANIA I.4 + EDN política cloud AP existente |
+
+**Síntese de ancoragem:** dos 15 entregáveis do PIAAP, **9 ancoram diretamente em iniciativas PAANIA existentes** (operacionalizando-as ou estendendo-as: II.11×4, II.13×2, II.12×1, III.1×1, IV.4×1, IV.6×2, I.4×2, I.1×1, IV.3×3 — múltiplas referências possíveis por entregável), **6 são marcados [NEW]** como camadas operacionais não presentes em PAANIA (CRIA, comunicação, consulta sindical, DIAs/ORIAs, GovIA Portugal/Chat, RCAIA) — todos justificados por evidência comparativa internacional (UK Playbook + Australia APS Plan). Nenhum entregável duplica iniciativas existentes.
 
 ---
 
@@ -499,14 +523,18 @@ Modelo: APS AI Plan (Austrália) cita Department of Veterans' Affairs AI-enhance
 
 ## Note for final-report stakeholder review
 
-Este draft de PIAAP é um **artefacto de discussão** preparado para a fase de síntese de ANIA. Antes da publicação como instrumento operacional, deve ser:
+Este draft de PIAAP é um **artefacto de discussão** preparado para a fase de síntese de ANIA. **Positioning principle:** o PIAAP **não** é um plano paralelo a PAANIA — é o documento operacional que consolida as iniciativas PAANIA já comprometidas para a Administração Pública (II.11, II.12, II.13, III.1, IV.3-IV.7) num único instrumento, e que se cruza com o Plano de Ação 2026-27 da Estratégia para a Digitalização da Nação (EDN) nas camadas digitais transversais (identidade, procurement, cloud, cibersegurança).
+
+Antes da publicação como instrumento operacional, deve ser:
 
 1. **Discutido com a tutela política** (Ministro das Finanças + Ministro da Modernização do Estado e da Administração Pública)
 2. **Consultado com as Confederações Sindicais** (UGT + CGTP) e respetivas estruturas sindicais da Administração Pública
 3. **Validado por uma Comissão Temática** com representação de AMA + Centro para a IA Responsável + DGAEP + INA + CNPD + Provedor de Justiça
-4. **Alinhado com a Lei Nacional para a IA** (a aprovar — cf. Recomendação R22 do [portugal_ania_synthesis.md](portugal_ania_synthesis.md))
-5. **Cross-checked com o AI Act** (Regulamento (UE) 2024/1689) e respetiva transposição nacional
-6. **Calibrado em escopo** com a realidade da Administração Pública Local + Regional (este draft cobre Administração Central; extensão para AP Local/Regional carece de coordenação com ANMP + Câmaras Municipais)
+4. **Alinhado com PAANIA**: confirmar cronogramas dos 9 entregáveis ancorados (II.11, II.12, II.13, III.1, IV.3, IV.4, IV.6, I.1, I.4) com as entidades responsáveis (ARTE, FCT, ANI, INA, AMA, IPQ, ANACOM); evitar duplicação ao longo da entrega
+5. **Cruzado com o Plano de Ação 2026-27 da EDN** para identificar todas as Acções que tocam a AP digital (eGov, Cartão de Cidadão / CMD, Base.gov, ESPap, ENSC, SIMPLEX), confirmando que o PIAAP defere a esses instrumentos onde já cobrem o âmbito
+6. **Alinhado com a Lei Nacional para a IA** (a aprovar — cf. Recomendação R22 do [portugal_ania_synthesis.md](portugal_ania_synthesis.md))
+7. **Cross-checked com o AI Act** (Regulamento (UE) 2024/1689) e respetiva transposição nacional
+8. **Calibrado em escopo** com a realidade da Administração Pública Local + Regional (este draft cobre Administração Central; extensão para AP Local/Regional carece de coordenação com ANMP + Câmaras Municipais)
 
 Cronograma proposto para finalização:
 - **Janeiro 2027** — versão consultiva publicada para comentário público (30 dias)

@@ -9,21 +9,23 @@
 
 ## Executive summary
 
-ANIA is a coherent and EU-anchored strategic document. It correctly positions Portugal under the EU AI Act regime, articulates 4 pillars × 32 initiatives × 6 guiding principles, and commits to a named sovereign LLM ambition (AMALIA). Against the 17 international comparators analysed, however, **ANIA has two structural gaps and approximately 25 specific delivery gaps** that should be addressed in its 2027 refresh and beyond.
+ANIA is a coherent and EU-anchored strategic document. It correctly positions Portugal under the EU AI Act regime, articulates 4 Eixos × 32 initiatives × 6 guiding principles, and commits to a named sovereign LLM ambition (AMALIA). Against the 17 international comparators analysed, **ANIA covers 4 of the 6 common-denominator pillars at LEAD strength** (Infrastructure & Data via Eixo I; Talent & R&D via Eixo III + II.1-II.5; Business Adoption via Eixo II; Governance & International via Eixo IV) but has **two structural gaps** plus approximately 25 specific delivery refinements that should be addressed in its 2027 refresh and beyond.
 
 ### The two structural gaps
 
-1. **No standalone Infrastructure & Data pillar.** Portugal is **the only jurisdiction in the 17-country comparator set** that folds compute / data centres / sovereign cloud / standards into other pillars rather than treating Infrastructure & Data as a coherent programme. 12 of 17 jurisdictions LEAD on this pillar (Brazil PBIA Axis 1, Germany GAIA-X + JUPITER, UK NDL + AIRR, Australia GovAI, Spain Palanca 2+7, France compute+data theme, China state infra, Singapore Compute+Data enablers, USA "Build", Italy Leonardo, Finland LUMI, Japan computing infra); 4 SHARE it; only Portugal folds it in.
+1. **No standalone Public Administration pillar; PA-AI is distributed across three Eixos.** Portugal's PA-AI initiatives sit in **Eixo II (II.11 Centro de Excelência IA na AP + II.12 Concursos nacionais IA para AP + II.13 Guia CCP)** alongside Business-Adoption initiatives, in **Eixo III (III.1 Plano acelerado de formação de IA na AP / Doutor AP)**, and in **Eixo IV (IV.4-IV.7 governance + EU AI Act implementation)**. 10 of 17 jurisdictions LEAD on PA as a standalone pillar (UK Playbook, Australia APS Plan, Brazil PBIA Axis 3, Italy PA pillar, Spain Palanca 6, China "AI+ Governance", Qatar Smart-Govt, UAE "Govt of the Future", Singapore Govt enablers, USA CAIOC); 7 SHARE it (including Portugal). The distributed approach makes PA-AI delivery harder to track, fund, and operationally coordinate, even though Eixo II principle (3) elevates "Public Administration as a catalyst" rhetorically.
 
-2. **No standalone Society pillar.** Portugal folds inclusion + trust + civic-AI into the 6 guiding principles rather than as a structural pillar. 4 jurisdictions LEAD on Society (Germany, Singapore, Australia, China), 11 SHARE it, and Portugal is among 2-3 of 17 that fold-in. **The Society gap is more defensible than the Infrastructure & Data gap** because Portugal's principles framework genuinely operationalises inclusion, but the absence of named civic-AI platforms (à la Germany's Civic Innovation Platform / Brazil's Action 50-51 / Singapore's AI Verify Foundation) is a real omission.
+2. **No standalone Society pillar.** Portugal folds inclusion + trust + civic-AI into the 6 guiding principles + initiative III.8 (AI literacy action for citizens) rather than as a structural pillar. 4 jurisdictions LEAD on Society (Germany, Singapore, Australia, China), 11 SHARE it, and Portugal is among 2 of 17 (with USA) that fold-in. **Caveat:** USA folds-in deliberately (political minimalism on inclusion); Portugal's folding-in is harder to defend given its EU-anchored inclusion commitments and the absence of named civic-AI platforms (à la Germany's Civic Innovation Platform / Brazil's planned Actions 50-51 / Singapore's AI Verify Foundation).
+
+**What ANIA does NOT have a gap on (correction vs earlier draft of this synthesis):** Infrastructure & Data. The official RCM 2/2026 text confirms **Eixo I (Infraestrutura e Dados)** is a standalone pillar with 4 named initiatives — I.1 Advanced Computing and AI Factory (EuroHPC/Deucalion), I.2 Gigafactory, I.3 Data spaces in critical areas, I.4 National Data Centre Plan. Portugal is comfortably in the 13-jurisdiction LEAD majority on this pillar; the recommendations below extend and deepen Eixo I rather than create a missing pillar.
 
 ### The five most actionable specific gaps
 
-1. **No PA AI Playbook** — the single largest operational deficit. UK's 118-page Playbook + Australia's 30-page APS AI Plan are the templates. **Addressed in companion artefact** [piaap_draft.md](piaap_draft.md).
-2. **No per-ministry CAIO architecture** — Australia mandates a Chief AI Officer per agency by 2026; Brazil has a centralised Federal AI Core; USA mandates per-agency CAIOs via OMB M-25-21.
-3. **No AI Review Committee** with cross-watchdog membership — Australia's 6-weekly committee with Information Commissioner + Privacy Commissioner + Ombudsman is the template.
-4. **No universal civil-servant AI training mandate with named timeline** — Australia commits to "all APS staff trained within 12 months" (Dec 2025 → Dec 2026); UK's 5-tier civil-servant segmentation is the alternative.
-5. **No GovAI-equivalent vendor-agnostic onshore brokerage platform** — Australia's GovAI hosts vendor models including OpenAI GPT onshore for Commonwealth-data-sovereignty use cases.
+1. **No consolidated PA AI Playbook** — the single largest operational deficit. ANIA's PA-AI initiatives (II.11 + II.12 + II.13 + III.1 + IV.4-IV.7) exist as a distributed set but are not stitched into one operational document the way UK's 118-page Playbook or Australia's 30-page APS AI Plan are. **Addressed in companion artefact** [piaap_draft.md](piaap_draft.md), which builds on II.11 (Centro de Excelência IA na AP) rather than creating a new institution.
+2. **No per-ministry CAIO architecture** — Australia mandates a Chief AI Officer per agency by 2026; Brazil has a centralised Federal AI Core; USA mandates per-agency CAIOs via OMB M-25-21. ANIA II.11 establishes the Centre of Excellence but does not mandate ministry-level CAIOs.
+3. **No AI Review Committee** with cross-watchdog membership — Australia's 6-weekly committee with Information Commissioner + Privacy Commissioner + Ombudsman is the template. ANIA IV.4 (EU AI Act implementation) defines competent authorities but does not establish a recurring cross-watchdog review forum.
+4. **No universal civil-servant AI training mandate with named timeline** — Australia commits to "all APS staff trained within 12 months" (Dec 2025 → Dec 2026); UK's 5-tier civil-servant segmentation is the alternative. ANIA III.1 (Doutor AP) trains an advanced cohort, not the universal civil-servant base.
+5. **No GovAI-equivalent vendor-agnostic onshore brokerage platform** — Australia's GovAI hosts vendor models including OpenAI GPT onshore for Commonwealth-data-sovereignty use cases. ANIA II.11 implies platform consolidation but does not name a vendor-agnostic brokerage layer.
 
 ### Top-5 ranked recommendations (full set of 25 below)
 
@@ -45,11 +47,11 @@ Before listing gaps it is important to anchor what should NOT change in ANIA's e
 
 - **EU AI Act anchoring** — clean, stable, and the right regulatory home for Portugal. Avoid drift toward UK pro-innovation / Australia sector-based / USA activist alternatives, all of which were considered by comparator countries and explicitly rejected by EU members.
 - **Single coherent document of 22 pages** — easier for stakeholder communication than Brazil's 66-page PBIA or Germany's 2-document stack or Australia's 3-document stack.
-- **6 named guiding principles** as a compact enumeration. Most comparators have implicit principle sets; Portugal's explicit 6 is more citable.
-- **4-pillar structure** — readable. The structural gaps are addressable by adding cross-cutting Infrastructure + Society subsections within each pillar (Option B) without breaking the parsimony.
-- **AMALIA as named sovereign Portuguese LLM** — a strong identity move for the ~10M PT-PT speakers globally. Now correctly understood as the PT-PT complement to Brazil's PT-BR ambition, not in competition with it.
-- **CPLP framing** as a natural diplomatic positioning for Portugal — even if currently under-operationalised, the framing is correct.
-- **Action #20 of Portugal Digital Strategy 2026-27 positioning** — situates ANIA within a coherent national digital agenda rather than as a free-standing AI document. This is good integration.
+- **6 named guiding principles** as a compact enumeration. Most comparators have implicit principle sets; Portugal's explicit 6 is more citable, and principle (3) "Public Administration as a catalyst" explicitly elevates the PA-AI thread that the structural Eixos then distribute.
+- **4-Eixo structure with named Infrastructure & Data layer (Eixo I)** — readable, and crucially Eixo I groups the four foundational initiatives (I.1-I.4) into one coherent programme. The two remaining structural gaps (PA distribution + Society folding-in) are addressable by **consolidating PA-AI as a cross-Eixo programme + adding named Society cross-cutting subsections** (Option B) without breaking the 4-Eixo parsimony.
+- **AMALIA as named sovereign Portuguese LLM** (II.7) — a strong identity move for the ~10M PT-PT speakers globally. Now correctly understood as the PT-PT complement to Brazil's PT-BR ambition, not in competition with it.
+- **CPLP framing** as a natural diplomatic positioning for Portugal — even if currently under-operationalised in IV.7, the framing is correct.
+- **Action #20 of Portugal Digital Strategy 2026-27 (EDN) positioning** — situates ANIA within a coherent national digital agenda rather than as a free-standing AI document. PIAAP and other operational layers should similarly anchor in the EDN action plans where possible.
 
 ---
 
@@ -65,29 +67,29 @@ A quote from UK's AI Opportunities Action Plan captures the framing question eve
 
 ## Recommendations grouped by universal pillar
 
-### Pillar 1 — Infrastructure & Data
+### Pillar 1 — Infrastructure & Data (extending ANIA Eixo I)
 
-**The structural framing:** Portugal needs to elevate Infrastructure & Data either to a standalone 5th pillar or, at minimum, to a strong cross-cutting layer mandated within each of the existing 4 pillars (see *Pillar selection / omission* section below). The 4 recommendations in this pillar assume the latter and can be re-grouped under a 5th pillar if Option A is adopted at final-report time.
+**The structural framing:** ANIA's Eixo I (Infraestrutura e Dados) is a standalone pillar with 4 named initiatives (I.1 EuroHPC/AI Factory + I.2 Gigafactory + I.3 Data spaces in critical areas + I.4 National Data Centre Plan). The 4 recommendations below are **extensions and deep-dives within Eixo I**, not the creation of a missing pillar. They sharpen named deliverables (GAIA-X node, Standardisation Roadmap, SME compute access) and connect Eixo I to AMALIA (II.7) for full sovereign-AI stack coherence.
 
 #### R1 — Anchor a Portuguese GAIA-X node + Atlantic-Lusophone Data Space
 
 | Field | Value |
 |---|---|
 | Source | Germany (GAIA-X), Brazil (Sovereign Cloud Action 27), Australia (GovAI), UK (NDL) |
-| Anchor ANIA initiative | II.9 (data infrastructure) + extends |
+| Anchor ANIA initiative | I.3 (Data spaces in critical areas) + I.4 (National Data Centre Plan) — extends |
 | Effort | M-L |
 | When | 2026-2028 |
 | Lead | APDC + INESC-TEC + AMA + IPN |
 | Key risk | EU-data-space duplication if not aligned with European Data Strategy |
 
-Germany leads GAIA-X. Brazil names Sovereign Cloud (Action 27) + IND (National Data Infrastructure) at Federal-Government scale. Portugal should explicitly anchor a Portuguese GAIA-X node + Atlantic-Lusophone Data Space federation, positioning Portugal as the EU-side hub for Lusophone data sovereignty (CPLP variant of federated data infrastructure). The Açores can host a low-temperature ambient data centre node; mainland Portugal provides the EU-compliant compute layer; CPLP partner countries federate via the same standards. *Matrix references: A.4 row 4, C.1 row 2.*
+Germany leads GAIA-X. Brazil names Sovereign Cloud (Action 27) + IND (National Data Infrastructure) at Federal-Government scale. ANIA I.3 commits to sectoral data spaces (health, education, industry, PA) aligned with the European Data Spaces foreseen in DEP, and I.4 finalises the National Data Centre Plan. Portugal should **explicitly anchor a Portuguese GAIA-X node within the I.3 data-space programme** + Atlantic-Lusophone Data Space federation, positioning Portugal as the EU-side hub for Lusophone data sovereignty (CPLP variant of federated data infrastructure). The Açores can host a low-temperature ambient data centre node under I.4; mainland Portugal provides the EU-compliant compute layer; CPLP partner countries federate via the same standards. *Matrix references: A.4 row 4, C.1 row 2.*
 
 #### R2 — Brazil-Portugal parallel-LLM coordination (AMALIA PT-PT + PBIA Action 9 PT-BR)
 
 | Field | Value |
 |---|---|
 | Source | Brazil PBIA Action 9 |
-| Anchor ANIA initiative | II.7 (AMALIA) + extends |
+| Anchor ANIA initiative | II.7 (AMALIA continuation) — adds bilateral coordination layer |
 | Effort | L |
 | When | 2026-2028 |
 | Lead | MCTES + FCT + INESC-TEC ↔ MCTI + CGEE + CIT Digital (Brazil) |
@@ -109,7 +111,7 @@ This is the **single highest-leverage cross-comparator opportunity in the entire
 | Field | Value |
 |---|---|
 | Source | Germany DIN+DKE Standardisation Roadmap |
-| Anchor ANIA initiative | IV.6 + extends |
+| Anchor ANIA initiative | IV.6 (EU AI Act implementation guide + standards + risk-assessment tools) — extends with named roadmap deliverable |
 | Effort | M |
 | When | 2026 H2 → 2027 H1 |
 | Lead | IPQ + APQ + IPN-LIT + IT + IST |
@@ -117,18 +119,18 @@ This is the **single highest-leverage cross-comparator opportunity in the entire
 
 Germany's DIN + DKE published an AI Standardisation Roadmap at the 2020 Digital Summit. It maps current and future standardisation needs (safety, robustness, transparency, non-discrimination) and drives subsequent implementation programmes. Portugal should commission an equivalent via IPQ + APQ + IPN-LIT + IT + IST, contributing Portuguese specifics into EU CEN-CENELEC standardisation work. *Matrix reference: A.4 row 6, C.1 row 5.*
 
-#### R4 — Expand Deucalion access for SMEs + researchers + anchor EuroHPC industrial computer participation
+#### R4 — Formalise Deucalion access for SMEs + researchers + anchor EuroHPC industrial computer participation
 
 | Field | Value |
 |---|---|
 | Source | Germany (JUPITER + EuroHPC industrial computer), Brazil (Action 4 Pro-Infra AI) |
-| Anchor ANIA initiative | II.4 + extends |
+| Anchor ANIA initiative | I.1 (Advanced Computing and AI Factory/EuroHPC) + I.2 (Gigafactory) — extends with named access policy |
 | Effort | M |
 | When | 2026 H2 onwards |
 | Lead | FCT + FCCN + MACC |
 | Key risk | Deucalion saturation; need clear allocation policy |
 
-Brazil names AI service centres (Action 4 Pro-Infra AI for ICTs) as the SME-and-researcher compute access mechanism. Germany commits to expanding national HPC (JUPITER) + EuroHPC industrial computer. Portugal should formalise SME and researcher access pathways to Deucalion + participate as anchor partner in any EuroHPC industrial computer initiative. *Matrix reference: A.4 row 1, C.1 rows 1+7.*
+ANIA I.1 commits to expanding national supercomputing capacity (Deucalion + EuroHPC alignment) and I.2 commits to attracting a national Gigafactory. Today, only ~5% of MareNostrum5 capacity (research) + 8-9% (innovation) is allocated to Portugal — explicitly flagged as insufficient in the ANIA text. Brazil names AI service centres (Action 4 Pro-Infra AI for ICTs) as the SME-and-researcher compute access mechanism. Germany commits to expanding national HPC (JUPITER) + EuroHPC industrial computer. Portugal should **formalise SME and researcher access pathways to Deucalion under I.1** (named percentage allocations + booking procedure + reimbursement scheme) + position the I.2 Gigafactory as anchor partner in the EuroHPC industrial computer initiative. *Matrix references: A.4 row 1, C.1 rows 1+7.*
 
 ### Pillar 2 — Talent & R&D
 
@@ -232,27 +234,29 @@ Australia BCA Action 15 proposes an AI Commercialisation Accelerator (AICA) mode
 
 UK names AI Sector Champions in life sciences, financial services, creative industries. Portugal's natural picks (per ANIA's strengths analysis): **Health & Pharmaceuticals + Tourism + Blue Economy + Footwear/Textiles + Aerospace (via Edisoft)**. Each champion programme has named industry lead, public-funding line, export ambition, and 3-year milestones. *Matrix reference: A.2 row 7, C.3 row 3.*
 
-### Pillar 4 — Public Administration (highest-leverage gap area)
+### Pillar 4 — Public Administration (consolidating ANIA's distributed PA-AI thread)
+
+**The structural framing:** ANIA does not have a standalone PA pillar; instead, PA-AI initiatives are distributed across **Eixo II (II.11 + II.12 + II.13), Eixo III (III.1 Doutor AP), and Eixo IV (IV.4 EU AI Act implementation + IV.5 sandboxes + IV.6 guide + IV.7 intl coop)**. The 6 recommendations below either anchor in those existing initiatives (R12 builds on II.11; R13 extends II.11; R16 extends III.1; R17 extends IV.6) or add named cross-cutting deliverables (R14 AI Review Committee under IV.4; R15 GovAI Portugal as a new platform within II.11). The companion artefact [piaap_draft.md](piaap_draft.md) is the consolidation vehicle.
 
 #### R12 — Publish the PIAAP (Plano de IA para a Administração Pública)
 
 | Field | Value |
 |---|---|
 | Source | UK AI Playbook (118pp, mandatory) + Australia APS AI Plan (30pp Trust/People/Tools) |
-| Anchor ANIA initiative | II.11 + extends to operational layer |
+| Anchor ANIA initiative | II.11 (AI Centre of Excellence in PA) + consolidates II.12, II.13, III.1, IV.4-IV.7 into one operational document |
 | Effort | M |
 | When | 2026 H2 (publication) → 2027 H2 (full operationalisation) |
 | Lead | AMA + DGAEP + INA + Centro para a IA Responsável |
 | Key risk | Stakeholder resistance from line ministries used to discretion |
 
-**The single highest-leverage recommendation in this synthesis.** Portugal needs an operational PA layer to ANIA. The PIAAP follows Australia APS Plan structure (Trust / People / Tools × ~11 deliverables) but adopts UK Playbook's 10 principles + case-studies appendix. **Detailed draft in companion artefact [piaap_draft.md](piaap_draft.md).** *Matrix reference: C.4 row 3.*
+**The single highest-leverage recommendation in this synthesis.** Portugal needs an operational PA layer that stitches together ANIA's already-committed PA-AI initiatives. The PIAAP follows Australia APS Plan structure (Trust / People / Tools × ~15 deliverables) but adopts UK Playbook's 10 principles + case-studies appendix. **Detailed draft in companion artefact [piaap_draft.md](piaap_draft.md), which anchors each deliverable to a named existing ANIA / EDN initiative rather than inventing fresh institutions.** *Matrix reference: C.4 row 3.*
 
 #### R13 — Per-ministry CAIO + separate AI Accountable Official
 
 | Field | Value |
 |---|---|
 | Source | Australia APS Plan + USA OMB M-25-21 + Brazil Federal AI Core |
-| Anchor ANIA initiative | New under II.11 |
+| Anchor ANIA initiative | II.11 (Centro de Excelência IA na AP) — extends with named per-ministry roles |
 | Effort | S |
 | When | 2026 H2 |
 | Lead | AMA + Ministério das Finanças |
@@ -265,7 +269,7 @@ Australia's APS Plan separates **Chief AI Officer** (drives adoption + strategic
 | Field | Value |
 |---|---|
 | Source | Australia APS Plan AI Review Committee |
-| Anchor ANIA initiative | IV.4 + new |
+| Anchor ANIA initiative | IV.4 (EU AI Act implementation — competent authorities + coordination model) + IV.3 (Centro para IA Responsável) — adds recurring cross-watchdog forum |
 | Effort | S |
 | When | 2026 H2 → full maturity 2027 |
 | Lead | Centro para a IA Responsável (secretariat) + member bodies |
@@ -278,7 +282,7 @@ Australia's AI Review Committee meets every 6 weeks, provides non-binding advice
 | Field | Value |
 |---|---|
 | Source | Australia GovAI + Brazil Sovereign Cloud + UK i.AI Incubator |
-| Anchor ANIA initiative | II.9 + new |
+| Anchor ANIA initiative | II.11 (Centre of Excellence in PA) — adds a named vendor-agnostic platform deliverable; references I.4 (National Data Centre Plan) for hosting |
 | Effort | M |
 | When | 2027 H1 |
 | Lead | AMA + IPN + INCM |
@@ -291,7 +295,7 @@ Australia's GovAI is a vendor-agnostic onshore platform hosting multiple LLMs (i
 | Field | Value |
 |---|---|
 | Source | Australia APS Plan (mandatory all-APS within 12 months) + UK 5-tier civil-servant segmentation |
-| Anchor ANIA initiative | III.1 + new mandate |
+| Anchor ANIA initiative | III.1 (Plano acelerado de formação de IA na AP / Doutor AP) — extends from advanced cohort to universal civil-servant mandate |
 | Effort | S |
 | When | 2026 H2 → 2028 H1 |
 | Lead | INA + DGAEP + Centro para a IA Responsável |
@@ -304,7 +308,7 @@ Australia mandates "all APS staff trained in AI fundamentals within 12 months" o
 | Field | Value |
 |---|---|
 | Source | Australia APS Plan central register + UK ATRS |
-| Anchor ANIA initiative | IV.6 + new |
+| Anchor ANIA initiative | IV.6 (EU AI Act implementation guide + risk-assessment tools) — adds named central register deliverable |
 | Effort | S-M |
 | When | 2027 H1 |
 | Lead | AMA + CNPD |
@@ -321,7 +325,7 @@ Australia mandates a central register of completed AI impact assessments (FOCI, 
 | Field | Value |
 |---|---|
 | Source | Germany AI Observatory for Work and Society |
-| Anchor ANIA initiative | IV.2 + new |
+| Anchor ANIA initiative | IV.1 (Incentives for Responsible AI Research — explicitly includes AI Economics and Work Impact) + IV.3 (Centre for Responsible AI) — adds named observatory + tripartite layer |
 | Effort | M |
 | When | 2026 H2 → 2027 |
 | Lead | DGEEP + Centro para a IA Responsável + UGT + CGTP + CIP |
@@ -334,7 +338,7 @@ Germany has a Federal AI Observatory in the Ministry of Labour focused on AI's l
 | Field | Value |
 |---|---|
 | Source | Germany (Civic Innovation Platform + Civic Data Lab + Civic Tech Labs for Green) + Brazil (Action 50-51 planned) |
-| Anchor ANIA initiative | III.4 + new |
+| Anchor ANIA initiative | III.6 (National AI Week) + III.8 (AI literacy action for citizens) — adds participatory civic-AI fora |
 | Effort | M |
 | When | 2027 |
 | Lead | Fundação Calouste Gulbenkian + INCoDe.2030 + Centro para a IA Responsável |
@@ -351,7 +355,7 @@ This is folded under R8 above.
 | Field | Value |
 |---|---|
 | Source | Australia (National Archives) + UK (Rec 13 British media training corpus) + Brazil (Amazon biome AI) |
-| Anchor ANIA initiative | III.4 + new |
+| Anchor ANIA initiative | I.3 (Data spaces in critical areas) — adds cultural-heritage as a named sectoral data space; feeds AMALIA II.7 corpus |
 | Effort | M |
 | When | 2027-2030 |
 | Lead | DGLAB + Biblioteca Nacional + IGESPAR + universities |
@@ -366,7 +370,7 @@ UK Rec 13 proposes a copyright-cleared British media asset training dataset buil
 | Field | Value |
 |---|---|
 | Source | Japan Act No. 53/2025 (only country in comparator set with dedicated AI Act) |
-| Anchor ANIA initiative | IV.5 + new |
+| Anchor ANIA initiative | IV.4 (Implementation of the EU AI Act) — extends from regulatory implementation to dedicated primary legislation |
 | Effort | L |
 | When | 2027-2028 (legislative cycle) |
 | Lead | Assembleia da República + Ministério da Justiça + Ministério da Economia |
@@ -438,15 +442,15 @@ These are concrete features observed in comparator countries that Portugal shoul
 
 ## Pillar selection / omission — deferred to final-report discussion
 
-Per user direction (2026-05-16), the question of whether ANIA's 4-pillar structure should evolve is **explicitly deferred for discussion at final-report time**. Three options to weigh, with the evidence base above:
+Per user direction (2026-05-16), the question of whether ANIA's 4-Eixo structure should evolve is **explicitly deferred for discussion at final-report time**. With the RCM 2/2026 confirmation that Eixo I (Infraestrutura e Dados) IS a standalone pillar, the two remaining structural gaps are (a) PA-AI distributed across three Eixos rather than consolidated, and (b) Society folded into the 6 guiding principles rather than as a standalone pillar. Three options to weigh:
 
 | Option | Approach | Risk | Benefit |
 |---|---|---|---|
-| **A — 6-pillar evolution** | Replace 4 ANIA pillars with the 6 universal pillars (Infrastructure & Data / Talent & R&D / Business Adoption / Public Administration / Society / Governance & International) | Most disruptive; requires legal/document revision | Maximum alignment with international peers; ANIA gaps disappear by construction |
-| **B — Hybrid (4 visible + cross-cutting layers)** | Keep ANIA's 4 pillars but mandate cross-cutting Infrastructure + Society sub-sections within each, with named lead coordinators | Cross-cutting often gets de-prioritised in implementation | Preserves ANIA's stakeholder communication advantage + addresses both structural gaps |
-| **C — Status quo (defend 4-pillar parsimony)** | Keep ANIA's 4 pillars as-is, rely on 6 guiding principles + cross-cutting language | Vulnerable to the gap-analysis evidence above; risks ANIA looking under-specified vs peers in international comparisons | Lowest disruption; preserves current institutional commitments |
+| **A — 6-pillar evolution** | Replace 4 ANIA Eixos with the 6 universal pillars (Infrastructure & Data / Talent & R&D / Business Adoption / Public Administration / Society / Governance & International) | Most disruptive; requires legal/document revision and breaks the Eixo II "Innovation and Adoption" logic that intentionally pairs business + PA adoption | Maximum alignment with international peers; both remaining gaps disappear by construction |
+| **B — Hybrid (4 Eixos + named cross-cutting layers)** | Keep ANIA's 4 Eixos but (i) consolidate PA-AI initiatives (II.11-II.13 + III.1 + IV.4-IV.7) into a named cross-Eixo PA-AI programme operated through PIAAP, and (ii) add a named Society cross-cutting subsection within Eixo IV with civic-AI platform deliverables | Cross-cutting often gets de-prioritised in implementation if no single owner | Preserves ANIA's stakeholder communication advantage + addresses both remaining gaps without breaking the existing Eixo logic |
+| **C — Status quo (defend 4-Eixo parsimony)** | Keep ANIA's 4 Eixos as-is, rely on principle (3) "PA as a catalyst" + the 6 guiding principles + the EDN cross-references | Vulnerable to the gap-analysis evidence above; risks ANIA looking under-specified on PA delivery + Society vs peers | Lowest disruption; preserves current institutional commitments |
 
-The evidence in the matrix (B.1 row 1: Portugal is *the only* 17-jurisdiction folder-in for Infrastructure & Data) makes Option C the hardest to defend. The recommendation will be drafted at final-report time after explicit user discussion.
+The evidence in the matrix (B.1 rows 4 and 5: PA distributed across 3 Eixos + Society folded into principles + III.8) makes Option C harder to defend than the status-quo defence would suggest. **Option B is the recommended draft direction** — the PIAAP companion artefact operationalises the PA consolidation half of Option B without requiring a formal RCM revision of ANIA itself. Final recommendation will be drafted after explicit user discussion at final-report time.
 
 ---
 
@@ -461,35 +465,37 @@ The evidence in the matrix (B.1 row 1: Portugal is *the only* 17-jurisdiction fo
 
 ---
 
-## Annex — Recommendation × matrix-row × source-country cross-reference
+## Annex — Recommendation × matrix-row × source-country × anchoring ANIA initiative
 
-| Rec # | Title | Matrix rows | Primary source country |
-|---|---|---|---|
-| R1 | GAIA-X Portuguese node + Atlantic-Lusophone Data Space | A.4 r4, C.1 r2 | DE, BR, AU, GB |
-| R2 | Brazil-Portugal parallel-LLM coordination | A.4 r2, C.1 r4 | BR |
-| R3 | Portuguese AI Standardisation Roadmap | A.4 r6, C.1 r5 | DE |
-| R4 | Deucalion access + EuroHPC industrial computer | A.4 r1, C.1 r1+r7 | DE, BR |
-| R5 | 4 Portuguese AI Centres of Excellence | C.2 r2 | DE, BR |
-| R6 | Portuguese AI Breakthrough Programme | C.2 r1, C.3 r4 | DE (SPRIND), GB (ARIA), US (DARPA) |
-| R7 | National AI Skills Compact | C.2 r4 | AU (BCA Action 3) |
-| R8 | Portuguese AI Olympiad + Lifes-equivalent | C.5 r1, C.2 r6 | BR |
-| R9 | PME 4.0 AI Uptake Programme | C.3 r2 | DE (Mittelstand 4.0), BR (Action 44), AU (AI Adopt) |
-| R10 | AI Commercialisation Accelerator Portugal | C.3 r4 | AU (AICA), GB (Catapult) |
-| R11 | AI for Portuguese Sectoral Champions | A.2 r7, C.3 r3 | GB, AU |
-| R12 | PIAAP (PA AI Playbook) | C.4 r3 | GB (Playbook), AU (APS Plan) |
-| R13 | Per-ministry CAIO + AAO | C.4 r1 | AU (APS Plan), US (M-25-21), BR (AI Core) |
-| R14 | AI Review Committee | C.4 r4 | AU (APS Plan) |
-| R15 | GovAI Portugal | C.4 r5 | AU (GovAI), BR (Sovereign Cloud) |
-| R16 | Universal civil-servant training mandate | C.4 r2 | AU (APS Plan), GB (Playbook tier model) |
-| R17 | Central register of AI impact assessments | C.4 r6+r7, A.5 r5 | AU (APS Plan), GB (ATRS) |
-| R18 | Observatório Português de IA | C.5 r4 | DE (AI Observatory) |
-| R19 | Civic-AI participation platforms | C.5 r5 | DE (Civic AI triad), BR (Action 50-51) |
-| R20 | (folded under R8) | — | — |
-| R21 | Atlantic-Lusophone cultural-heritage AI | C.5 r6 | GB (Rec 13), AU, BR |
-| R22 | Portuguese AI Law | A.5 r1+r4 | JP (Act No. 53/2025) |
-| R23 | CPLP AI Framework + Brazil-Portugal Tech Prosperity Deal | A.1 r7, C.6 r3 | AU (Tech Prosperity Deal), BR |
-| R24 | Adopt AI Verify | A.4 r3, C.6 r7 | SG |
-| R25 | PT-ATRS (Algorithmic Transparency Standard) | A.5 r5, C.4 r7 | GB (ATRS) |
+Each recommendation is anchored to one or more existing ANIA initiatives (extending what is already in PAANIA) where possible. "New" indicates a deliverable not currently named in the 32 PAANIA initiatives; "Extends" indicates an existing initiative being broadened or deepened.
+
+| Rec # | Title | Matrix rows | Primary source country | Anchoring ANIA initiative(s) |
+|---|---|---|---|---|
+| R1 | GAIA-X Portuguese node + Atlantic-Lusophone Data Space | A.4 r4, C.1 r2 | DE, BR, AU, GB | I.3 + I.4 (extends) |
+| R2 | Brazil-Portugal parallel-LLM coordination | A.4 r2, C.1 r4 | BR | II.7 (extends) |
+| R3 | Portuguese AI Standardisation Roadmap | A.4 r6, C.1 r5 | DE | IV.6 (extends) |
+| R4 | Deucalion access + EuroHPC industrial computer | A.4 r1, C.1 r1+r7 | DE, BR | I.1 + I.2 (extends) |
+| R5 | 4 Portuguese AI Centres of Excellence | C.2 r2 | DE, BR | II.5 (extends) |
+| R6 | Portuguese AI Breakthrough Programme | C.2 r1, C.3 r4 | DE (SPRIND), GB (ARIA), US (DARPA) | II.1 + II.2 (extends with mission-management agency) |
+| R7 | National AI Skills Compact | C.2 r4 | AU (BCA Action 3) | III.2 + III.3 (extends; coordinates with IEFP/ANQEP) |
+| R8 | Portuguese AI Olympiad + Lifes-equivalent | C.5 r1, C.2 r6 | BR | III.7 + III.8 (extends with school-level + teacher-training tracks) |
+| R9 | PME 4.0 AI Uptake Programme | C.3 r2 | DE (Mittelstand 4.0), BR (Action 44), AU (AI Adopt) | II.9 + II.10 (extends with regional advisor network) |
+| R10 | AI Commercialisation Accelerator Portugal | C.3 r4 | AU (AICA), GB (Catapult) | II.5 + II.6 (extends; consolidation mandate) |
+| R11 | AI for Portuguese Sectoral Champions | A.2 r7, C.3 r3 | GB, AU | II.5 (extends with named sectoral picks) |
+| R12 | PIAAP (PA AI Playbook) | C.4 r3 | GB (Playbook), AU (APS Plan) | II.11 (consolidates II.12, II.13, III.1, IV.4-IV.7 into one operational document) |
+| R13 | Per-ministry CAIO + AAO | C.4 r1 | AU (APS Plan), US (M-25-21), BR (AI Core) | II.11 (extends) |
+| R14 | AI Review Committee | C.4 r4 | AU (APS Plan) | IV.3 + IV.4 (extends) |
+| R15 | GovAI Portugal | C.4 r5 | AU (GovAI), BR (Sovereign Cloud) | II.11 + I.4 (new platform deliverable within Centre of Excellence + National DC Plan hosting) |
+| R16 | Universal civil-servant training mandate | C.4 r2 | AU (APS Plan), GB (Playbook tier model) | III.1 (extends from advanced to universal cohort) |
+| R17 | Central register of AI impact assessments | C.4 r6+r7, A.5 r5 | AU (APS Plan), GB (ATRS) | IV.6 (extends) |
+| R18 | Observatório Português de IA no Trabalho e Sociedade | C.5 r4 | DE (AI Observatory) | IV.1 + IV.3 (extends; tripartite social-dialogue layer) |
+| R19 | Civic-AI participation platforms | C.5 r5 | DE (Civic AI triad), BR (Action 50-51) | III.6 + III.8 (extends; new civic-AI fora) |
+| R20 | (folded under R8) | — | — | — |
+| R21 | Atlantic-Lusophone cultural-heritage AI | C.5 r6 | GB (Rec 13), AU, BR | I.3 (new sectoral data space within data-space programme) |
+| R22 | Portuguese AI Law | A.5 r1+r4 | JP (Act No. 53/2025) | IV.4 (extends from regulatory implementation to dedicated primary legislation) |
+| R23 | CPLP AI Framework + Brazil-Portugal Tech Prosperity Deal | A.1 r7, C.6 r3 | AU (Tech Prosperity Deal), BR | IV.7 (extends with named bilateral + multilateral instruments) |
+| R24 | Adopt AI Verify | A.4 r3, C.6 r7 | SG | IV.3 + IV.6 (extends; technical-testing layer) |
+| R25 | PT-ATRS (Algorithmic Transparency Standard) | A.5 r5, C.4 r7 | GB (ATRS) | IV.4 + IV.6 (extends with mandatory transparency norm) |
 
 ---
 
