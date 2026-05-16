@@ -114,7 +114,17 @@ export class MediaViewer {
                 this._pdfModule.GlobalWorkerOptions.workerSrc = 'static/vendor/pdf.worker.min.mjs';
             }
 
-            const pdfDoc = await this._pdfModule.getDocument({ url }).promise;
+            // wasmUrl: folder (trailing slash) PDF.js loads decoder WASM
+            // modules from at runtime — openjpeg (JPEG 2000), jbig2,
+            // qcms_bg (color management), quickjs-eval (form scripting).
+            // Without this, PDF.js builds `${wasmUrl}openjpeg_nowasm_fallback.js`
+            // with wasmUrl=undefined → literal "null..." path → 404 →
+            // pages with JPX images refuse to render (UAE strategy doc
+            // first-two-pages symptom 2026-05-15).
+            const pdfDoc = await this._pdfModule.getDocument({
+                url,
+                wasmUrl: 'static/vendor/wasm/',
+            }).promise;
             const renderVersion = Date.now();
             const state = {
                 pdfDoc,

@@ -29,6 +29,23 @@ _SYSTEM_PROMPT = (
 )
 
 
+# JSON schema passed to llama.cpp's json_schema-constrained sampling.
+# The sampler enforces this at token level — including proper backslash
+# escaping inside string values. Without this, LaTeX content like
+# `$\lambda$` or `$\partial b$` produced ~1% malformed-JSON failures
+# (bare `\l`, `\p` rejected by json.loads). With this, the sampler
+# physically cannot emit invalid escapes. See llm_client.chat_json
+# docstring for the failure-mode history.
+_SUMMARY_SCHEMA: dict = {
+    'type': 'object',
+    'required': ['summary'],
+    'properties': {
+        'summary': {'type': 'string', 'minLength': 1},
+    },
+    'additionalProperties': False,
+}
+
+
 def _user_prompt(members: list[Entity]) -> str:
     lines = [f'Cluster of {len(members)} related entities:', '']
     # Cap the prompt at the most-information-dense slice to keep the
@@ -52,31 +69,40 @@ def _summarize_one(
     by_cid: dict[int, list[str]],
     entity_by_id: dict[str, Entity],
     llm: LLMClient,
-) -> tuple[Entity, Relationship] | None:
-    """Build one community summary. Returns None when the community is
-    skipped (no community_id, fewer than 2 thematic members, LLM error,
-    or empty summary text). Pure function over its inputs — safe to call
-    from worker threads sharing the same LLMClient."""
+) -> tuple[str, Entity | None, Relationship | None]:
+    """Build one community summary. Returns a tagged result:
+      ('ok', entity, rel)     - summary generated successfully
+      ('skipped', None, None) - intentional skip (no community_id,
+                                fewer than 2 thematic members, or
+                                empty LLM response). NOT a gap.
+      ('failed', None, None)  - LLM error during generation. This IS
+                                a real gap the user should see.
+    Pure function over its inputs — safe to call from worker threads
+    sharing the same LLMClient."""
     cid = ce.properties.get('community_id')
     if cid is None:
-        return None
+        return ('skipped', None, None)
     members = [entity_by_id[mid] for mid in by_cid.get(cid, []) if mid in entity_by_id]
     thematic = [m for m in members if m.type in {'concept', 'person', 'organization', 'term'}]
     if len(thematic) < 2:
-        return None
+        return ('skipped', None, None)
     try:
         parsed = llm.chat_json(
             system_prompt=_SYSTEM_PROMPT,
             user_prompt=_user_prompt(thematic),
             temperature=0.2,
             max_tokens=1024,
+            json_schema=_SUMMARY_SCHEMA,
         )
     except LLMError as e:
         logger.warning('Community %s summarization failed: %s', cid, e)
-        return None
+        return ('failed', None, None)
     text = (parsed.get('summary') or '').strip()
     if not text:
-        return None
+        # Empty LLM response: not a hard failure, treat as skip so the
+        # community doesn't generate a useless empty summary entity and
+        # doesn't keep flipping the recluster banner forever.
+        return ('skipped', None, None)
     summary_id = f'community_summary:{cid}'
     summary_entity = Entity(
         id=summary_id,
@@ -94,7 +120,7 @@ def _summarize_one(
         target=ce.id,
         type='summarizes',
     )
-    return summary_entity, rel
+    return ('ok', summary_entity, rel)
 
 
 def summarize_communities(
@@ -102,18 +128,27 @@ def summarize_communities(
     community_memberships: dict[str, int],
     entity_by_id: dict[str, Entity],
     client: LLMClient | None = None,
-) -> tuple[list[Entity], list[Relationship]]:
+) -> tuple[list[Entity], list[Relationship], int, int]:
     """Generate one community_summary entity per community.
 
-    Returns the new summary entities plus :summarizes edges. The per-
-    community Gemma calls run in parallel up to COMMUNITY_SUMMARY_PARALLELISM
-    workers; the same llama-server slot constraint as entity extraction
-    applies (raising past the slot count just queues server-side). Output
-    order matches input order so downstream consumers see deterministic
-    results.
+    Returns `(summary_entities, summarizes_edges, n_attempted, n_failed)`:
+      - summary_entities / summarizes_edges: the produced graph objects.
+      - n_attempted: communities the summarizer ACTUALLY tried to summarize
+        (i.e. those with >=2 thematic members; eligibility-skipped ones
+        excluded). Use this for "real" denominators - comparing
+        len(summary_entities) against this tells you the true coverage.
+      - n_failed: of those attempted, how many failed due to LLM errors.
+        This is the signal for a gap that's worth surfacing to the user
+        (recluster banner). Intentional skips are not a gap.
+
+    The per-community Gemma calls run in parallel up to
+    COMMUNITY_SUMMARY_PARALLELISM workers; the same llama-server slot
+    constraint as entity extraction applies (raising past the slot count
+    just queues server-side). Output order matches input order so
+    downstream consumers see deterministic results.
     """
     if not community_entities:
-        return [], []
+        return [], [], 0, 0
 
     llm = client or LLMClient()
     # Invert memberships: community_id -> [member_ids]
@@ -124,6 +159,8 @@ def summarize_communities(
     workers = max(1, COMMUNITY_SUMMARY_PARALLELISM)
     summary_entities: list[Entity] = []
     rels: list[Relationship] = []
+    n_attempted = 0
+    n_failed = 0
 
     # ThreadPoolExecutor.map preserves input order. _summarize_one is a
     # pure function of (ce, by_cid, entity_by_id, llm) — by_cid and
@@ -136,15 +173,21 @@ def summarize_communities(
         results = pool.map(lambda ce: _summarize_one(ce, by_cid, entity_by_id, llm), community_entities)
 
     try:
-        for r in results:
-            if r is None:
-                continue
-            summary_entities.append(r[0])
-            rels.append(r[1])
+        for status, ent, rel in results:
+            if status == 'ok':
+                n_attempted += 1
+                summary_entities.append(ent)
+                rels.append(rel)
+            elif status == 'failed':
+                n_attempted += 1
+                n_failed += 1
+            # 'skipped' contributes to neither counter (intentional).
     finally:
         if workers > 1:
             pool.shutdown(wait=True)
 
-    logger.info('Community summaries: generated %d (parallelism=%d)',
-                len(summary_entities), workers)
-    return summary_entities, rels
+    logger.info(
+        'Community summaries: generated %d / %d attempted (failed=%d, parallelism=%d)',
+        len(summary_entities), n_attempted, n_failed, workers,
+    )
+    return summary_entities, rels, n_attempted, n_failed

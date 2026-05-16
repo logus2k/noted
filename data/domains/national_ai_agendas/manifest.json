@@ -1,0 +1,168 @@
+{
+  "domain_id": "national_ai_agendas",
+  "name": "National AI Agendas",
+  "description": "National AI Agendas",
+  "created_at": "2026-05-15T12:50:07.465949+00:00",
+  "embeddings_model": "bge-m3",
+  "pinned": false,
+  "included_files": [
+    {
+      "path": "National Artificial Intelligence Agenda__EN.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-15T12:52:10.849369+00:00",
+      "category": "National AI Agendas",
+      "display_name": "Portugal - National Artificial Intelligence Agenda"
+    },
+    {
+      "path": "argentina_anexo_5628461_1.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-15T12:52:10.896487+00:00",
+      "category": "National AI Agendas",
+      "display_name": "Argentina - Bases Para La Agenda Digital"
+    },
+    {
+      "path": "finland_TEM_2022_63.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-15T12:52:10.961497+00:00",
+      "category": "National AI Agendas",
+      "display_name": "Finland - Artificial Intelligence 4.0 Programme"
+    },
+    {
+      "path": "swedens-ai-strategy.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-15T12:52:11.428900+00:00",
+      "category": "National AI Agendas",
+      "display_name": "Sweden - AI Strategy"
+    },
+    {
+      "path": "sweden_action-plan-for-swedens-ai-strategy.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-15T12:52:11.483480+00:00",
+      "category": "National AI Agendas",
+      "display_name": "Sweden - Action Plan for Sweden's AI Strategy"
+    },
+    {
+      "path": "qatar_digital_agenda_2030_full_version_english.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-15T12:52:12.683260+00:00",
+      "category": "National AI Agendas",
+      "display_name": "Qatar - Digital Agenda 2030"
+    },
+    {
+      "path": "eua_ai_action_plan.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-15T19:49:59.037103+00:00",
+      "category": "National AI Agendas",
+      "display_name": "USA - AI Action Plan"
+    },
+    {
+      "path": "uae_national_strategy_for_ai.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-15T19:50:00.254169+00:00",
+      "category": "National AI Agendas",
+      "display_name": "UAE - National Strategy for AI"
+    },
+    {
+      "path": "spain_estrategia de inteligencia_artificial_2024.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-16T11:48:05.779467+00:00",
+      "category": "National AI Agendas",
+      "display_name": "Spain - Estrategia de Inteligencia Artificial 2024"
+    },
+    {
+      "path": "france_ai_our_ambition_for_france.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-16T12:01:43.956950+00:00",
+      "category": "National AI Agendas",
+      "display_name": "France - AI Our Ambition for France"
+    },
+    {
+      "path": "uk_ai_playbook_for_the_uk_government.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-16T12:17:00.530030+00:00",
+      "category": "National AI Agendas",
+      "display_name": "UK - AI Playbook for the UK Government"
+    },
+    {
+      "path": "Italian_strategy_for_artificial_intelligence_2024-2026.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-16T12:40:48.237773+00:00",
+      "category": "National AI Agendas",
+      "display_name": "Italy - Italian Strategy for Artificial Intelligence 2024-2026"
+    },
+    {
+      "path": "uk_ai_opportunities_action_plan.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-16T13:08:21.192941+00:00",
+      "category": "National AI Agendas",
+      "display_name": "UK - AI Opportunities Action Plan"
+    },
+    {
+      "path": "singapore_ national_ai_strategy_2023.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-16T13:35:06.488440+00:00",
+      "category": "National AI Agendas",
+      "display_name": "Singapore - National AI Strategy 2023"
+    },
+    {
+      "path": "japan_ai_basic_plan.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-16T13:50:37.655821+00:00",
+      "category": "National AI Agendas",
+      "display_name": "Japan - AI Basic Plan"
+    },
+    {
+      "path": "china_ai_plus_action_plan_2025_translation.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-16T14:50:30.332901+00:00",
+      "category": "National AI Agendas",
+      "display_name": "China - AI Plus Action Plan 2025"
+    },
+    {
+      "path": "australia_ai_plan_for_public_service.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-16T15:05:15.238909+00:00",
+      "category": "National AI Agendas",
+      "display_name": "Australia - AI Plan for Public Service"
+    },
+    {
+      "path": "australia_accelerating_australia_ai_agenda.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-16T15:05:15.564629+00:00",
+      "category": "National AI Agendas",
+      "display_name": "Australia - Accelerating Australia AI Agenda"
+    },
+    {
+      "path": "australia_national_ai_plan.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-16T15:05:15.766178+00:00",
+      "category": "National AI Agendas",
+      "display_name": "Australia - National AI Plan"
+    },
+    {
+      "path": "germany_aktionsplan_kuenstliche_intelligenz_2023.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-16T15:33:14.158627+00:00",
+      "category": "National AI Agendas",
+      "display_name": "Germany - Action Plan Artificial Intelligence by the BMBF"
+    },
+    {
+      "path": "germany_nationale_ki_strategie.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-16T15:57:52.827849+00:00",
+      "category": "National AI Agendas",
+      "display_name": "Germany - AI Strategy of the German Federal Government"
+    },
+    {
+      "path": "brazil_ai_for_the_good_of_al_2025.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-16T16:24:57.516353+00:00",
+      "category": "National AI Agendas",
+      "display_name": "Brazil - AI for the Good of All 2025"
+    }
+  ],
+  "arcadedb_database": "national_ai_agendas",
+  "corpus_collection": "national_ai_agendas__corpus",
+  "entity_cache_collection": "national_ai_agendas__gr_entities",
+  "summary_cache_collection": "national_ai_agendas__gr_summaries"
+}

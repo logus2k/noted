@@ -3112,7 +3112,11 @@ export class ExplorerPanel {
                 key: `kb-documents:cat:${path}`,
                 icon: FOLDER_ICON,
                 folder: true,
-                expanded: true,
+                // Default collapsed. Previously `expanded: true` here
+                // caused the entire Documents subtree to auto-expand
+                // recursively (every category + sub-category opened
+                // when the user clicked Documents). The user only
+                // wants to see the level they clicked.
                 children: [...childFolders, ...docNodes],
             };
         };

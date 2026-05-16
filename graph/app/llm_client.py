@@ -170,13 +170,34 @@ class LLMClient:
         *,
         temperature: float = 0.1,
         max_tokens: int = 2048,
+        json_schema: dict | None = None,
     ) -> dict:
         """Ask the model for a JSON object. Returns parsed dict.
 
-        Uses response_format={"type": "json_object"} where supported. Falls
-        back to extracting the first balanced {...} span from raw content
-        if the server ignores the format hint.
+        When `json_schema` is provided, uses llama.cpp's strict
+        json_schema-constrained sampling. The sampler physically cannot
+        emit a token that would invalidate the schema — including bare
+        backslashes inside string values (the bug that ate ~1% of
+        community summaries on LaTeX-heavy academic content: `\\lambda`,
+        `\\partial`, etc. needed to be JSON-escaped as `\\\\lambda` but
+        the unconstrained model emitted them raw, breaking json.loads).
+        With json_schema, the sampler forces proper `\\\\` escapes at
+        token-level. Validated 2026-05-15: gemma-4 returns valid JSON
+        carrying LaTeX content reliably.
+
+        Without `json_schema`, uses the loose `{"type": "json_object"}`
+        hint — encourages JSON shape but does NOT constrain escapes.
+
+        Falls back to extracting the first balanced {...} span from raw
+        content if the server ignores the format hint.
         """
+        if json_schema is not None:
+            rf = {
+                'type': 'json_schema',
+                'json_schema': {'name': 'response', 'schema': json_schema},
+            }
+        else:
+            rf = {'type': 'json_object'}
         payload: dict[str, Any] = {
             'model': self._model,
             'messages': [
@@ -186,7 +207,7 @@ class LLMClient:
             'stream': False,
             'temperature': temperature,
             'max_tokens': max_tokens,
-            'response_format': {'type': 'json_object'},
+            'response_format': rf,
             # Disable thinking for structured-output calls. With the global
             # `reasoning = on` in llama-router-models.ini, Gemma 4 emits a
             # `<think>...</think>` block that agent_server's _ThinkingSplice

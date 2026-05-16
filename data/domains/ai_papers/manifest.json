@@ -60,7 +60,7 @@
       "mode": "read_store",
       "added_at": "2026-05-13T21:01:19.232795+00:00",
       "category": "Whitepapers/Transformers",
-      "display_name": ""
+      "display_name": "Root Mean Square Layer Normalization"
     }
   ],
   "arcadedb_database": "ai_papers",

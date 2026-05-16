@@ -681,13 +681,17 @@ class ResearchBuilder:
         self.progress['communities_total'] = len(community_entities)
         timings['analytics'] = _now() - t0
 
+        summary_attempted = 0
+        summary_failed = 0
         if not skip_community_summaries:
             self._set_phase('summarizing')
             t0 = _now()
-            summary_entities, summary_rels = summarize_communities(
+            summary_entities, summary_rels, summary_attempted, summary_failed = summarize_communities(
                 community_entities, communities_dict, entity_by_id,
             )
             self.progress['communities_summarized'] = len(summary_entities)
+            self.progress['community_summaries_attempted'] = summary_attempted
+            self.progress['community_summaries_failed'] = summary_failed
             timings['summarizing'] = _now() - t0
 
         total = _now() - phase_t0
@@ -1295,20 +1299,45 @@ class ResearchBuilder:
             self._set_phase('caching')
             self._push_caches(thematic_entities, summary_entities, replace=True)
 
-        domain_state.clear_recluster_pending(self.kb_id)
+        # LLM-gap check before clearing the pending marker. The summarizer
+        # skips communities with <2 thematic members BY DESIGN (no point
+        # summarizing a singleton) — those are not gaps. Real gaps are
+        # communities the summarizer ATTEMPTED but failed on (LLMError
+        # mid-run). Only those flip the recluster banner; otherwise the
+        # banner would persist forever after every recluster, since the
+        # eligibility-skipped count is permanent in the data.
+        n_communities = len(community_entities)
+        n_summaries = len(summary_entities)
+        n_attempted = self.progress.get('community_summaries_attempted', n_summaries)
+        n_failed = self.progress.get('community_summaries_failed', 0)
+        recluster_pending_final = False
+        if n_failed > 0:
+            gap_reason = (
+                f'community summaries: {n_failed} of {n_attempted} attempted '
+                f'failed to generate (check generation service health)'
+            )
+            domain_state.set_recluster_pending(self.kb_id, reason=gap_reason)
+            recluster_pending_final = True
+            logger.warning(
+                'Recluster finished with LLM gap on %s: %s', self.kb_id, gap_reason,
+            )
+        else:
+            domain_state.clear_recluster_pending(self.kb_id)
 
         finished = datetime.now(timezone.utc)
         out = {
             'thematic_entities': len(thematic_entities),
             'sameas_edges': len(sameas_rels),
             'similar_to_edges': len(similar_rels),
-            'communities': len(community_entities),
-            'community_summaries': len(summary_entities),
+            'communities': n_communities,
+            'community_summaries': n_summaries,
+            'community_summaries_attempted': n_attempted,
+            'community_summaries_failed': n_failed,
             'duration_seconds': _now() - t0,
             'started_at': started.isoformat(),
             'finished_at': finished.isoformat(),
             **write_counts,
-            'pending_recluster': False,
+            'pending_recluster': recluster_pending_final,
         }
         self._set_phase('done', **{k: v for k, v in out.items() if k != 'started_at'})
         logger.info('Recluster complete: %s', out)
