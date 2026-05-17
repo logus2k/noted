@@ -9,7 +9,7 @@
 
 ## Executive summary
 
-ANIA is a coherent and EU-anchored strategic document. It correctly positions Portugal under the EU AI Act regime, articulates 4 Eixos × 32 initiatives × 6 guiding principles, and commits to a named sovereign LLM ambition (AMALIA). Against the 17 international comparators analysed, **ANIA covers 4 of the 6 common-denominator pillars at LEAD strength** (Infrastructure & Data via Eixo I; Talent & R&D via Eixo III + II.1-II.5; Business Adoption via Eixo II; Governance & International via Eixo IV) but has **two structural gaps** plus approximately 25 specific delivery refinements that should be addressed in its 2027 refresh and beyond.
+ANIA is a coherent and EU-anchored strategic document. It correctly positions Portugal under the EU AI Act regime, articulates 4 Eixos × 32 initiatives × 6 guiding principles, and commits to a named sovereign LLM ambition (AMALIA). Against the **16 international comparators analysed (17 jurisdictions including Portugal as anchor in the matrix)**, **ANIA covers 4 of the 6 common-denominator pillars at LEAD strength** (Infrastructure & Data via Eixo I; Talent & R&D via Eixo III + II.1-II.5; Business Adoption via Eixo II; Governance & International via Eixo IV) but has **two structural gaps** plus **28 specific delivery refinements (R1-R28)** that should be addressed in its 2027 refresh and beyond.
 
 ### The two structural gaps
 
@@ -37,7 +37,7 @@ ANIA is a coherent and EU-anchored strategic document. It correctly positions Po
 | **R14** | **AI Review Committee (CNPD + Provedor de Justiça + CADA + sectoral)** | S | 2026 H2 | Australia APS Plan |
 | **R22** | **Pass a Portuguese AI Law** | L | 2027-2028 | Japan Act No. 53/2025 |
 
-The remaining 20 recommendations are grouped by the 6 universal pillars below.
+The remaining 23 recommendations are grouped by the 6 universal pillars below + a cross-cutting pillar for the Japan AI Strategy 2022 imports (R26-R28).
 
 ---
 
@@ -57,7 +57,7 @@ Before listing gaps it is important to anchor what should NOT change in ANIA's e
 
 ## Methodology
 
-Each country in the comparator set was analysed against a consistent template (header / quantitative anchors / structure / distinctive mechanisms / "what country X does that Portugal does NOT" / "what Portugal does that X does NOT" / style comparison / critique-lens conclusion). The 17 comparators are: Argentina, USA, Finland, Qatar, UAE, Spain, Sweden, France, UK, Italy, China, Singapore, Japan, Australia (3 docs consolidated), Germany (2 docs consolidated), and Brazil. Each comparator was selected for offering a distinct national approach to a similar policy challenge; together they triangulate the design space Portugal sits in.
+Each country in the comparator set was analysed against a consistent template (header / quantitative anchors / structure / distinctive mechanisms / "what country X does that Portugal does NOT" / "what Portugal does that X does NOT" / style comparison / critique-lens conclusion). The **16 comparator countries** are: Argentina, USA, Finland, Qatar, UAE, Spain, Sweden, France, UK (2 docs consolidated), Italy, China, Singapore, Japan (2 docs consolidated: AI Strategy 2022 + AI Basic Plan 2025), Australia (3 docs consolidated), Germany (2 docs consolidated), and Brazil. Combined with Portugal as the anchor, this yields **17 jurisdictions in the matrix columns**. Each comparator was selected for offering a distinct national approach to a similar policy challenge; together they triangulate the design space Portugal sits in.
 
 Cells in the comparator matrix (Section A/B/C) cite back to the country summaries. Recommendations below cite both the comparator matrix row and the source country (or countries) the move is drawn from.
 
@@ -138,8 +138,8 @@ ANIA I.1 commits to expanding national supercomputing capacity (Deucalion + Euro
 
 | Field | Value |
 |---|---|
-| Source | Germany (6 named: DFKI/BIFOLD/Lamarr/ScaDS.AI/MCML/TUEAI), Brazil (CPA + INCT-AI) |
-| Anchor ANIA initiative | II.3 + extends |
+| Source | Germany (6 named: DFKI/BIFOLD/Lamarr/ScaDS.AI/MCML/TUEAI), Brazil (CPA + INCT-AI), Japan (3 named: RIKEN AIP + AIST AIRC + NICT) |
+| Anchor ANIA initiative | II.5 (Sectoral AI Centres — already commits to consortium-based innovation in Health, Education, Industrial sectors) — extends with named geographic federalism + 4-centre architecture |
 | Effort | M-L |
 | When | 2026 H2 → 2027 |
 | Lead | FCT + CCDR (regional coordination commissions) + universities |
@@ -159,7 +159,7 @@ Federal-equivalent funding via FCT + Regional Coordination Commissions (CCDRs) c
 | Field | Value |
 |---|---|
 | Source | Germany SPRIND + UK ARIA + USA DARPA |
-| Anchor ANIA initiative | II.2 + extends |
+| Anchor ANIA initiative | II.1 (Support for fundamental research projects, particularly of national strategic interest) + II.2 (Strengthen collaboration with international networks) — extends with mission-management agency layer |
 | Effort | M |
 | When | 2027-2028 |
 | Lead | FCT + ANI + Conselho Coordenador de C&T |
@@ -172,7 +172,7 @@ Germany has SPRIND (Federal Agency for Disruptive Innovation), modelled on DARPA
 | Field | Value |
 |---|---|
 | Source | Australia BCA Action 3 |
-| Anchor ANIA initiative | I.1, I.2, III.1, III.2 + extends |
+| Anchor ANIA initiative | III.2 (National Smart Skills Framework — already maps existing/emerging skills) + III.3 (Recognition and expansion of Micro-credentials and CTESP) — extends with industry-academia-government compact + IEFP/ANQEP coordination + EDN Ação 17 (Pacto de Competências Digitais) integration |
 | Effort | S-M |
 | When | 2026 H2 → 2027 H1 |
 | Lead | ANQEP + IEFP + universities + AIP + COTEC |
@@ -185,7 +185,7 @@ Australia's BCA proposes a National AI Skills Compact modelled on NSW's Digital 
 | Field | Value |
 |---|---|
 | Source | Brazil (AI Olympiad Action 14; Lifes Action 15) |
-| Anchor ANIA initiative | I.3 + extends |
+| Anchor ANIA initiative | III.7 ("AI Generation" campaign to motivate young people) + III.8 (AI literacy action for citizens) — extends with school-level Olympiad track + teacher-training laboratories under ESEs; EDN Ação 18 (Programa Nacional Raparigas STEM) and Ação 19 (Digital e IA na Educação) as parallel coordination layers |
 | Effort | S |
 | When | 2026 H2 (Olympiad) + 2027 (Lifes) |
 | Lead | DGE + Olimpíadas Portuguesas de Informática + ESEs |
@@ -200,7 +200,7 @@ Brazil's AI Olympiad (Action 14) + Lifes (Interdisciplinary Laboratories for Edu
 | Field | Value |
 |---|---|
 | Source | Germany Mittelstand 4.0 Centres + Brazil Action 44 + Australia AI Adopt Program |
-| Anchor ANIA initiative | II.13 + extends |
+| Anchor ANIA initiative | II.9 (AI in SMEs — using IFIC) + II.10 (PME.IA — National Platform of AI Products for SMEs, low-code/no-code) — extends with regional advisor network per NUTS-II + EDN Ação 14.2 (Coaching 4.0 Vouchers PME, lead ARTE) as the voucher-instrument vehicle |
 | Effort | M |
 | When | 2026 H2 → 2028 |
 | Lead | IAPMEI + AIP + sectoral associations + IEFP |
@@ -213,7 +213,7 @@ Germany's Mittelstand 4.0 Centres of Excellence + AI trainer programme set the t
 | Field | Value |
 |---|---|
 | Source | Australia AICA (BCA Action 15) + UK Catapult Network + Brazil Embrapii integration |
-| Anchor ANIA initiative | II.6 + extends |
+| Anchor ANIA initiative | II.5 (Sectoral AI Centres) + II.6 (National platform 'Opportunities in AI') — extends with explicit consolidation mandate ("AI Bridge Portugal" naming layer) + EDN Ação 15 (Apoios à Inovação e Empreendedorismo Digital) as the broader instrument context |
 | Effort | M |
 | When | 2027 |
 | Lead | ANI + COTEC + CoLABs |
@@ -226,7 +226,7 @@ Australia BCA Action 15 proposes an AI Commercialisation Accelerator (AICA) mode
 | Field | Value |
 |---|---|
 | Source | UK named champions in life sciences/financial services/creative industries + Australia sectoral focus |
-| Anchor ANIA initiative | II.5, II.7, II.8 + extends |
+| Anchor ANIA initiative | II.5 (Sectoral AI Centres — Health, Education, Industrial sectors already named; extend with named Portuguese sectoral picks: Health & Pharma, Tourism, Blue Economy, Footwear/Textiles, Aerospace) + EDN Ação 14.4 (Comércio Digital — internacionalização AICEP) as the export-promotion vehicle |
 | Effort | L |
 | When | 2026-2030 |
 | Lead | Per-sector ministry + AICEP for FDI attraction |
@@ -316,9 +316,11 @@ Australia mandates "all APS staff trained in AI fundamentals within 12 months" o
 
 Australia mandates a central register of completed AI impact assessments (FOCI, IRAP, cyber-security, impact) so that agencies can reference/reuse prior evaluations rather than re-conducting. UK's ATRS is the mandatory transparency analogue. Portugal should establish a **Registo Central de Avaliações de Impacto de IA** under AMA, with EU AI Act Article 29 alignment. *Matrix references: C.4 rows 6+7, A.5 row 5.*
 
-### Pillar 5 — Society
+### Pillar 5 — Society (addressing one of ANIA's two remaining structural gaps)
 
-**Structural framing:** Whether Society becomes a standalone 5th pillar (Option A) or stays folded-into the 6 principles + cross-cutting (Option B) is the **pillar-selection question** deferred to final-report discussion (see *Pillar selection / omission* section below). The 4 recommendations below assume either structure.
+**The structural framing:** ANIA folds Society into the 6 guiding principles + III.8 (AI literacy action for citizens). Only Portugal and USA fold-in across the 17-jurisdiction set; USA does so deliberately on political-minimalism grounds, Portugal less defensibly given its EU-anchored inclusion commitments. Whether Society becomes a standalone 5th Eixo (Option A) or stays folded-in with named cross-cutting subsections added (Option B — recommended draft direction) is the **pillar-selection question** deferred to final-report discussion (see *Pillar selection / omission* section below).
+
+**Option B operationalisation** (the synthesis recommendation): add a named **"Sociedade e Inclusão" cross-cutting subsection within Eixo IV (Responsabilidade e Ética)**, integrating R18-R21 below as the named civic-AI / observatory / cultural-heritage layer. This avoids breaking the 4-Eixo parsimony while addressing the gap with named operational deliverables. The 4 recommendations below are written to support either structure (Option A or Option B).
 
 #### R18 — Establish the Observatório Português de IA no Trabalho e na Sociedade
 
@@ -422,6 +424,75 @@ Singapore's **AI Verify** is an open-source toolkit for trustworthy AI testing, 
 
 UK's ATRS is a mandatory transparency standard for in-scope public bodies (publishes the AI tool, its use, its dataset, its risk evaluation). Portugal should establish **Norma Portuguesa de Transparência Algorítmica (NPTA)** under EU AI Act Article 26 deployer obligations. *Matrix references: A.5 row 5, C.4 row 7.*
 
+### Cross-cutting Pillar — Japan AI Strategy 2022 imports (Strategic Objective 0 + Digital Twins + Quantified Education)
+
+The following 3 recommendations are added 2026-05-17 after integration of Japan's AI Strategy 2022 (Apr 2022, pre-statutory Cabinet Office document; superseded operationally by the AI Act + Basic Plan 2025 but contributing conceptual scaffolding worth importing independently). They sit cross-cutting across multiple Eixos rather than under any single one.
+
+#### R26 — Portuguese Strategic Objective 0: National + Planetary Resilience (Crisis-AI axis)
+
+| Field | Value |
+|---|---|
+| Source | Japan AI Strategy 2022 p.4-18 (Strategic Objective 0) |
+| Anchor ANIA initiative | New cross-cutting axis prepended to the 4 Eixos; anchors operationally in II.5 (Sectoral AI Centres — Health/Disaster sectors) + I.3 (Data spaces critical areas — disaster + climate) + IV.1 (Responsible AI research includes "AI Economics and Work Impact"); cross-references EDN Ação 4 (ENC) + Ação 13.4 (Anel CAM + Açores submarine cables) |
+| Effort | M-L |
+| When | 2026 H2 (axis formalisation) → 2028 (operational deployment) |
+| Lead | ANEPC (Autoridade Nacional de Emergência e Proteção Civil) + ICNF + IPMA + DGS + Centro para a IA Responsável |
+| Key risk | Cross-Eixo accountability dilution if no single lead designated |
+
+Japan's AI Strategy 2022 prepended **Strategic Objective 0 — National Resilience + Planetary Resilience** to the four 2019-inherited objectives, with named imminent crises: large-scale earthquakes, volcanic eruptions, climate-driven heavy rain, pandemics. Portugal faces directly analogous crises: **annual wildfires** (the single highest-damage recurring event), **Atlantic seismic risk** (1755 Lisbon precedent + active Açores volcanism), **climate-driven floods + drought**, **pandemic preparedness**. The recommendation is to formally prepend a **"Objectivo Estratégico 0 — Resiliência Nacional + Planetária"** to ANIA, operationalised through three streams:
+
+- **AI for wildfire prediction + prevention + response** (ICNF + IPMA + Proteção Civil + universities) — already mentioned in synthesis R6 example missions; this elevates it to a structural axis
+- **AI for Atlantic seismic + Açores volcanic monitoring** (IPMA + Universidade dos Açores + INESC-TEC) — Digital Twin coupling per R27 below
+- **AI for pandemic preparedness + One Health surveillance** (DGS + INSA Ricardo Jorge + SNS24 integration)
+
+The Japanese frame also includes **"Planetary Resilience"** — "AI for Nature-Positive Economy" — that fits Portugal's Blue Economy + Atlantic biodiversity wedge naturally. *Matrix references: A.6 rows 3+5 (newly enriched 2026-05-17).*
+
+#### R27 — Digital Twin Portugal (architectural primitive for PA, crisis response, and territorial planning)
+
+| Field | Value |
+|---|---|
+| Source | Japan AI Strategy 2022 p.12-13 (citing Virtual Singapore + India Stack) |
+| Anchor ANIA initiative | I.3 (Data spaces critical areas) + I.4 (National Data Centre Plan) — extends; **dual-anchored at EDN Ação 8.6** (Aumento da qualidade e quantidade de dados a nível local — explicitly commits to "Desenvolvimento de 5 Gémeos Digitais para simulação, monitorização e prevenção de situações no mundo real" + plataformas de gestão urbana para 129 municípios) + EDN Ação 9 (PAGE — Plataforma de Apoio à Gestão do Estado) |
+| Effort | M |
+| When | 2026 H2 (Ação 8.6 starts 2S 2025 → 2S 2026; PIAAP additional gov-AI Digital Twin layer 2027 H1) |
+| Lead | ARTE + INE + INESC-TEC + IGESPAR + ANPC |
+| Key risk | Fragmentation across 5 separate Gémeos Digitais without unified data-architecture; needs single technical authority |
+
+EDN Ação 8.6 **already commits to 5 Gémeos Digitais** + urban-management platforms for 129 municípios. Japan's AI Strategy 2022 (p.12-13) provides the **over-arching architectural framing** for elevating Digital Twins from sub-deliverables to a **cross-cutting Eixo-I architecture**:
+
+> "Digital Twins are not only a disaster countermeasure but also a foundation for national administration. It can also be a platform for improving the efficiency of private services and creating new services and a flexible lifestyle." [Strategy 2022 p.13]
+
+Three named Portuguese Digital Twin priorities to consolidate the existing EDN Ação 8.6 commitments:
+
+1. **Digital Twin Atlântico-Açores** — seismic + volcanic + meteo + ocean state (links to R26 above + R21 cultural-heritage data; coordinates with the Anel CAM + Anel Açores submarine cables under EDN Ação 13.4)
+2. **Digital Twin Floresta + Wildfire** — fuel load + ignition risk + spread prediction + recovery planning (ICNF + universities + IPMA)
+3. **Digital Twin Cidades 129** — urban-management data + traffic + utilities + public-service flows for the 129 municipalities under Ação 8.6 (ARTE + ANMP + Câmaras Municipais)
+
+PIAAP deliverable 3.5 (Biblioteca de Casos de Uso) should integrate Digital Twin reference architectures as a named pattern. *Matrix reference: C.1 row 2 (newly enriched 2026-05-17 to capture Strategy 2022 Digital Twin foundation framing).*
+
+#### R28 — Quantified per-cohort annual education targets in Eixo III
+
+| Field | Value |
+|---|---|
+| Source | Japan AI Strategy 2022 p.28-31 (named annual cohort targets with 2025 realisation) |
+| Anchor ANIA initiative | III.2 (National Smart Skills Framework — already maps skills) + III.3 (Micro-credentials + CTESP) + III.6 (National AI Week) — extends with quantified per-cohort annual targets; coordinates with EDN Ação 17 (Pacto de Competências Digitais) |
+| Effort | S-M |
+| When | 2026 H2 (target-setting + decree) → 2030 (realisation year) |
+| Lead | DGES + IEFP + DGEEC + ANQEP + ARTE (Ação 17 coordination) |
+| Key risk | Targets without funded delivery vehicles become aspirational metrics |
+
+Japan's AI Strategy 2022 sets the most quantified human-capital targets in the comparator set:
+
+| JP Cohort | JP Annual target | PT analogue target (suggested, ~1/10 to ~1/15 scale per population) |
+|---|---|---|
+| High-school grads with basic AI/data-science literacy | ~1,000,000 | ~50,000 (Portugal high-school grad cohort is ~85K/yr per INE; aim for 60% AI-literacy coverage) |
+| University + technical college grads with elementary AI/DS | ~500,000 | ~25,000 (PT university+CTeSP grad cohort ~75K/yr; aim for 1/3 with elementary AI/DS) |
+| Applied AI/DS (specialised fields) | ~250,000 | ~10,000 |
+| Expert (innovation-creators) | ~2,000 (of which ~100 top-class) | ~500-1,000 (of which ~25 top-class) |
+| Recurrent education for working adults | ~1,000,000 | ~50,000 (coordinate via IEFP + Pacto de Competências Digitais) |
+
+ANIA III.2 + III.3 currently commit to mapping/recognising/expanding without quantified annual cohort targets. Adding these would elevate Eixo III from process commitments to outcome-anchored commitments, matching Japan's pattern while remaining proportional to Portuguese scale. **Realisation target year: 2030.** *Matrix reference: C.2 row 4 (quantified skills-gap row).*
+
 ---
 
 ## What Portugal should NOT copy (anti-patterns from the comparator set)
@@ -458,10 +529,10 @@ The evidence in the matrix (B.1 rows 4 and 5: PA distributed across 3 Eixos + So
 
 | Horizon | What |
 |---|---|
-| **2026 H2 (before year-end)** | R7 (Skills Compact draft), R8 (Olympiad announcement + Lifes scoping), R12 (PIAAP publication), R13 (CAIO+AAO mandate), R14 (AI Review Committee establishment), R16 (training mandate decree), R23 (Brazil-Portugal Tech Prosperity Deal negotiation), R24 (AI Verify adoption decision) |
-| **2027 H1** | R3 (Standardisation Roadmap), R5 (4 AI Centres named), R10 (AI Bridge consolidation), R15 (GovAI Portugal pilot), R17 (Central register live), R18 (Observatório established), R19 (Civic-AI platforms), R23 (CPLP AI Framework signed), R25 (PT-ATRS draft) |
-| **2027 H2 → 2028** | R1 (GAIA-X node anchored), R2 (Brazil-Portugal parallel-LLM coordination launched), R6 (AI Breakthrough Programme), R11 (Sectoral Champions kickoff), R15 (GovAI full rollout), R22 (Portuguese AI Law passage) |
-| **2028 → 2030** | R2 (LLM coordination scale-up), R4 (Deucalion industrial computer expansion), R11 (Sectoral Champions outcomes), R21 (Atlantic-Lusophone cultural corpus) |
+| **2026 H2 (before year-end)** | R4 (Deucalion SME/researcher access policy formalised), R7 (Skills Compact draft), R8 (Olympiad announcement + Lifes scoping), R9 (PME 4.0 launch via EDN Ação 14.2 Coaching 4.0 Vouchers), R12 (PIAAP publication), R13 (CAIO+AAO mandate), R14 (AI Review Committee establishment), R16 (training mandate decree), R23 (Brazil-Portugal Tech Prosperity Deal negotiation), R24 (AI Verify adoption decision), **R26 (Strategic Objective 0 axis formalisation)**, **R28 (per-cohort education targets decree)** |
+| **2027 H1** | R3 (Standardisation Roadmap), R5 (4 AI Centres named), R9 (PME 4.0 advisor network rollout per NUTS-II), R10 (AI Bridge consolidation), R15 (GovAI Portugal pilot, contingent on EDN Ação 13.1 Cloud Soberana), R17 (Central register live), R18 (Observatório established), R19 (Civic-AI platforms via EDN Ação 12 Participa.gov 2.0), R23 (CPLP AI Framework signed), R25 (PT-ATRS draft), **R27 (Digital Twin Portugal additional gov-AI layer, alongside EDN Ação 8.6 5 Gémeos Digitais)** |
+| **2027 H2 → 2028** | R1 (GAIA-X node anchored within I.3/I.4 + EDN Ação 13.4 submarine cables), R2 (Brazil-Portugal parallel-LLM coordination launched), R6 (AI Breakthrough Programme), R11 (Sectoral Champions kickoff), R15 (GovAI full rollout), R22 (Portuguese AI Law passage), **R26 (Crisis-AI operational deployment: wildfire + seismic + pandemic streams)** |
+| **2028 → 2030** | R2 (LLM coordination scale-up), R4 (Deucalion industrial-computer expansion + Gigafactory I.2 anchor), R11 (Sectoral Champions outcomes), R21 (Atlantic-Lusophone cultural corpus), **R28 (education-target realisation year 2030)** |
 
 ---
 
@@ -496,8 +567,11 @@ Each recommendation is anchored to one or more existing PAANIA initiatives (exte
 | R23 | CPLP AI Framework + Brazil-Portugal Tech Prosperity Deal | A.1 r7, C.6 r3 | AU (Tech Prosperity Deal), BR | IV.7 (extends) | 2.5 (parcerias internacionais com países de língua oficial portuguesa) |
 | R24 | Adopt AI Verify | A.4 r3, C.6 r7 | SG | IV.3 + IV.6 (extends) | — (PAANIA-anchored) |
 | R25 | PT-ATRS (Algorithmic Transparency Standard) | A.5 r5, C.4 r7 | GB (ATRS) | IV.4 + IV.6 (extends) | 8.5 + 8.2 (classificação soberana de dados) |
+| R26 | Portuguese Strategic Objective 0 — National + Planetary Resilience (Crisis-AI axis) | A.6 r3+r5 | JP Strategy 2022 (Strategic Objective 0) | New cross-cutting axis; operationally II.5 + I.3 + IV.1 | 4 (ENC) + 13.4 (Anel CAM + Açores) |
+| R27 | Digital Twin Portugal | C.1 r2 | JP Strategy 2022 (Digital Twins p.12-13) + EDN already-committed | I.3 + I.4 (extends; cross-cutting Eixo-I architecture) | **8.6 (5 Gémeos Digitais, dual-anchor) + 9 (PAGE)** |
+| R28 | Quantified per-cohort annual education targets in Eixo III | C.2 r4 | JP Strategy 2022 (p.28-31 quantified targets) | III.2 + III.3 + III.6 (extends with per-cohort annual targets, realisation 2030) | 17 (Pacto de Competências Digitais) |
 
-**EDN coverage summary:** 22 of 25 recommendations now have a verified EDN Ação cross-reference (only R2 AMALIA-coordination, R18 social-dialogue Observatório, and R24 AI Verify are PAANIA-only or out-of-EDN-scope). R12 PIAAP is the broadest cross-EDN consolidator, riding on 8 distinct EDN Ações.
+**Recommendation count + EDN coverage summary:** **28 recommendations (R1-R28)** total — 25 original + 3 added 2026-05-17 from Japan AI Strategy 2022 (R26-R28). **25 of 28 recommendations** have a verified EDN Ação cross-reference (only R2 AMALIA-coordination, R18 social-dialogue Observatório, and R24 AI Verify are PAANIA-only or out-of-EDN-scope). R12 PIAAP is the broadest cross-EDN consolidator, riding on 10 distinct EDN Ações. R27 Digital Twin Portugal is the second-broadest, dual-anchored at PAANIA I.3+I.4 and EDN Ação 8.6 + 9.
 
 ---
 

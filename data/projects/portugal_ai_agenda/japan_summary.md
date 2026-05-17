@@ -473,3 +473,18 @@ Final comparator set (16 countries + Portugal as anchor = 17 jurisdictions in ma
 ### Method note
 
 Both source PDFs are English translations of Japanese originals; the AI Strategy 2022 PDF explicitly notes machine translation via NICT's TexTra. Page numbers refer to the printed PDFs. For legal-precision use cases, consult the Japanese originals.
+
+---
+
+## Appendix — PESTLE summary for Japan
+
+| Dim | Stance |
+|---|---|
+| **P — Political** | LDP; Cabinet Decision under Act 53/2025; **AI Strategic HQ under PM (all Cabinet)**; **AI Act passed bipartisan**; USA + Hiroshima AI Process priority; **Trustworthy-AI PDCA** positioning; AI Strategy 2019 → 2021 → 2022 → AI Act + Basic Plan 2025 lineage |
+| **E — Economic** | Not yen at headline; 2025-30 multi-stage; aligned with G7; top-tier (3rd-4th globally) publications; not itemised at € level |
+| **S — Social** | School curriculum integration; gender + ageing inclusion (demographic pressure); strong (Trustworthy AI); **Society 5.0 + Human-centered AI Social Principles (Mar 2019: Dignity + Diversity & Inclusion + Sustainability)**; **quantified per-cohort education targets (Strategy 2022: 1M high-school + 500K university + 250K applied + 2K expert + 1M recurrent annually, realisation 2025)**; Highly-Skilled Foreign Professional visa |
+| **T — Technological** | Fugaku + ABCI + **next-gen flagship supercomputer**; Sakana AI (limited LLM); **AISI Japan (UK-benchmark, doubling staff)**; **Data linkage platform + WAGRI agri-export + Digital Twins foundation (Strategy 2022 p.12-13, citing Virtual Singapore + India Stack)**; **3 named AI Japan R&D Network centres: RIKEN AIP + AIST AIRC + NICT (UCRI + CiNet) (Strategy 2022 fn 32)**; METI sandboxes; "Watt-Bit Collaboration" + All-Photonics Network + Beyond 5G |
+| **L — Legal** | **Act No. 53/2025 (dedicated AI Act — only country in set)**; APPI privacy; TDM exception (Copyright Act Art. 30-4); Trustworthy AI guidelines; PIPC + DPA oversight; Personal Information Protection Commission amending personal information law for AI |
+| **E — Environmental** | ~25% renewable (lowest among G7 EU+JP); sectoral DC sustainability; **"AI for Nature-Positive Economy" + Planetary Resilience (Strategy 2022 p.15-16, citing Dasgupta Review + WEF BiodiverCities + NbS)**; **Strategic Objective 0 — named imminent crises (Tokyo Metropolitan Inland Earthquake, Nankai Trough Earthquake, Mt. Fuji eruption, climate floods, novel pandemics) (Strategy 2022 p.4-18)**; "Resilient and Responsible AI" dual frame |
+
+*Cross-references: see [comparator_matrix.md](comparator_matrix.md) Section A for the per-dimension matrix and [comparator_pestle_table.md](comparator_pestle_table.md) for the 17-jurisdiction transpose view.*

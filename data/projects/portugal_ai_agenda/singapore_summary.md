@@ -314,3 +314,18 @@ Singapore's framework + Spain's per-initiative budget transparency + UK's case-s
 - Model AI Governance Framework (2019), AI Verify (2022), AI Verify Foundation (2023) — Singapore's three governance instruments.
 - [National Artificial Intelligence Agenda__EN.pdf](../../domains/national_ai_agendas/sources/National%20Artificial%20Intelligence%20Agenda__EN.pdf) — Portugal ANIA, for comparison anchors.
 - Note: This summary was produced from a text-only extraction of the source PDF; figures rendered as descriptive text. Page numbers refer to printed footers.
+
+---
+
+## Appendix — PESTLE summary for Singapore
+
+| Dim | Stance |
+|---|---|
+| **P — Political** | PAP technocratic; DPM Lawrence Wong (now PM); Smart Nation + IMDA; USA + ASEAN + UK bilateral; **Hub + responsible-applier** positioning; Smart Nation Group integrated coordination |
+| **E — Economic** | S$5B SG NAIS 1.0 baseline + S$1B+ NAIS 2.0 announcements; NAIS 2.0 to 2030 horizon; strong NRF + RIE; high per-capita publications; MAS + IMDA studies backing |
+| **S — Social** | **Creators/Practitioners/Users + seniors + disabled** (distinctive trichotomy); **AI Apprenticeship Programme + Skills Future**; **AI Verify Foundation 90+ corp members (civic-AI)**; NTUC worker-voice; sectoral gender focus |
+| **T — Technological** | NSCC; multi-model brokerage (no sovereign LLM); **AI Verify Foundation (global influence)**; **Model AI Governance Framework + AI Verify sandboxes**; Tech.Pass talent visa; TDM-permissive + Trusted Data Sharing |
+| **L — Legal** | **Model AI Governance Framework + sector-based**; PDPA privacy; **TDM-permissive (singular EU+ jurisdiction)**; voluntary clarity; PDPC + IMDA oversight; no national AI Act per se but Model framework is global-influence template |
+| **E — Environmental** | Limited domestic renewables; trusted + carbon-neutral DC pilots; **Singapore Green Plan**; Green AI initiatives |
+
+*Cross-references: see [comparator_matrix.md](comparator_matrix.md) Section A for the per-dimension matrix and [comparator_pestle_table.md](comparator_pestle_table.md) for the 17-jurisdiction transpose view.*

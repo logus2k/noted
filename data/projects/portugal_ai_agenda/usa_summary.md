@@ -98,3 +98,18 @@ What Portugal should **NOT** copy:
 - [eua_ai_action_plan.pdf](../../domains/national_ai_agendas/sources/eua_ai_action_plan.pdf) — primary document, all citations [p.x] refer to its page numbers.
 - [Executive Order 14179 (23 Jan 2025)](https://www.govinfo.gov/content/pkg/FR-2025-01-31/pdf/2025-02172.pdf) — referenced [p.1, fn.1]
 - [National Artificial Intelligence Agenda__EN.pdf](../../domains/national_ai_agendas/sources/National%20Artificial%20Intelligence%20Agenda__EN.pdf) — Portugal ANIA, for comparison anchors.
+
+---
+
+## Appendix — PESTLE summary for United States
+
+| Dim | Stance |
+|---|---|
+| **P — Political** | Trump 2nd-term Republican; White House OSTP (Kratsios + Sacks + Rubio signatories); **partisan (one-administration)**; **Frontier dominance** positioning; Indo-Pacific + UK bilateral priority; CAIOC + EO 14179 inter-ministerial |
+| **E — Economic** | Frontier-leadership (not € target); not itemised at headline; **#1 publications + patents globally**; through 2030 horizon; OSTP / OMB backing |
+| **S — Social** | Federal CAIO + workforce training (federal-side only); worker-displacement narrow focus; civic-AI limited; federal training mandate |
+| **T — Technological** | Frontier private (OpenAI/Anthropic) + DOE labs; NIST-AISI; FedRAMP federal cloud; OMB M-25-21 (per-agency CAIO mandate) + M-25-22 (Efficient Acquisition of AI procurement); NIST AI RMF standards; O-1 + sectoral talent visa |
+| **L — Legal** | **Sector-based (anti-EU AI Act)**; sectoral privacy (CCPA, HIPAA, no GDPR-equivalent); **Executive Order 14179 + executive orders not statute**; OMB transparency federal; sectoral tort liability |
+| **E — Environmental** | Mixed (state-vary); no AI-environmental framing at federal level; limited DC sustainability |
+
+*Cross-references: see [comparator_matrix.md](comparator_matrix.md) Section A for the per-dimension matrix and [comparator_pestle_table.md](comparator_pestle_table.md) for the 17-jurisdiction transpose view.*

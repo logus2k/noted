@@ -75,3 +75,18 @@ Argentina would need its own current-decade AI strategy to be a real comparator;
 
 - [argentina_anexo_5628461_1.pdf](../../domains/national_ai_agendas/sources/argentina_anexo_5628461_1.pdf) — primary document, all citations [p.x] refer to its page numbers.
 - [National Artificial Intelligence Agenda__EN.pdf](../../domains/national_ai_agendas/sources/National%20Artificial%20Intelligence%20Agenda__EN.pdf) — Portugal ANIA, for comparison anchors.
+
+---
+
+## Appendix — PESTLE summary for Argentina
+
+| Dim | Stance |
+|---|---|
+| **P — Political** | Macri centre-right (2018 context); Sec. Gov. Digital under JGM; **not AI-specific** (digital agenda baseline); regional / OAS bilateral focus |
+| **E — Economic** | Not quantified; pre-LLM era document; no headline GDP target; multi-year horizon 2018-23 (now stale) |
+| **S — Social** | Gender + rural + agritech + K-12 explicit (distinctive for 2018 vintage); limited worker voice; some K-12 AI literacy |
+| **T — Technological** | Limited HPC; no sovereign LLM; no AISI; basic digital infrastructure; no AI procurement instrument |
+| **L — Legal** | Civil law general + LGPD-A (Argentina version, post-2020); no AI-specific legislation; no algorithmic transparency standard |
+| **E — Environmental** | Mixed renewables; no AI-environmental framing |
+
+*Cross-references: see [comparator_matrix.md](comparator_matrix.md) Section A for the per-dimension matrix and [comparator_pestle_table.md](comparator_pestle_table.md) for the 17-jurisdiction transpose view.*

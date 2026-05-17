@@ -242,3 +242,18 @@ Each provides specific importable moves; together they triangulate the design sp
   - Cybersecurity Law amendment (October 2025, effective January 2026)
 - [National Artificial Intelligence Agenda__EN.pdf](../../domains/national_ai_agendas/sources/National%20Artificial%20Intelligence%20Agenda__EN.pdf) — Portugal ANIA, for comparison anchors.
 - Note: This summary draws on the English working translation produced from gov.cn; for legal-interpretation precision, consult the original Chinese text.
+
+---
+
+## Appendix — PESTLE summary for China
+
+| Dim | Stance |
+|---|---|
+| **P — Political** | CCP state-led; State Council (NDRC coord.); BRICS + Global South bilateral; **State-led "AI+" framing**; central planning + 5-Year Plan integration |
+| **E — Economic** | R$/¥ not published in EUR; through 2030 horizon; **3% R&D by 2025 national target**; **#2 publications, rising patents**; NDRC + NBS backing; not € — strategic missions |
+| **S — Social** | Workforce reskilling state-led; rural + elderly inclusion; state-managed civic-AI; limited worker voice; state-curricula AI literacy |
+| **T — Technological** | **National supercomputing top global** (top-2 globally); multi-vendor state-supported LLMs; state-managed AI safety; national TDM-permissive; sectoral procurement; state pilot zones |
+| **L — Legal** | **Generative AI Interim Measures + algorithm filing**; PIPL privacy; CAC + NDRC oversight; algorithm filing requirement; no national AI Act per se but quasi-legal regulatory regime + October 2025 Cybersecurity Law amendment |
+| **E — Environmental** | Coal-dominant + renewable expansion; limited DC sustainability framing; limited explicit AI-environmental focus |
+
+*Cross-references: see [comparator_matrix.md](comparator_matrix.md) Section A for the per-dimension matrix and [comparator_pestle_table.md](comparator_pestle_table.md) for the 17-jurisdiction transpose view.*

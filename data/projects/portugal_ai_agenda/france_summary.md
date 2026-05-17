@@ -276,3 +276,18 @@ The most productive Portugal-France move would be a **bilateral Iberian-French A
 - Paris AI Action Summit (Feb 2025) — the diplomatic forum to which the report's WAIO recommendation was directed [p.114].
 - [National Artificial Intelligence Agenda__EN.pdf](../../domains/national_ai_agendas/sources/National%20Artificial%20Intelligence%20Agenda__EN.pdf) — Portugal ANIA, for comparison anchors.
 - Note: This summary was produced from a text-only extraction of the source PDF; figures rendered as descriptive text. Page numbers refer to printed footers.
+
+---
+
+## Appendix — PESTLE summary for France
+
+| Dim | Stance |
+|---|---|
+| **P — Political** | Macron / Renaissance; **independent commission credibility** (Aghion + Bouverot); per-recommendation Ministry assigned; **Germany priority + Africa** bilateral focus; **Frontier challenger** positioning |
+| **E — Economic** | **€27B/5yr value-creation goal**; 5-year to 2029; **Conseil d'analyse économique** backing; top-tier EU publications; aligned with EU 3% R&D |
+| **S — Social** | "France IA" outreach; sectoral via universities; comité dialogue worker voice; **diversity + regional** inclusion; French Tech visa |
+| **T — Technological** | Jean Zay + Adastra; **Mistral + Bull/Atos sovereign compute**; INRIA + ANSSI; EU + Mistral compute infra; EU TEFs; per-rec Ministry procurement |
+| **L — Legal** | **EU AI Act** + GDPR + Loi Inf. Lib.; EU CDSM; CNIL oversight; no national AI Act |
+| **E — Environmental** | Nuclear-dominant low-carbon; EU Green Deal alignment; sectoral DC sustainability; **AI Action Summit host** (Feb 2025) |
+
+*Cross-references: see [comparator_matrix.md](comparator_matrix.md) Section A for the per-dimension matrix and [comparator_pestle_table.md](comparator_pestle_table.md) for the 17-jurisdiction transpose view.*

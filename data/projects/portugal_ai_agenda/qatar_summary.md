@@ -115,3 +115,18 @@ What Portugal should **not** copy:
 - [National Artificial Intelligence Agenda__EN.pdf](../../domains/national_ai_agendas/sources/National%20Artificial%20Intelligence%20Agenda__EN.pdf) — Portugal ANIA, for comparison anchors.
 
 > **Note:** This summary is based on a thorough read of the executive sections, the strategic-objectives grid, the Path-to-Vision-2030 chapter, and the first two pillar chapters (Cutting-Edge Digital Infrastructure, Booming Digital Economy). The remaining pillar chapters (Thriving Digital Innovation, Seamless Digital Government, Nurtured Digital Technologies, Future Leading Digital Society) follow the same template visible in the strategic-programmes grid at [p.10] and the chapter pattern established at [p.30-38]; the structural critique above accounts for all 23 strategic programmes listed in the grid.
+
+---
+
+## Appendix — PESTLE summary for Qatar
+
+| Dim | Stance |
+|---|---|
+| **P — Political** | Royal/monarchic; PM Sheikh Mohammed + MCIT; **not AI-specific** document (digital agenda 2030); GCC + global hub priority; **Applier/hub** positioning; top-down royal-court coordination |
+| **E — Economic** | Digital-economy GDP contribution (general, not AI-quantified); 2030 horizon; not itemised at line |
+| **S — Social** | Sectoral inclusion; digital citizenship; limited worker voice; school curricula |
+| **T — Technological** | National data centres; hub ambition; no sovereign LLM; no AISI; basic standards |
+| **L — Legal** | Sector-based; PDPL privacy; no AI-specific law; CIRT-Qatar oversight |
+| **E — Environmental** | Gas-dominant; hub branding; minimal AI-environmental focus |
+
+*Cross-references: see [comparator_matrix.md](comparator_matrix.md) Section A for the per-dimension matrix and [comparator_pestle_table.md](comparator_pestle_table.md) for the 17-jurisdiction transpose view.*

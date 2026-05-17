@@ -59,6 +59,18 @@ Este Plano aplica-se a todas as entidades da Administração Pública Central. A
 
 Não aplica-se a usos de IA em domínios militar, defesa, intelligence e enforcement, que mantêm os seus regimes de supervisão existentes.
 
+### Âmbito Local e Regional — fase 2 (deferida)
+
+**Esta v0.3 cobre Administração Pública Central** (Ministérios, Direções-Gerais, Institutos Públicos, agências centrais — ~700.000 funcionários estimados). A extensão para Administração Pública Local (308 Câmaras Municipais + 3.000+ Juntas de Freguesia + serviços municipalizados) e Regional (Açores + Madeira + 5 CCDR continentais) **fica explicitamente deferida para a fase 2 do PIAAP**, dada a necessidade de:
+
+1. **Coordenação institucional com a ANMP** (Associação Nacional de Municípios Portugueses) e **ANAFRE** (Associação Nacional de Freguesias) para co-desenho do enquadramento aplicável a entidades de autonomia administrativa
+2. **Adaptação do mandato CDAP** (Conselho para o Digital na AP, RCM 94/2024 revisto em EDN Ação 2.3) para refletir a representação dos Governos Regionais e da AP Local — atualmente a CDAP cobre apenas a AP Central
+3. **Calibração proporcional dos entregáveis** — particularmente 2.1 (formação universal: ~50.000 funcionários adicionais na AP Local segundo dados INE 2024), 2.4 (DIA/ORIA: cada Câmara Municipal não tem escala para nomear cargo dedicado; modelo intermunicipal via CIMs / Áreas Metropolitanas pode ser apropriado), e 3.1-3.2 (GovIA Portugal + Chat: arquitetura federada incluindo nós municipais)
+4. **Cross-reference com EDN Ação 11** (Atendimento Omnicanal — inclui Lojas de Cidadão + Espaços Cidadão geridos pela ARTE com presença local) e **Ação 8.6** (plataformas de gestão urbana para 129 municípios + 5 Gémeos Digitais) que já operam no nível local
+5. **Articulação com o Plano de Transformação Digital da Administração Pública Local** (instrumento PRR distinto, gerido pelo IFAP/CCDR) para evitar duplicação de instrumentos
+
+**Cronograma proposto para fase 2 (PIAAP-L/R):** consulta com ANMP iniciada em 2027 H1; documento publicado para discussão pública em 2027 H2; aprovação em Conselho de Ministros em 2028 H1.
+
 ---
 
 ## Three pillars

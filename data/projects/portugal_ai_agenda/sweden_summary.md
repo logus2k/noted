@@ -241,3 +241,18 @@ The closest geopolitical analogue is **Spain (Iberian peer)**; the closest styli
 - *Sweden's Digitalisation Strategy 2025-2030* (Fi2025/01181) — overarching digital framework [Strategy p.6].
 - [National Artificial Intelligence Agenda__EN.pdf](../../domains/national_ai_agendas/sources/National%20Artificial%20Intelligence%20Agenda__EN.pdf) — Portugal ANIA, for comparison anchors.
 - Note: This summary was produced from text-only extractions of both source PDFs; layout figures rendered as descriptive text. Page numbers refer to printed footers.
+
+---
+
+## Appendix — PESTLE summary for Sweden
+
+| Dim | Stance |
+|---|---|
+| **P — Political** | Moderate-led centre-right coalition; PM Kristersson + Min. Slottner; **Government Offices central** coordination; EU + Nordic priority; **Applier + responsible** positioning; negotiated cross-aisle |
+| **E — Economic** | Itemised Action Plan annex; 2026-30 horizon; aligned with EU 3% R&D; Statistics Sweden / KOMM backing; strong per-capita publications |
+| **S — Social** | **Strong worker-voice (Nordic veto)**; sectoral training; **strong public trust framing**; strong worker voice + accessibility focus; sectoral gender focus |
+| **T — Technological** | Berzelius + Dardel; no sovereign LLM; EU Data Spaces; **EU + SIS standards + ATR (Algorithmic Transparency Register)**; strong sandboxes (Reallabore-like); sectoral talent |
+| **L — Legal** | EU AI Act + GDPR; EU CDSM; IMY oversight; no national AI Act |
+| **E — Environmental** | **Strong (60%+) renewables**; **Sustainable DC + Energy Performance Act**; Berzelius energy KPIs; strong sustainability framing |
+
+*Cross-references: see [comparator_matrix.md](comparator_matrix.md) Section A for the per-dimension matrix and [comparator_pestle_table.md](comparator_pestle_table.md) for the 17-jurisdiction transpose view.*

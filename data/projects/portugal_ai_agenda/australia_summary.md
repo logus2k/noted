@@ -333,3 +333,18 @@ The Australian addition to this set is specifically: **(a) the every-public-serv
 - [japan_summary.md](japan_summary.md) — Japan's PDCA iterative model, referenced by BCA Moonshot R&D analogue.
 - [singapore_summary.md](singapore_summary.md) — Singapore AIAP apprenticeship model + AI Verify, both cited by BCA.
 - Note: This summary was produced from text-only extractions of all three source PDFs (`pdftotext -layout`); figures rendered as descriptive text. Page numbers refer to printed footers.
+
+---
+
+## Appendix — PESTLE summary for Australia
+
+| Dim | Stance |
+|---|---|
+| **P — Political** | Labor (Albanese) — "fairness, inclusion, opportunity" explicit; 3-doc stack: BCA (industry) + DISR (NAP) + Finance/DTA/APSC (APS); **NAP cross-ministerial + APS Plan central**; USA Tech Prosperity Deal + SG + IN + UK + ROK bilateral |
+| **E — Economic** | **$116B GDP + 4.3pp labour productivity by 2030** + $19B/yr public-sector value; A$460M existing + A$1B NRF + A$950M RDTI; 3-year phased Jul 2025-Jun 2028; **Productivity Commission backing** (named); 17th Global AI Index 2024 |
+| **S — Social** | **All APS staff foundational training mandated within 12 months**; **First Nations + women + regional + disability + ageing — Indigenous Data Sovereignty named**; **explicit union consultation mandate**; **"Australians most nervous globally about AI"** (frank framing); **National AI Skills Compact** |
+| **T — Technological** | Mapping compute + commercial expansion; brokerage (GovAI) not LLM; **AISI (NAP Action 7) + BCA proposes AAISI (PPP variant)**; **BuyICT AI subcategories + AI Model Contract Oct 2025**; National AI Sandbox; DTA technical std for govt AI; **GovAI vendor-agnostic + GovAI Chat universal** |
+| **L — Legal** | **Sector-based + tech-neutral law (NOT EU AI Act path)**; Privacy Act 1988 (modernisation); **NAP explicitly rules OUT TDM exception** (protect creators) vs BCA pushes for it; **AI Review Committee (APS Plan, 6-weekly, multi-watchdog)**; voluntary clarity; OAIC + sectoral |
+| **E — Environmental** | Renewable expansion + transition; **National DC principles + CDC LiquidCore + 100% net-zero electricity + near-zero water**; **National AI principles + Indigenous Kakadu case study** for climate AI |
+
+*Cross-references: see [comparator_matrix.md](comparator_matrix.md) Section A for the per-dimension matrix and [comparator_pestle_table.md](comparator_pestle_table.md) for the 17-jurisdiction transpose view.*

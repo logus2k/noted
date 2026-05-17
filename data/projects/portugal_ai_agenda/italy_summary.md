@@ -292,3 +292,18 @@ This coalition would be substantially more competitive globally than any of the 
 - Stanford CRFM Foundation Models Index — referenced [p.6].
 - [National Artificial Intelligence Agenda__EN.pdf](../../domains/national_ai_agendas/sources/National%20Artificial%20Intelligence%20Agenda__EN.pdf) — Portugal ANIA, for comparison anchors.
 - Note: This summary was produced from a text-only extraction of the source PDF; figures rendered as descriptive text. Page numbers refer to printed footers.
+
+---
+
+## Appendix — PESTLE summary for Italy
+
+| Dim | Stance |
+|---|---|
+| **P — Political** | Meloni / FdI centre-right; AGID issuing; **Foundation under PM Office (planned, distinctive)**; EU + Mediterranean priority; **Applier + sovereign LMM** positioning |
+| **E — Economic** | Not € at headline; 2024-26 (3-year); aligned with EU 3% R&D by 2030; top-tier EU publications |
+| **S — Social** | Mezzogiorno (regional South) focus; sectoral training/voice; moderate public trust framing; PA objective training |
+| **T — Technological** | Leonardo (EuroHPC); **LMM (planned sovereign Italian)**; EU Data Spaces; EU + UNI standards; EU TEFs; sectoral procurement |
+| **L — Legal** | **EU AI Act** + Codice Privacy (GDPR); EU CDSM; Garante + AGCOM oversight; no national AI Act |
+| **E — Environmental** | ~40% renewable; EU Green Deal; implicit DC sustainability |
+
+*Cross-references: see [comparator_matrix.md](comparator_matrix.md) Section A for the per-dimension matrix and [comparator_pestle_table.md](comparator_pestle_table.md) for the 17-jurisdiction transpose view.*

@@ -469,3 +469,18 @@ Germany's specific addition to this set is: **(a) the Strategy+Aktionsplan bienn
 - [uk_summary.md](uk_summary.md) — UK is Germany's main AI publication-volume competitor (Aktionsplan goal: surpass UK in Europe).
 - [australia_summary.md](australia_summary.md) — Australia has same strategic+operational stack pattern.
 - Note: Strategy 2020 Update was already published in English. Aktionsplan 2023 was published in English by BMBF. Page numbers refer to printed footers.
+
+---
+
+## Appendix — PESTLE summary for Germany
+
+| Dim | Stance |
+|---|---|
+| **P — Political** | Grand coalition (2020); FDP/Greens/SPD (2023); BMBF leads (Stark-Watzinger); **strong cross-coalition continuity**; **France priority + German-French AI initiative** + Canada + JP + ROK + BR + IN bilateral; **"AI Made in Europe" + Industry 4.0 wedge** |
+| **E — Economic** | **€5B by 2025** total Federal AI commitment; **CO2-saving potential study commissioned**; 2025 deadline; aligned with EU 3% R&D; **5th publications globally** |
+| **S — Social** | National Skills Strategy + sectoral; **Strong Mitbestimmung + AI Observatory for Work and Society**; **Strong (Plattform Lernende Systeme + Sustainable AI Brand)**; **#mintmagie + STEM Action Plan 2.0 (gender)**; **Elements of AI patronage + AI Campus**; **Civic Innovation Platform + Civic Data Lab + Civic Tech Labs for Green** |
+| **T — Technological** | **JUPITER exascale Q4 2024 + Gauss + LRZ + HLRS**; **Aleph Alpha Luminous + Stable Diffusion + DeepL (market-led LLMs)**; Sectoral AISI (BSI + Cyber Agency + ZITiS); **GAIA-X (federated, Germany-France-led)**; KOINNO procurement; **DIN + DKE AI Standardisation Roadmap**; **4 EU TEFs anchored + Reallabore network**; **Skilled Workers Immigration Act-AI leverage** |
+| **L — Legal** | **Sector-based + EU AI Act transposition with research-exemption push**; BDSG (GDPR); EU CDSM TDM; sectoral standards roadmap; BSI + BfDI + sectoral oversight |
+| **E — Environmental** | ~50% renewable + Energiewende; **Green ICT + EMAS digital platform + data centre energy review**; **"Sustainable AI Brand" + Sustainability-by-Design + Ethics-by-Design**; **KI-Leuchttürme + Recycling/Circular Economy AI Hub + Resource-efficient AI**; **AI electronics + NeuroTEC II + neuromorphic + "Energy-efficient AI system" pilot** |
+
+*Cross-references: see [comparator_matrix.md](comparator_matrix.md) Section A for the per-dimension matrix and [comparator_pestle_table.md](comparator_pestle_table.md) for the 17-jurisdiction transpose view.*

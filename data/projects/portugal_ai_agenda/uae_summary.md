@@ -126,3 +126,18 @@ What Portugal should **not** copy:
 - [uae_national_strategy_for_ai.pdf](../../domains/national_ai_agendas/sources/uae_national_strategy_for_ai.pdf) — primary document, all citations [p.x] refer to its page numbers.
 - [National Artificial Intelligence Agenda__EN.pdf](../../domains/national_ai_agendas/sources/National%20Artificial%20Intelligence%20Agenda__EN.pdf) — Portugal ANIA, for comparison anchors.
 - Note: This summary was produced from a text-only extraction of the source PDF; charts and figures are referenced by page number but rendered as descriptive text in this analysis. Page numbers correspond to the printed footer in the PDF.
+
+---
+
+## Appendix — PESTLE summary for UAE
+
+| Dim | Stance |
+|---|---|
+| **P — Political** | Federal monarchy; **first AI Minister globally (HE Omar Sultan Al Olama)**; **Minister of AI as central coordination node** (distinctive); multi-vector USA + Saudi + China bilateral; **"AI Centennial 2071"** framing |
+| **E — Economic** | $96B by 2031 (~14% non-oil GDP); 2031 horizon; not itemised at line; UAE Stats Authority backing |
+| **S — Social** | UAI Seal branding (distinctive); school curricula; sectoral inclusion; UAE Golden Visa for AI talent; moderate gender focus |
+| **T — Technological** | Falcon (private/TII); UAE Data Office; hub ambition; UAE.gov + Tasamy platforms; UAI Seal standards; UAI access programmes for SMEs |
+| **L — Legal** | Sector-based; DIFC DPL privacy; no AI-specific law; UAE Data Office oversight |
+| **E — Environmental** | Solar push (Masdar); hub branding; limited sustainability AI focus |
+
+*Cross-references: see [comparator_matrix.md](comparator_matrix.md) Section A for the per-dimension matrix and [comparator_pestle_table.md](comparator_pestle_table.md) for the 17-jurisdiction transpose view.*

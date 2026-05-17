@@ -129,3 +129,18 @@ What Finland's plan does **not** help with, where Portugal needs to look elsewhe
 - [Roadmap for a Fair Data Economy (Sitra)](https://www.sitra.fi/en/topics/roadmap-for-the-data-economy/) — referenced [p.23, fn.27]
 - [VTT 'Carbon handprint evolved into environmental handprint'](https://www.vttresearch.com/en/news-and-ideas/carbon-handprint-evolved-environmental-handprint-vtt-and-lut-developed-positive) — referenced [p.19, fn.25]
 - [National Artificial Intelligence Agenda__EN.pdf](../../domains/national_ai_agendas/sources/National%20Artificial%20Intelligence%20Agenda__EN.pdf) — Portugal ANIA, for comparison anchors.
+
+---
+
+## Appendix — PESTLE summary for Finland
+
+| Dim | Stance |
+|---|---|
+| **P — Political** | Cross-coalition continuity (Rinne/Marin/Orpo era); TEM Steering Group; EU + Nordic priority; **Twin-transition + carbon handprint** positioning |
+| **E — Economic** | TEM-funded but not aggregated; 10-year strategy + 2027 milestones; aligned with EU 3% R&D; top-tier EU per-capita publications |
+| **S — Social** | Strong civic dialogue; **Elements of AI (originated FI, global influence)**; twin-transition + youth focus; Nordic worker voice; sectoral upskilling |
+| **T — Technological** | LUMI (EuroHPC); no sovereign LLM; EU Data Spaces; EU-aligned standards; EU TEFs; EU Blue Card talent |
+| **L — Legal** | EU AI Act + GDPR; EU CDSM; DPA Finland oversight; no national AI Act |
+| **E — Environmental** | **Strong (75%+) renewables**; cold-climate cooling advantage; **"Twin transition" + carbon handprint** (distinctive originator); strong energy-efficient AI focus |
+
+*Cross-references: see [comparator_matrix.md](comparator_matrix.md) Section A for the per-dimension matrix and [comparator_pestle_table.md](comparator_pestle_table.md) for the 17-jurisdiction transpose view.*

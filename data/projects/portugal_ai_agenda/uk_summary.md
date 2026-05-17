@@ -381,3 +381,18 @@ UK's strategic-plus-operational stack is **the most complete** in this set, but 
 ### Cross-references
 - [National Artificial Intelligence Agenda__EN.pdf](../../domains/national_ai_agendas/sources/National%20Artificial%20Intelligence%20Agenda__EN.pdf) — Portugal ANIA, for comparison anchors.
 - Note: This summary was produced from text-only extractions of both source PDFs; figures rendered as descriptive text. Page numbers refer to printed footers.
+
+---
+
+## Appendix — PESTLE summary for United Kingdom
+
+| Dim | Stance |
+|---|---|
+| **P — Political** | Labour (Starmer post-Brexit); Peter Kyle MP (DSIT) + Clifford (AP); GDS for Playbook; **all 50 recs accepted by govt (CP 1242) — cross-party endorsement**; USA + JP + SG bilateral; **"AI maker, not AI taker"** positioning |
+| **E — Economic** | **£400B AI boost by 2030**; £14B+ infrastructure investments announced; through 2030 + 2035 quant; **3rd-largest AI market globally**; NAO + Public First citations; UKRI R&D increase |
+| **S — Social** | National AI Literacy initiative; **5-tier civil-servant segmentation** (Playbook); strong civic dialogue (NAO + AISI); **Rec 16 gender (22% women target in AI/data science by 2030)**; HPI talent visa |
+| **T — Technological** | **AIRR 20× expansion + AIGZs**; frontier ambition via Sovereign AI unit; **AISI (UK, pre-deployment evals, first globally)**; **National Data Library (NDL) "open by default"**; **i.AI Incubator (open-source GitHub) + Crown Commercial Service**; **ATRS mandatory in-scope**; National AI Sandbox |
+| **L — Legal** | **Pro-innovation principles + sector regulators (post-Brexit, NOT EU AI Act)**; TDM exception with opt-out proposed; UK GDPR + DPA 2018; **future legislation paused**; ICO + AISI + sectoral oversight |
+| **E — Environmental** | ~40% low-carbon; **AI Energy Council** + sustainability dialogue; UK water dialogue; climate-tech focus |
+
+*Cross-references: see [comparator_matrix.md](comparator_matrix.md) Section A for the per-dimension matrix and [comparator_pestle_table.md](comparator_pestle_table.md) for the 17-jurisdiction transpose view.*

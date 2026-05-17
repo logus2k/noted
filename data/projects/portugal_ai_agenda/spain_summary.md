@@ -218,3 +218,18 @@ The two countries should formally coordinate — Spain's ALIA "Ibéricos" subfam
 - Spain ENIA 2020 (referenced [p.7]) — foundational document on which Estrategia 2024 builds.
 - Reglamento (UE) 2024/1689 (EU AI Act) — anchor referenced throughout.
 - Note: This summary was produced from a text-only extraction of the source PDF; figures and tables are referenced by page number as descriptive text.
+
+---
+
+## Appendix — PESTLE summary for Spain
+
+| Dim | Stance |
+|---|---|
+| **P — Political** | PSOE-Sumar centre-left; José Luis Escrivá (MTDFP); cross-ministerial under MTDFP; EU + Iberoamérica bilateral; **Development positioning** (ALIA + AESIA) |
+| **E — Economic** | **Tabla 6 per-initiative € (gold standard for budget granularity)**; 2026 horizon; EU 3% R&D by 2030; strong Spanish-language presence in publications; INE + Tabla 6 backing |
+| **S — Social** | "Aprende IA" + civic outreach; regional + gender inclusion; sectoral CB worker voice; strong public-trust framing; Iberoamericano talent flow |
+| **T — Technological** | MareNostrum (EuroHPC, 312 Pflops, 650 PB storage); **ALIA (state-funded LLM family in castellano + 4 co-official languages, scaling to 175B parameters with "Ibéricos" PT-ES subfamily)**; **AESIA (first operational EU AI regulator, A Coruña, named)**; EU Data Spaces + AENOR standards; EU TEFs |
+| **L — Legal** | **EU AI Act** + LOPDGDD (GDPR); EU CDSM; AESIA decree (no full national AI Act); AEPD + AESIA oversight |
+| **E — Environmental** | ~50% renewable; **Palanca 2 sustainable DCs**; EU Green Deal alignment |
+
+*Cross-references: see [comparator_matrix.md](comparator_matrix.md) Section A for the per-dimension matrix and [comparator_pestle_table.md](comparator_pestle_table.md) for the 17-jurisdiction transpose view.*

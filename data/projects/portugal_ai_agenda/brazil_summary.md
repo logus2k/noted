@@ -539,3 +539,18 @@ This should be the **headline cross-comparator recommendation** in the Portugal 
 - [italy_summary.md](italy_summary.md) — closest comparator for sovereign LLM analogue (LLM in Portuguese ↔ LMM Italian).
 - [singapore_summary.md](singapore_summary.md) — closest comparator for algorithmic transparency centre (Brazil Action 51 ↔ AI Verify).
 - Note: This summary was produced from the full PDF (in English translation, MCTI-CGEE 2025). Page numbers refer to printed footers.
+
+---
+
+## Appendix — PESTLE summary for Brazil
+
+| Dim | Stance |
+|---|---|
+| **P — Political** | PT social-democratic (Lula); MCTI + CGEE + CCT; President Lula + Min. Luciana Santos; CIT Digital + Federal Govt AI Core (SGD/MGI); Latin America + Africa + CPLP + India bilateral; **"AI for the Good of All" + Global South lead** |
+| **E — Economic** | **R$ 23.03B BRL 2024-28 with % per axis** (5-axis budget granularity, gold-standard alongside ES Tabla 6); 2024-28 (5-year); aligned with national S&T; **EPE + CGEE + ABC** backing; top-20 publications |
+| **S — Social** | **Brazilian AI Olympiad (Action 14) + AI Diffusion Program**; **Cultural + regional + peoples' diversity + low-income (CadÚnico)** inclusion; **Strong (CUT + workforce protection framing)**; **PNPD/Lifes gender focus + 50% women target in researchers**; Actions 50-51 planned civic-AI |
+| **T — Technological** | **Top-5 worldwide supercomputer target (Action 1) + Sinapad 6.2 Pflop/s**; **LLM in PT-BR (Action 9, named, state-funded)**; **National Center for Algorithmic Transparency (Action 51, planned)**; **Sovereign Cloud (Action 27) + IND (National Data Infrastructure)**; Action 35 AI procurement; **Brazilian Guides for Responsible AI (Action 50)**; pilot environments via AI Core (Action 24) |
+| **L — Legal** | **Bill 2338/23 in Congress + LGPD-anchored**; LGPD privacy; TDM under review (AGD); **National Center for Algorithmic Transparency (planned, Action 51)**; civil law + LGPD liability; ANPD + sectoral + national centre oversight |
+| **E — Environmental** | **89.2% renewable (2023, EPE) — highest in the comparator set**; **Action 7 Sustainable AI Pro-Infra + Action 41 N/NE renewable DCs**; **Hydroelectric reservoir cooling potential**; **"AI for Good of All" sustainability differentiator**; **SIPEC Climate Prediction (Action 40) + Amazon biome AI (Imm. Action 25)** |
+
+*Cross-references: see [comparator_matrix.md](comparator_matrix.md) Section A for the per-dimension matrix and [comparator_pestle_table.md](comparator_pestle_table.md) for the 17-jurisdiction transpose view.*
