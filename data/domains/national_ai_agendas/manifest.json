@@ -178,7 +178,8 @@
       "path": "japan_ai_strategy_2022.pdf",
       "mode": "read_store",
       "added_at": "2026-05-17T12:08:39.212291+00:00",
-      "category": "National AI Agendas"
+      "category": "National AI Agendas",
+      "display_name": "Japan - AI Strategy 2022"
     }
   ],
   "arcadedb_database": "national_ai_agendas",
