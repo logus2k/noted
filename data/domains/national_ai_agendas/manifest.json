@@ -159,6 +159,26 @@
       "added_at": "2026-05-16T16:24:57.516353+00:00",
       "category": "National AI Agendas",
       "display_name": "Brazil - AI for the Good of All 2025"
+    },
+    {
+      "path": "portugal_resolucao_conselho_de_ministros_2_2026.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-16T18:35:47.890326+00:00",
+      "category": "National AI Agendas",
+      "display_name": "Portugal - Resolu\u00e7\u00e3o do Conselho de Ministros n\u00ba2, 2026"
+    },
+    {
+      "path": "portugal_plano_de_a\u00e7\u00e3o_2026-2027_edn.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-16T19:04:28.790283+00:00",
+      "category": "National AI Agendas",
+      "display_name": "Portugal - Plano de A\u00e7\u00e3o 2026-2027"
+    },
+    {
+      "path": "japan_ai_strategy_2022.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-17T12:08:39.212291+00:00",
+      "category": "National AI Agendas"
     }
   ],
   "arcadedb_database": "national_ai_agendas",

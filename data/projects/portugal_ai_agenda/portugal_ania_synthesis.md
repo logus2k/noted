@@ -76,7 +76,7 @@ A quote from UK's AI Opportunities Action Plan captures the framing question eve
 | Field | Value |
 |---|---|
 | Source | Germany (GAIA-X), Brazil (Sovereign Cloud Action 27), Australia (GovAI), UK (NDL) |
-| Anchor ANIA initiative | I.3 (Data spaces in critical areas) + I.4 (National Data Centre Plan) — extends |
+| Anchor ANIA initiative | I.3 (Data spaces in critical areas) + I.4 (National Data Centre Plan) — extends; cross-references **EDN Ação 8.7** (alinhamento com iniciativas europeias de espaços de dados, lead ARTE), **Ação 13.1** (Cloud Soberana) and **Ação 13.4** (Anel CAM + Anel Açores submarine cables — physical layer for an Atlantic-Lusophone Data Space) |
 | Effort | M-L |
 | When | 2026-2028 |
 | Lead | APDC + INESC-TEC + AMA + IPN |
@@ -124,7 +124,7 @@ Germany's DIN + DKE published an AI Standardisation Roadmap at the 2020 Digital 
 | Field | Value |
 |---|---|
 | Source | Germany (JUPITER + EuroHPC industrial computer), Brazil (Action 4 Pro-Infra AI) |
-| Anchor ANIA initiative | I.1 (Advanced Computing and AI Factory/EuroHPC) + I.2 (Gigafactory) — extends with named access policy |
+| Anchor ANIA initiative | I.1 (Advanced Computing and AI Factory/EuroHPC) + I.2 (Gigafactory) — extends with named access policy. **Dual-anchored at EDN Ação 13.2 (Plano Nacional de Centros de Dados + GigaFactory + revisão da Estratégia Nacional de Semicondutores RCM 12/2024)** |
 | Effort | M |
 | When | 2026 H2 onwards |
 | Lead | FCT + FCCN + MACC |
@@ -282,7 +282,7 @@ Australia's AI Review Committee meets every 6 weeks, provides non-binding advice
 | Field | Value |
 |---|---|
 | Source | Australia GovAI + Brazil Sovereign Cloud + UK i.AI Incubator |
-| Anchor ANIA initiative | II.11 (Centre of Excellence in PA) — adds a named vendor-agnostic platform deliverable; references I.4 (National Data Centre Plan) for hosting |
+| Anchor ANIA initiative | II.11 (Centre of Excellence in PA) — adds a named vendor-agnostic platform deliverable; references I.4 (National Data Centre Plan) for hosting + **EDN Ação 13.1 (Plano para o Desenvolvimento de uma Cloud Soberana)** as the underlying infrastructure to ride |
 | Effort | M |
 | When | 2027 H1 |
 | Lead | AMA + IPN + INCM |
@@ -383,7 +383,7 @@ Japan passed **Act No. 53 of 2025** — the only national jurisdiction in the 17
 | Field | Value |
 |---|---|
 | Source | Australia (Tech Prosperity Deal with USA, MoU Singapore, Framework India) + Brazil (S-S framing) |
-| Anchor ANIA initiative | IV.7 + new |
+| Anchor ANIA initiative | IV.7 (Cooperação internacional e diplomacia tecnológica) — extends with named bilateral + multilateral instruments + **EDN Ação 2.5 (Estabelecimento de parcerias internacionais na área do Digital, com referência explícita a países de língua oficial portuguesa, lead Governo de Portugal + ARTE + DGE)** as the operational vehicle |
 | Effort | M |
 | When | 2026 H2 (Brazil-Portugal bilateral) → 2027 (CPLP) |
 | Lead | MNE + Instituto Camões + MCTES |
@@ -465,37 +465,39 @@ The evidence in the matrix (B.1 rows 4 and 5: PA distributed across 3 Eixos + So
 
 ---
 
-## Annex — Recommendation × matrix-row × source-country × anchoring ANIA initiative
+## Annex — Recommendation × matrix-row × source-country × anchoring ANIA initiative × EDN Ação cross-reference
 
-Each recommendation is anchored to one or more existing ANIA initiatives (extending what is already in PAANIA) where possible. "New" indicates a deliverable not currently named in the 32 PAANIA initiatives; "Extends" indicates an existing initiative being broadened or deepened.
+Each recommendation is anchored to one or more existing PAANIA initiatives (extending what is already in PAANIA) where possible, and cross-referenced to the 2026-27 Plano de Ação da EDN (Estratégia Digital Nacional) where the recommendation also rides on broader EDN deliverables.
 
-| Rec # | Title | Matrix rows | Primary source country | Anchoring ANIA initiative(s) |
-|---|---|---|---|---|
-| R1 | GAIA-X Portuguese node + Atlantic-Lusophone Data Space | A.4 r4, C.1 r2 | DE, BR, AU, GB | I.3 + I.4 (extends) |
-| R2 | Brazil-Portugal parallel-LLM coordination | A.4 r2, C.1 r4 | BR | II.7 (extends) |
-| R3 | Portuguese AI Standardisation Roadmap | A.4 r6, C.1 r5 | DE | IV.6 (extends) |
-| R4 | Deucalion access + EuroHPC industrial computer | A.4 r1, C.1 r1+r7 | DE, BR | I.1 + I.2 (extends) |
-| R5 | 4 Portuguese AI Centres of Excellence | C.2 r2 | DE, BR | II.5 (extends) |
-| R6 | Portuguese AI Breakthrough Programme | C.2 r1, C.3 r4 | DE (SPRIND), GB (ARIA), US (DARPA) | II.1 + II.2 (extends with mission-management agency) |
-| R7 | National AI Skills Compact | C.2 r4 | AU (BCA Action 3) | III.2 + III.3 (extends; coordinates with IEFP/ANQEP) |
-| R8 | Portuguese AI Olympiad + Lifes-equivalent | C.5 r1, C.2 r6 | BR | III.7 + III.8 (extends with school-level + teacher-training tracks) |
-| R9 | PME 4.0 AI Uptake Programme | C.3 r2 | DE (Mittelstand 4.0), BR (Action 44), AU (AI Adopt) | II.9 + II.10 (extends with regional advisor network) |
-| R10 | AI Commercialisation Accelerator Portugal | C.3 r4 | AU (AICA), GB (Catapult) | II.5 + II.6 (extends; consolidation mandate) |
-| R11 | AI for Portuguese Sectoral Champions | A.2 r7, C.3 r3 | GB, AU | II.5 (extends with named sectoral picks) |
-| R12 | PIAAP (PA AI Playbook) | C.4 r3 | GB (Playbook), AU (APS Plan) | II.11 (consolidates II.12, II.13, III.1, IV.4-IV.7 into one operational document) |
-| R13 | Per-ministry CAIO + AAO | C.4 r1 | AU (APS Plan), US (M-25-21), BR (AI Core) | II.11 (extends) |
-| R14 | AI Review Committee | C.4 r4 | AU (APS Plan) | IV.3 + IV.4 (extends) |
-| R15 | GovAI Portugal | C.4 r5 | AU (GovAI), BR (Sovereign Cloud) | II.11 + I.4 (new platform deliverable within Centre of Excellence + National DC Plan hosting) |
-| R16 | Universal civil-servant training mandate | C.4 r2 | AU (APS Plan), GB (Playbook tier model) | III.1 (extends from advanced to universal cohort) |
-| R17 | Central register of AI impact assessments | C.4 r6+r7, A.5 r5 | AU (APS Plan), GB (ATRS) | IV.6 (extends) |
-| R18 | Observatório Português de IA no Trabalho e Sociedade | C.5 r4 | DE (AI Observatory) | IV.1 + IV.3 (extends; tripartite social-dialogue layer) |
-| R19 | Civic-AI participation platforms | C.5 r5 | DE (Civic AI triad), BR (Action 50-51) | III.6 + III.8 (extends; new civic-AI fora) |
-| R20 | (folded under R8) | — | — | — |
-| R21 | Atlantic-Lusophone cultural-heritage AI | C.5 r6 | GB (Rec 13), AU, BR | I.3 (new sectoral data space within data-space programme) |
-| R22 | Portuguese AI Law | A.5 r1+r4 | JP (Act No. 53/2025) | IV.4 (extends from regulatory implementation to dedicated primary legislation) |
-| R23 | CPLP AI Framework + Brazil-Portugal Tech Prosperity Deal | A.1 r7, C.6 r3 | AU (Tech Prosperity Deal), BR | IV.7 (extends with named bilateral + multilateral instruments) |
-| R24 | Adopt AI Verify | A.4 r3, C.6 r7 | SG | IV.3 + IV.6 (extends; technical-testing layer) |
-| R25 | PT-ATRS (Algorithmic Transparency Standard) | A.5 r5, C.4 r7 | GB (ATRS) | IV.4 + IV.6 (extends with mandatory transparency norm) |
+| Rec # | Title | Matrix rows | Primary source country | PAANIA anchor(s) | EDN Ação cross-ref |
+|---|---|---|---|---|---|
+| R1 | GAIA-X Portuguese node + Atlantic-Lusophone Data Space | A.4 r4, C.1 r2 | DE, BR, AU, GB | I.3 + I.4 (extends) | 8.7 + 13.1 + 13.4 |
+| R2 | Brazil-Portugal parallel-LLM coordination | A.4 r2, C.1 r4 | BR | II.7 (extends) | — (PAANIA-anchored) |
+| R3 | Portuguese AI Standardisation Roadmap | A.4 r6, C.1 r5 | DE | IV.6 (extends) | 8.4 (Data Act diploma) |
+| R4 | Deucalion access + EuroHPC industrial computer | A.4 r1, C.1 r1+r7 | DE, BR | I.1 + I.2 (extends) | 13.2 (dual-anchor: DC Plan + GigaFactory + RCM 12/2024 semiconductors) |
+| R5 | 4 Portuguese AI Centres of Excellence | C.2 r2 | DE, BR | II.5 (extends) | 3 (Polo Colaborativo, lead ANI) |
+| R6 | Portuguese AI Breakthrough Programme | C.2 r1, C.3 r4 | DE (SPRIND), GB (ARIA), US (DARPA) | II.1 + II.2 (extends) | 15.1 (IFIC emerging-tech funds) |
+| R7 | National AI Skills Compact | C.2 r4 | AU (BCA Action 3) | III.2 + III.3 (extends) | 17 (Pacto de Competências Digitais, lead ARTE) |
+| R8 | Portuguese AI Olympiad + Lifes-equivalent | C.5 r1, C.2 r6 | BR | III.7 + III.8 (extends) | 18 (Raparigas STEM) + 19 (Digital e IA na Educação) |
+| R9 | PME 4.0 AI Uptake Programme | C.3 r2 | DE (Mittelstand 4.0), BR (Action 44), AU (AI Adopt) | II.9 + II.10 (extends) | 14.1 + 14.2 (Coaching 4.0 Vouchers PME, lead ARTE/IAPMEI) |
+| R10 | AI Commercialisation Accelerator Portugal | C.3 r4 | AU (AICA), GB (Catapult) | II.5 + II.6 (extends) | 15 (Inovação/Empreendedorismo Digital) |
+| R11 | AI for Portuguese Sectoral Champions | A.2 r7, C.3 r3 | GB, AU | II.5 (extends with named sectoral picks) | 14.4 (internacionalização AICEP) |
+| R12 | PIAAP (PA AI Playbook) | C.4 r3 | GB (Playbook), AU (APS Plan) | II.11 (consolidates II.12, II.13, III.1, IV.4-IV.7) | 1 + 2 + 3 + 4 + 8 + 9 + 10 + 11 (cross-EDN consolidator) |
+| R13 | Per-ministry CAIO + AAO | C.4 r1 | AU (APS Plan), US (M-25-21), BR (AI Core) | II.11 (extends) | 2.3 (revisão CDAP/RCM 94/2024) |
+| R14 | AI Review Committee | C.4 r4 | AU (APS Plan) | IV.3 + IV.4 (extends) | 4 (ENC) + 2 (ARTE governance) |
+| R15 | GovAI Portugal | C.4 r5 | AU (GovAI), BR (Sovereign Cloud) | II.11 + I.4 (new platform within Centre of Excellence) | 13.1 (Cloud Soberana) + 9 (PAGE arquitectura) |
+| R16 | Universal civil-servant training mandate | C.4 r2 | AU (APS Plan), GB (Playbook tier model) | III.1 (extends from advanced to universal cohort) | 17 (Pacto Competências) |
+| R17 | Central register of AI impact assessments | C.4 r6+r7, A.5 r5 | AU (APS Plan), GB (ATRS) | IV.6 (extends) | 8.5 (app "Os meus dados na AP") |
+| R18 | Observatório Português de IA no Trabalho e Sociedade | C.5 r4 | DE (AI Observatory) | IV.1 + IV.3 (extends) | Fora do EDN (Concertação Social) |
+| R19 | Civic-AI participation platforms | C.5 r5 | DE (Civic AI triad), BR (Action 50-51) | III.6 + III.8 (extends) | 12 (Participa.gov 2.0, lead ARTE) |
+| R20 | (folded under R8) | — | — | — | — |
+| R21 | Atlantic-Lusophone cultural-heritage AI | C.5 r6 | GB (Rec 13), AU, BR | I.3 (new sectoral data space) | 8.7 (espaços europeus de dados) |
+| R22 | Portuguese AI Law | A.5 r1+r4 | JP (Act No. 53/2025) | IV.4 (extends) | 5 (Legislação pronta para o Digital) + 16 (Regulação) |
+| R23 | CPLP AI Framework + Brazil-Portugal Tech Prosperity Deal | A.1 r7, C.6 r3 | AU (Tech Prosperity Deal), BR | IV.7 (extends) | 2.5 (parcerias internacionais com países de língua oficial portuguesa) |
+| R24 | Adopt AI Verify | A.4 r3, C.6 r7 | SG | IV.3 + IV.6 (extends) | — (PAANIA-anchored) |
+| R25 | PT-ATRS (Algorithmic Transparency Standard) | A.5 r5, C.4 r7 | GB (ATRS) | IV.4 + IV.6 (extends) | 8.5 + 8.2 (classificação soberana de dados) |
+
+**EDN coverage summary:** 22 of 25 recommendations now have a verified EDN Ação cross-reference (only R2 AMALIA-coordination, R18 social-dialogue Observatório, and R24 AI Verify are PAANIA-only or out-of-EDN-scope). R12 PIAAP is the broadest cross-EDN consolidator, riding on 8 distinct EDN Ações.
 
 ---
 
