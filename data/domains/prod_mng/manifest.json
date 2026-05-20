@@ -1,0 +1,167 @@
+{
+  "domain_id": "prod_mng",
+  "name": "Product Management",
+  "description": "Product Management",
+  "created_at": "2026-05-19T20:46:25.306170+00:00",
+  "embeddings_model": "bge-m3",
+  "pinned": false,
+  "included_files": [
+    {
+      "path": "Intelligent retail - Report.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-19T20:46:49.109038+00:00",
+      "category": "Product Management",
+      "display_name": ""
+    },
+    {
+      "path": "building-the-ai-bank-of-the-future.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-19T20:46:49.353048+00:00",
+      "category": "Product Management",
+      "display_name": ""
+    },
+    {
+      "path": "WEF_AI_in_Action_Beyond_Experimentation_to_Transform_Industry_2025.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-19T20:46:49.630669+00:00",
+      "category": "Product Management",
+      "display_name": ""
+    },
+    {
+      "path": "AI-Driven-Product-Development-Playbook.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-19T20:46:50.798945+00:00",
+      "category": "Product Management",
+      "display_name": ""
+    },
+    {
+      "path": "ArtificiaL_.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-19T20:46:51.998988+00:00",
+      "category": "Product Management",
+      "display_name": ""
+    },
+    {
+      "path": "ebook_Generative_AI_inglese.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-19T20:46:52.342253+00:00",
+      "category": "Product Management",
+      "display_name": ""
+    },
+    {
+      "path": "CNTXT-The-Definitive-Guide-to-Generative-AI-for-Industry.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-19T20:46:57.724115+00:00",
+      "category": "Product Management",
+      "display_name": ""
+    },
+    {
+      "path": "Anthropic-enterprise-ebook-digital.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-19T20:46:58.102927+00:00",
+      "category": "Product Management",
+      "display_name": ""
+    },
+    {
+      "path": "EnterpriseAIPlaybook_PereiraGraylinBrynjolfsson (1).pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-19T20:46:58.421821+00:00",
+      "category": "Product Management",
+      "display_name": ""
+    },
+    {
+      "path": "WEF_AI_at_Work_from_Productivity_Hacks_to_Organizational_Transformation_2026.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-19T20:46:59.004894+00:00",
+      "category": "Product Management",
+      "display_name": ""
+    },
+    {
+      "path": "Roland Berger GenAI-driven transformation final.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-19T20:46:59.305776+00:00",
+      "category": "Product Management",
+      "display_name": ""
+    },
+    {
+      "path": "26 First White Paper on Gen AI DCO.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-19T20:47:00.155696+00:00",
+      "category": "Product Management",
+      "display_name": ""
+    },
+    {
+      "path": "The-AI-Transformation-Playbook-2024.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-19T20:47:00.794317+00:00",
+      "category": "Product Management",
+      "display_name": ""
+    },
+    {
+      "path": "S4S-The-Gen-AI-Product-Managers-Playbook_-Your-7-Step-Guide-to-Success.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-19T20:47:01.144478+00:00",
+      "category": "Product Management",
+      "display_name": ""
+    },
+    {
+      "path": "Generative-AI-in-Practice-100-Amazing-Ways-Generative-Artificial-Intelligence-is-Changing-Business-.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-19T20:47:01.441579+00:00",
+      "category": "Product Management",
+      "display_name": ""
+    },
+    {
+      "path": "genai-strategy-from-ideation-to-adoption.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-19T20:47:01.566590+00:00",
+      "category": "Product Management",
+      "display_name": ""
+    },
+    {
+      "path": "genai-for-next-gen-governments.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-19T20:47:02.082098+00:00",
+      "category": "Product Management",
+      "display_name": ""
+    },
+    {
+      "path": "future-of-manufacturing-with-generative-AI.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-19T20:47:02.289876+00:00",
+      "category": "Product Management",
+      "display_name": ""
+    },
+    {
+      "path": "Kibo-GenAI-Guide-for-Digital-Commerce.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-19T20:47:02.375960+00:00",
+      "category": "Product Management",
+      "display_name": ""
+    },
+    {
+      "path": "2025-05-eb-Ebook_Big_Book_Of_GenAI_Infinite.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-19T20:47:02.571434+00:00",
+      "category": "Product Management",
+      "display_name": ""
+    },
+    {
+      "path": "AI_Product_Managers_Handbook.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-19T20:47:03.198133+00:00",
+      "category": "Product Management",
+      "display_name": ""
+    },
+    {
+      "path": "pendo-ebook-playbook_for_ai_enhanced_product_management.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-19T20:47:03.281957+00:00",
+      "category": "Product Management"
+    }
+  ],
+  "arcadedb_database": "prod_mng",
+  "corpus_collection": "prod_mng__corpus",
+  "entity_cache_collection": "prod_mng__gr_entities",
+  "summary_cache_collection": "prod_mng__gr_summaries"
+}
