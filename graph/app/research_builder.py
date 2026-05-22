@@ -292,7 +292,7 @@ class ResearchBuilder:
             'communities_summarized': 0,
         }
         try:
-            return self._build_body(
+            stats = self._build_body(
                 started, t0,
                 dry_run=dry_run,
                 limit_chunks=limit_chunks,
@@ -312,6 +312,47 @@ class ResearchBuilder:
                             failed_phase=failed_phase)
             logger.exception('Research build failed at phase %s', failed_phase)
             raise
+
+        # Fresh-domain analytics fix. The `arcadedb` analytics backend runs
+        # algo.pagerank / algo.louvain against the *persisted* graph, but a
+        # full rebuild only persists the graph in its 'writing' phase — AFTER
+        # analytics has already run inside `_build_body`. On a fresh domain
+        # the graph is still empty when analytics runs, so it yields 0
+        # communities / 0 PageRank. Detect that signature (analytics was
+        # requested, entities were extracted, yet 0 communities came out) and
+        # re-run analytics now that the graph IS persisted, via the standard
+        # recluster path. Existing domains see communities > 0 here (analytics
+        # ran on their prior persisted graph) so this is a no-op for them.
+        if (not dry_run and not skip_analytics
+                and GRAPH_ANALYTICS_BACKEND == 'arcadedb'
+                and stats.communities == 0
+                and stats.accepted_entities > 0):
+            logger.info(
+                'Research build: 0 communities on a non-empty graph with the '
+                'arcadedb analytics backend — analytics ran pre-write against '
+                'an empty graph. Running a recluster pass over the now-'
+                'persisted graph.'
+            )
+            try:
+                rc = self.recluster()
+                stats.communities = rc.get('communities', stats.communities)
+                stats.community_summaries = rc.get(
+                    'community_summaries', stats.community_summaries)
+                logger.info(
+                    'Research build: post-rebuild recluster produced %d '
+                    'communities, %d community summaries.',
+                    stats.communities, stats.community_summaries,
+                )
+            except Exception:
+                # The base graph is fully written and usable; only the
+                # community layer is missing. Don't fail the whole rebuild —
+                # the user can still trigger "Recluster Now" manually.
+                logger.exception(
+                    'Research build: post-rebuild recluster pass failed; the '
+                    'graph is written but has no communities. A manual '
+                    'recluster will fix it.'
+                )
+        return stats
 
     def _build_body(
         self,
