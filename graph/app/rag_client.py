@@ -56,6 +56,7 @@ class RagClient:
         chunks: list[dict],
         format: str = 'pdf',
         collection: str | None = None,
+        chunking_profile_id: str | None = None,
     ) -> dict:
         """Ship pre-chunked text + provenance to noted-rag for embedding +
         ChromaDB upsert. Used by the PDF/DOCX/PPTX add path so noted-rag
@@ -67,6 +68,11 @@ class RagClient:
 
         `collection`: ChromaDB collection name (P3.2 multi-KB). When
         omitted, noted-rag falls back to its default (legacy `noted_corpus`).
+
+        `chunking_profile_id`: the named profile that produced these
+        chunks (forwarded so noted-rag can stamp it on chunk metadata
+        for traceability). Omit when unknown — noted-rag will stamp
+        with its catalog default.
         """
         if not chunks:
             return {'status': 'ok', 'indexed': 0, 'skipped_unchanged': 0, 'deleted_stale': 0}
@@ -79,6 +85,8 @@ class RagClient:
         }
         if collection:
             body['collection'] = collection
+        if chunking_profile_id:
+            body['chunking_profile_id'] = chunking_profile_id
         try:
             r = self._session.post(
                 f'{self._base}/upsert_chunks',

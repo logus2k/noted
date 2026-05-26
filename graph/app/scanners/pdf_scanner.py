@@ -30,9 +30,9 @@ from app.config import (
     DOCLING_OCR,
     DOCLING_TABLE_MODE,
     ENABLE_DOC_DESCRIPTIONS,
-    EXTRACT_CHUNK_TARGET_TOKENS,
     PICTURE_DESCRIPTION_MIN_AREA_PX,
 )
+from app.chunking_profiles import resolve_chunking_profile
 from app.scanners.md_scanner import MdChunk
 
 logger = logging.getLogger(__name__)
@@ -48,18 +48,23 @@ TOC_FILTER_RATIO: float = float(os.environ.get('TOC_FILTER_RATIO', '1.0'))
 
 
 _converter = None
-_chunker = None
+# Chunker is now keyed by max_tokens so different chunking profiles each
+# get their own HybridChunker instance, cached for the lifetime of the
+# process. The chunker constructor itself is cheap; the expensive bit is
+# tokenizer init (bge-m3), which happens once per max_tokens value. With
+# 4 profiles in the catalog, the cache holds at most 4 entries.
+_chunkers: dict[int, object] = {}
 
 
 def _ensure_loaded() -> None:
-    """Lazy-init Docling converter + chunker. Idempotent."""
-    global _converter, _chunker
+    """Lazy-init Docling converter. Idempotent. Chunkers are built on
+    demand by _get_chunker(max_tokens)."""
+    global _converter
     if _converter is not None:
         return
 
     # Imported lazily so module import is free even when no PDFs are
     # ingested in a given process (e.g. during a markdown-only rebuild).
-    from docling.chunking import HybridChunker
     from docling.datamodel.base_models import InputFormat
     from docling.datamodel.pipeline_options import PdfPipelineOptions
     from docling.document_converter import DocumentConverter, PdfFormatOption
@@ -102,28 +107,43 @@ def _ensure_loaded() -> None:
             InputFormat.PDF: PdfFormatOption(pipeline_options=pdf_opts),
         },
     )
+    logger.info(
+        'Docling loaded: table_mode=%s ocr=%s max_pages=%s',
+        DOCLING_TABLE_MODE, DOCLING_OCR, DOCLING_MAX_PAGES,
+    )
+
+
+def _get_chunker(max_tokens: int):
+    """Return a HybridChunker for the given max_tokens, cached for the
+    lifetime of the process. Tokenizer init (bge-m3) is the expensive
+    part; for the small set of distinct profile max_tokens values in
+    practice (4 today) we accept paying it once per value."""
+    chunker = _chunkers.get(max_tokens)
+    if chunker is not None:
+        return chunker
+    from docling.chunking import HybridChunker
     # Tokenizer: prefer the on-disk bge-m3 (under the bind-mounted models
     # tree); fall back to the HF id only if the local copy is missing.
     # Without this, HybridChunker calls HuggingFace on every container
     # restart for the tokenizer config files even though the full model
     # is on disk.
     bge_m3_local = '/data/models/bge-m3'
-    _chunker = HybridChunker(
+    chunker = HybridChunker(
         tokenizer=bge_m3_local if os.path.isdir(bge_m3_local) else 'BAAI/bge-m3',
-        max_tokens=EXTRACT_CHUNK_TARGET_TOKENS,
+        max_tokens=max_tokens,
         merge_peers=True,
     )
-    logger.info(
-        'Docling loaded: table_mode=%s ocr=%s max_pages=%s tokenizer=bge-m3 max_tokens=%d',
-        DOCLING_TABLE_MODE, DOCLING_OCR, DOCLING_MAX_PAGES,
-        EXTRACT_CHUNK_TARGET_TOKENS,
-    )
+    _chunkers[max_tokens] = chunker
+    logger.info('HybridChunker built: tokenizer=bge-m3 max_tokens=%d', max_tokens)
+    return chunker
 
 
 def scan_pdf(
     abs_path: str,
     repo_root: str | None = None,
     progress_writer: Callable[[dict], None] | None = None,
+    *,
+    chunking_profile_id: str | None = None,
 ) -> list[MdChunk]:
     """Convert one PDF (or DOCX / PPTX / HTML) into MdChunk instances.
 
@@ -150,6 +170,16 @@ def scan_pdf(
         rel_path = os.path.relpath(abs_path, repo_root)
     else:
         rel_path = os.path.basename(abs_path)
+
+    # Resolve chunking profile → max_tokens for the HybridChunker. None
+    # falls back to the catalog's default profile (whose target_tokens
+    # historically matched EXTRACT_CHUNK_TARGET_TOKENS=600). We feed
+    # Docling the profile's `target_tokens` (Docling's `max_tokens` is
+    # really an upper bound it tries to stay near, so target ≈ Docling
+    # max).
+    profile = resolve_chunking_profile(chunking_profile_id)
+    docling_max_tokens = profile['target_tokens']
+    _chunker = _get_chunker(docling_max_tokens)
 
     result = _converter.convert(abs_path)
     doc = result.document  # DoclingDocument

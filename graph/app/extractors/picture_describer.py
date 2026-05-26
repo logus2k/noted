@@ -19,11 +19,27 @@ from __future__ import annotations
 
 import base64
 import logging
+import re
 from typing import Any
 
 import requests
 
 from app.config import LLM_BASE_URL, LLM_TIMEOUT
+
+
+# See the matching block in table_describer.py for why we strip
+# `<think>...</think>` from the LLM response before storing the
+# caption. tldr: the preset's underlying model can emit raw CoT,
+# which then poisons RAG evidence and breaks the answering LLM's
+# own `<think>` protocol.
+_THINK_BLOCK_RE = re.compile(r'<think>[\s\S]*?</think>\s*', re.IGNORECASE)
+_THINK_OPEN_TRAILING_RE = re.compile(r'<think>[\s\S]*$', re.IGNORECASE)
+
+
+def _strip_think(text: str) -> str:
+    text = _THINK_BLOCK_RE.sub('', text or '')
+    text = _THINK_OPEN_TRAILING_RE.sub('', text)
+    return text.strip()
 
 
 logger = logging.getLogger(__name__)
@@ -98,7 +114,7 @@ def describe_picture(
         .get('message', {})
         .get('content', '')
     )
-    text = (content or '').strip()
+    text = _strip_think(content)
     if not text:
         return None
     return text

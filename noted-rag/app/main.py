@@ -400,6 +400,12 @@ class UpsertChunksRequest(BaseModel):
         default=None,
         description="P3.2: per-KB corpus collection. Defaults to legacy noted_corpus.",
     )
+    chunking_profile_id: str | None = Field(
+        default=None,
+        description="Named chunking profile (see chunking_profiles.json) "
+                    "that produced these chunks. Stamped on chunk metadata "
+                    "for traceability. None → catalog default profile.",
+    )
     chunks: list[UpsertChunk]
 
 
@@ -417,7 +423,20 @@ def upsert_chunks(req: UpsertChunksRequest) -> UpsertChunksResponse:
     Idempotent on content_hash like /ingest, scoped to a single source_path.
     Stale chunks for the same source (present before, absent now) are deleted.
     bbox is flattened to bbox_x0..bbox_y1 because Chroma metadata is flat.
+
+    `chunking_profile_id` is the profile that produced the incoming
+    chunks (resolved upstream in noted-graph). We stamp the id plus the
+    resolved bound values on each chunk's metadata for traceability;
+    that way future analysis can audit exactly what chunking the chunk
+    was built with even if the catalog JSON is edited later. Unknown
+    id → 400.
     """
+    # Validate the profile id (resolves to default if None).
+    try:
+        profile = ingest.resolve_chunking_profile(req.chunking_profile_id)
+    except KeyError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     records: list[ChunkRecord] = []
     for c in req.chunks:
         text = c.text or ""
@@ -433,6 +452,15 @@ def upsert_chunks(req: UpsertChunksRequest) -> UpsertChunksResponse:
             "content_hash": _content_hash(text),
             "last_modified": req.last_modified,
             "format": req.format,
+            # Profile that produced these chunks (resolved upstream).
+            # Store resolved values alongside the id so a later catalog
+            # edit doesn't retroactively change what we think produced
+            # these chunks.
+            "chunking_profile_id": profile["id"],
+            "chunking_max_tokens": profile["max_tokens"],
+            "chunking_min_tokens": profile["min_tokens"],
+            "chunking_target_tokens": profile["target_tokens"],
+            "chunking_overlap_tokens": profile["overlap_tokens"],
         }
         if c.page_no is not None:
             meta["page_no"] = int(c.page_no)
@@ -498,23 +526,76 @@ def upsert_chunks(req: UpsertChunksRequest) -> UpsertChunksResponse:
 async def trigger_ingest(
     background_tasks: BackgroundTasks,
     collection: str | None = None,
+    chunking_profile: str | None = None,
+    source_path: str | None = None,
 ) -> dict:
     """Trigger a corpus re-ingest (P3.2: `collection` query param targets
-    per-KB corpora; defaults to legacy noted_corpus)."""
+    per-KB corpora; defaults to legacy noted_corpus).
+
+    `chunking_profile` sets the run-level default profile applied to
+    sources that don't have a per-source profile recorded in the
+    inventory. None → falls back to chunking_profiles.json's
+    default_profile.
+
+    `source_path` (optional) scopes the run to a single inventory entry
+    so uploading one file doesn't re-walk every other entry into the
+    target collection. The cleanup pass is scoped to the same source
+    so unrelated chunks already in the collection are left alone.
+    None → walk the entire inventory (legacy bulk-rebuild behaviour)."""
+    # Validate the profile up front so the caller gets a 400 instead of
+    # silently falling back (validation lives in ingest.resolve...).
+    if chunking_profile:
+        try:
+            ingest.resolve_chunking_profile(chunking_profile)
+        except KeyError as e:
+            raise HTTPException(status_code=400, detail=str(e))
     job_id = uuid.uuid4().hex[:8]
-    _jobs[job_id] = {"status": "running", "collection": collection or COLLECTION_NAME}
+    _jobs[job_id] = {
+        "status": "running",
+        "collection": collection or COLLECTION_NAME,
+        "chunking_profile": chunking_profile,
+        "source_path": source_path,
+    }
 
     def _run() -> None:
         try:
-            result = ingest.run_ingest(rag, collection=collection)
-            _jobs[job_id] = {"status": "done", "collection": collection or COLLECTION_NAME, **result}
+            result = ingest.run_ingest(
+                rag, collection=collection,
+                chunking_profile_id=chunking_profile,
+                source_path=source_path,
+            )
+            _jobs[job_id] = {
+                "status": "done",
+                "collection": collection or COLLECTION_NAME,
+                "chunking_profile": chunking_profile,
+                "source_path": source_path,
+                **result,
+            }
             logger.info("ingest %s done: %s", job_id, result)
         except Exception as e:
             logger.exception("ingest %s failed", job_id)
             _jobs[job_id] = {"status": "error", "error": f"{type(e).__name__}: {e}"}
 
     background_tasks.add_task(_run)
-    return {"job_id": job_id, "status": "running", "collection": collection or COLLECTION_NAME}
+    return {
+        "job_id": job_id,
+        "status": "running",
+        "collection": collection or COLLECTION_NAME,
+        "chunking_profile": chunking_profile,
+        "source_path": source_path,
+    }
+
+
+@app.get("/chunking-profiles")
+async def list_chunking_profiles() -> dict:
+    """Return the catalog of named chunking profiles, plus the id of
+    the default. Used by the noted backend's proxy endpoint and
+    ultimately by the document-import dropdown in the frontend."""
+    cfg = ingest.load_chunking_profiles()
+    return {
+        "default_profile": cfg["default_profile"],
+        "profiles": cfg["profiles_list"],
+    }
 
 
 @app.get("/ingest/status/{job_id}")

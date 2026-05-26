@@ -11,7 +11,7 @@
       "mode": "read_store",
       "added_at": "2026-05-13T18:14:52.549168+00:00",
       "category": "Democracy",
-      "display_name": ""
+      "display_name": "Psycho-Politics - Liberalism and New Technologies of Power"
     },
     {
       "path": "01. Neo-reactionaries head for the exit_N_Land_2013.pdf",
@@ -80,7 +80,8 @@
       "path": "06_Totalitarianism Propaganda_H_Harendt_1951.pdf",
       "mode": "read_store",
       "added_at": "2026-05-13T19:12:13.923697+00:00",
-      "category": "Democracy"
+      "category": "Democracy",
+      "display_name": ""
     }
   ],
   "arcadedb_database": "ai_democracy",

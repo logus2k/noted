@@ -30,11 +30,8 @@ import os
 import re
 from dataclasses import dataclass
 
-from app.config import (
-    EXTRACT_CHUNK_MAX_TOKENS,
-    EXTRACT_CHUNK_MIN_TOKENS,
-    EXTRACT_CHUNK_TARGET_TOKENS,
-)
+from app.config import EXTRACT_CHUNK_TARGET_TOKENS  # default for _window_slide
+from app.chunking_profiles import resolve_chunking_profile
 from app.models import Entity, Relationship
 
 logger = logging.getLogger(__name__)
@@ -223,7 +220,12 @@ def _walk_markdown(root: str):
 
 # ── Doc + chunks ────────────────────────────────────────────────────
 
-def _process_file(abs_path: str, repo_root: str) -> tuple[Entity, list[MdChunk]]:
+def _process_file(
+    abs_path: str,
+    repo_root: str,
+    *,
+    chunking_profile_id: str | None = None,
+) -> tuple[Entity, list[MdChunk]]:
     with open(abs_path, 'r', encoding='utf-8') as f:
         text = f.read()
 
@@ -236,7 +238,7 @@ def _process_file(abs_path: str, repo_root: str) -> tuple[Entity, list[MdChunk]]
         mtime = 0
         size = len(text)
 
-    chunks = _chunk_markdown(text, rel_path)
+    chunks = _chunk_markdown(text, rel_path, chunking_profile_id=chunking_profile_id)
 
     doc_id = f'markdown_doc:{rel_path}'
     doc_entity = Entity(
@@ -258,8 +260,27 @@ def _process_file(abs_path: str, repo_root: str) -> tuple[Entity, list[MdChunk]]
 _HEADING_RE = re.compile(r'^(#{1,6})\s+(.+?)\s*$', re.MULTILINE)
 
 
-def _chunk_markdown(text: str, rel_path: str) -> list[MdChunk]:
-    """Heading-aware split at level >= 3, with token-budget packing."""
+def _chunk_markdown(
+    text: str,
+    rel_path: str,
+    *,
+    chunking_profile_id: str | None = None,
+) -> list[MdChunk]:
+    """Heading-aware split at level >= 3, with token-budget packing.
+
+    `chunking_profile_id` selects a named profile from
+    `chunking_profiles.json`. None → catalog default profile. The
+    profile's `max_tokens` / `min_tokens` / `target_tokens` /
+    `overlap_tokens` replace the legacy `EXTRACT_CHUNK_*` constants for
+    this call. Module-level constants stay as fallback (the default
+    profile mirrors them so byte-identical behaviour is preserved when
+    no profile is selected)."""
+    profile = resolve_chunking_profile(chunking_profile_id)
+    max_tokens = profile['max_tokens']
+    min_tokens = profile['min_tokens']
+    target_tokens = profile['target_tokens']
+    overlap_tokens = profile['overlap_tokens']
+
     sections = _split_on_headings(text, min_level=3)
     packed: list[MdChunk] = []
     buffer_sections: list[tuple[str, str]] = []
@@ -277,8 +298,12 @@ def _chunk_markdown(text: str, rel_path: str) -> list[MdChunk]:
             buffer_tokens = 0
             return
         # If a single section is already over MAX, window-slide it.
-        if buffer_tokens > EXTRACT_CHUNK_MAX_TOKENS:
-            for i, slice_text in enumerate(_window_slide(body)):
+        if buffer_tokens > max_tokens:
+            for i, slice_text in enumerate(_window_slide(
+                body,
+                target_tokens=target_tokens,
+                overlap_tokens=overlap_tokens,
+            )):
                 packed.append(MdChunk(
                     doc_path=rel_path,
                     chunk_index=next_index,
@@ -306,12 +331,12 @@ def _chunk_markdown(text: str, rel_path: str) -> list[MdChunk]:
             continue
         # If adding this section would overflow AND we already have enough
         # tokens to be above MIN, flush first.
-        if buffer_tokens + tokens > EXTRACT_CHUNK_TARGET_TOKENS and buffer_tokens >= EXTRACT_CHUNK_MIN_TOKENS:
+        if buffer_tokens + tokens > target_tokens and buffer_tokens >= min_tokens:
             flush()
         buffer_sections.append((section_path, body))
         buffer_tokens += tokens
         # If a single section is huge, flush it alone so the window slider kicks in.
-        if tokens > EXTRACT_CHUNK_MAX_TOKENS:
+        if tokens > max_tokens:
             flush()
     flush()
     return packed
@@ -359,10 +384,21 @@ def _split_on_headings(text: str, min_level: int) -> list[tuple[str, str]]:
     return sections
 
 
-def _window_slide(body: str) -> list[str]:
-    """Sliding window for oversized sections. TARGET chars, 10% overlap."""
-    win = int(EXTRACT_CHUNK_TARGET_TOKENS * _CHARS_PER_TOKEN)
-    overlap = max(1, int(win * 0.10))
+def _window_slide(
+    body: str,
+    *,
+    target_tokens: int = EXTRACT_CHUNK_TARGET_TOKENS,
+    overlap_tokens: int | None = None,
+) -> list[str]:
+    """Sliding window for oversized sections. Window size = target_tokens.
+    Overlap defaults to 10 % of the window if `overlap_tokens` is None
+    (preserves legacy behaviour); otherwise the profile's explicit value
+    is used."""
+    win = int(target_tokens * _CHARS_PER_TOKEN)
+    if overlap_tokens is None:
+        overlap = max(1, int(win * 0.10))
+    else:
+        overlap = max(1, int(overlap_tokens * _CHARS_PER_TOKEN))
     chunks: list[str] = []
     start = 0
     n = len(body)

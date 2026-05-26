@@ -101,13 +101,20 @@ def _normalize_entry(raw) -> dict | None:
             logger.warning('included_files entry %r has invalid mode %r; coercing to %s',
                            path, mode, MODE_READ_STORE)
             mode = MODE_READ_STORE
-        return {
+        normalized = {
             'path': path,
             'mode': mode,
             'added_at': raw.get('added_at') or '',
             'category': (raw.get('category') or '').strip(),
             'display_name': (raw.get('display_name') or '').strip(),
         }
+        # Preserve chunking_profile_id when present. Omitted on entries
+        # that predate the field (and on entries uploaded without an
+        # explicit profile) so downstream code can `.get()`-check it.
+        cpid = raw.get('chunking_profile_id')
+        if isinstance(cpid, str) and cpid:
+            normalized['chunking_profile_id'] = cpid
+        return normalized
     return None
 
 
@@ -143,6 +150,23 @@ def list_documents(domain_id: str) -> list[dict]:
     return out
 
 
+def chunking_profile_for(domain_id: str, rel_path: str) -> str | None:
+    """Return the chunking_profile_id recorded in the manifest entry
+    for `rel_path`, or None when the entry is absent / the field is not
+    present (legacy entries, or uploads without an explicit profile
+    choice). Called from _doc_add_worker to re-apply the user's per-doc
+    chunking choice on background re-chunks."""
+    with _lock:
+        manifest = _load_manifest(domain_id)
+    for raw in manifest.get('included_files', []):
+        entry = _normalize_entry(raw)
+        if entry is None:
+            continue
+        if entry['path'] == rel_path:
+            return entry.get('chunking_profile_id') or None
+    return None
+
+
 def list_paths(domain_id: str, mode_filter: str | None = MODE_READ_STORE) -> list[str]:
     """Just the manifest-relative paths, in order. md_scanner /
     research_builder consume this.
@@ -171,6 +195,7 @@ def add_uploaded_file(
     domain_id: str,
     mode: str = MODE_READ_STORE,
     category: str = '',
+    chunking_profile_id: str | None = None,
 ) -> dict:
     """Save uploaded file to this Domain's sources/ and append (or update)
     the manifest entry.
@@ -183,6 +208,12 @@ def add_uploaded_file(
 
     `category` is an optional free-text taxonomy label used by the
     Documents tree to group files within a Domain. Empty = uncategorized.
+
+    `chunking_profile_id` is the named profile (see
+    chunking_profiles.json) chosen at upload time. Persisted in the
+    manifest entry so the _doc_add_worker (and any future bulk
+    rebuild) can re-apply the same profile when re-chunking this
+    document. None = use the catalog default at chunk time.
 
     Accepted formats: .md plus the Docling-handled set
     (.pdf, .docx, .pptx, .html, .htm).
@@ -207,21 +238,27 @@ def add_uploaded_file(
         manifest = _load_manifest(domain_id)
         files = [_normalize_entry(e) for e in manifest.get('included_files', [])]
         files = [e for e in files if e is not None and e['path'] != relative_path]
-        files.append({
+        entry = {
             'path': relative_path,
             'mode': mode,
             'added_at': datetime.now(timezone.utc).isoformat(),
             'category': cat,
-        })
+        }
+        if chunking_profile_id:
+            entry['chunking_profile_id'] = chunking_profile_id
+        files.append(entry)
         manifest['included_files'] = files
         _save_manifest(domain_id, manifest)
-    return {
+    out = {
         'path': relative_path,
         'replaced': replaced,
         'mode': mode,
         'category': cat,
         'domain_id': domain_id,
     }
+    if chunking_profile_id:
+        out['chunking_profile_id'] = chunking_profile_id
+    return out
 
 
 def remove_document(path: str, domain_id: str) -> dict:

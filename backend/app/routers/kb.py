@@ -397,6 +397,12 @@ async def add_document(
         description="Optional free-text category for Documents tree grouping. "
                     "Empty = uncategorized.",
     ),
+    chunking_profile: str = Query(
+        "",
+        description="Optional named chunking profile id (see "
+                    "noted-rag /chunking-profiles for the catalog). "
+                    "Empty = use noted-rag's default profile.",
+    ),
 ):
     """Add a document to the Domain. Returns 202 IMMEDIATELY after the file
     lands on disk and the manifest is updated. The slow per-doc graph
@@ -439,6 +445,8 @@ async def add_document(
                     "overwrite": "true",
                     "collection": _domain_collection(domain_id),
                 }
+                if chunking_profile:
+                    data["chunking_profile"] = chunking_profile
                 r = await client.post(
                     f"{NOTED_BASE}/api/rag/sources/upload",
                     files=files, data=data,
@@ -457,6 +465,8 @@ async def add_document(
             params = {"mode": mode}
             if category:
                 params["category"] = category
+            if chunking_profile:
+                params["chunking_profile"] = chunking_profile
             r = await client.post(
                 f"{NOTED_BASE}/api/graph/research/{domain_id}/corpus/upload",
                 files=files,

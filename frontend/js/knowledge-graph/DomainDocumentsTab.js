@@ -306,20 +306,61 @@ export class DomainDocumentsTab {
 
     // ── Actions ─────────────────────────────────────────────────────
 
+    /** Fetch the chunking-profile catalog from the noted backend
+     *  (which proxies noted-rag). Cached on `this` after the first
+     *  call. Returns {default_profile, profiles[]} or a soft-fallback
+     *  {default_profile: '', profiles: []} when noted-rag is
+     *  unreachable — caller skips the dropdown in that case so the
+     *  upload still works against the server-side default profile. */
+    async _loadChunkingProfiles() {
+        if (this._chunkingProfilesCache) return this._chunkingProfilesCache;
+        try {
+            const r = await fetch('api/rag/chunking-profiles');
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            const data = await r.json();
+            this._chunkingProfilesCache = {
+                default_profile: data.default_profile || '',
+                profiles: Array.isArray(data.profiles) ? data.profiles : [],
+            };
+        } catch (e) {
+            console.warn('[DomainDocumentsTab] chunking-profiles fetch failed:', e);
+            this._chunkingProfilesCache = { default_profile: '', profiles: [] };
+        }
+        return this._chunkingProfilesCache;
+    }
+
     async _upload() {
         const d = this._ctx.domain;
-        const result = await modalForm([
+        const profiles = await this._loadChunkingProfiles();
+        const profileOptions = (profiles.profiles || []).map(p => ({
+            value: p.id, label: p.name,
+        }));
+        const profileDefault = profiles.default_profile || '';
+        const fields = [
             { key: 'mode', label: 'Mode', type: 'select',
               options: [
                   { value: 'read_store', label: 'Read & Store (visible + indexed in vector + graph)' },
                   { value: 'read_only',  label: 'Read-only (visible, NOT indexed in vector or graph)' },
               ],
               defaultValue: 'read_store' },
+        ];
+        // Only show the profile dropdown if the proxy returned a non-empty
+        // catalog. If noted-rag is unreachable or the file is empty, fall
+        // back silently to the default (no UI element shown).
+        if (profileOptions.length) {
+            fields.push({
+                key: 'chunking_profile', label: 'Chunking profile (vector index only)',
+                type: 'select', options: profileOptions, defaultValue: profileDefault,
+            });
+        }
+        fields.push(
             { key: 'category', label: 'Folder (optional, e.g. Manuals/Technical)',
               placeholder: 'e.g. Manuals/Technical or Reports', required: false },
             { key: 'file', label: `Document file(s) - hold Ctrl/Cmd to pick several (${ACCEPTED_EXT.join(', ')})`,
               type: 'file', accept: ACCEPTED_EXT.join(','), multiple: true },
-        ], { title: `Upload to ${d.name || d.domain_id}`, confirmText: 'Upload' });
+        );
+        const result = await modalForm(fields,
+            { title: `Upload to ${d.name || d.domain_id}`, confirmText: 'Upload' });
         if (!result || !result.file) return;
         const files = Array.isArray(result.file) ? result.file : [result.file];
         if (!files.length) return;
@@ -332,6 +373,7 @@ export class DomainDocumentsTab {
         }
         const mode = result.mode === 'read_only' ? 'read_only' : 'read_store';
         const category = (result.category || '').trim();
+        const chunkingProfile = (result.chunking_profile || '').trim();
         const total = files.length;
         if (total > 1) notify.info(`Uploading ${total} files to ${d.domain_id}...`);
         let succeeded = 0;
@@ -341,7 +383,8 @@ export class DomainDocumentsTab {
                 const fd = new FormData();
                 fd.append('file', f);
                 const url = `api/domains/${encodeURIComponent(d.domain_id)}/documents?mode=${encodeURIComponent(mode)}` +
-                            (category ? `&category=${encodeURIComponent(category)}` : '');
+                            (category ? `&category=${encodeURIComponent(category)}` : '') +
+                            (chunkingProfile ? `&chunking_profile=${encodeURIComponent(chunkingProfile)}` : '');
                 const r = await fetch(url, { method: 'POST', body: fd });
                 if (!r.ok) {
                     const err = await r.json().catch(() => ({}));

@@ -100,6 +100,22 @@ def _convention(domain_id: str, kind: str) -> str:
     raise ValueError(f'unknown resource kind: {kind!r}')
 
 
+def _manifest_chunking_profile(domain_id: str, rel_path: str) -> str | None:
+    """Look up the chunking_profile_id recorded for `rel_path` in this
+    Domain's manifest. Returns None when the entry is absent or doesn't
+    carry the field (legacy entries, or uploads without an explicit
+    profile choice). Best-effort: a failed manifest read returns None
+    rather than raising — the caller will fall back to the catalog
+    default and the doc still gets chunked."""
+    try:
+        from app import corpus
+        return corpus.chunking_profile_for(domain_id, rel_path)
+    except Exception as e:
+        logger.warning('manifest lookup failed for %s/%s: %s',
+                       domain_id, rel_path, e)
+        return None
+
+
 def _doc_add_worker(ctx: 'DomainContext') -> None:
     """Per-Domain background worker: drain ctx.add_queue serially under
     rebuild_lock, auto-recluster once the queue settles, then exit.
@@ -153,10 +169,23 @@ def _doc_add_worker(ctx: 'DomainContext') -> None:
                     pass
                 with ctx.rebuild_lock:
                     ext = os.path.splitext(rel_path)[1].lower()
+                    # Look up the chunking profile recorded in the
+                    # manifest entry for this doc. Falls back to None
+                    # (catalog default) for entries that predate the
+                    # field or were uploaded without an explicit choice.
+                    chunking_profile_id = _manifest_chunking_profile(
+                        ctx.domain_id, rel_path,
+                    )
                     if ext in _PDF_LIKE_EXTS:
-                        ctx.builder.add_doc_pdf(rel_path)
+                        ctx.builder.add_doc_pdf(
+                            rel_path,
+                            chunking_profile_id=chunking_profile_id,
+                        )
                     else:
-                        ctx.builder.add_doc(rel_path)
+                        ctx.builder.add_doc(
+                            rel_path,
+                            chunking_profile_id=chunking_profile_id,
+                        )
                 any_success = True
                 logger.info('doc-add-worker[%s]: extracted %s (doc %d, %d remaining)',
                             ctx.domain_id, rel_path, doc_done_in_drain, ctx.add_queue.qsize())

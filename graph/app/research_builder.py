@@ -964,13 +964,22 @@ class ResearchBuilder:
 
     # ── Per-doc incremental ops (P2) ──────────────────────────────────
 
-    def add_doc(self, rel_path: str) -> dict:
+    def add_doc(
+        self,
+        rel_path: str,
+        *,
+        chunking_profile_id: str | None = None,
+    ) -> dict:
         """Markdown per-doc add. Scans the file (md_scanner) then routes
         through the shared `_add_doc_from_chunks` pipeline.
 
         rel_path is relative to data/domains/<kb_id>/sources/.
         doc_entity.id ends up as `markdown_doc:<rel_path>`, consistent
         with what the full scanner produces.
+
+        `chunking_profile_id` flows through to `_chunk_markdown` so
+        the per-document profile choice from the Document Import modal
+        takes effect on graph-side chunks.
         """
         from app import corpus
         sources_root = corpus.sources_dir(self.kb_id)
@@ -979,7 +988,10 @@ class ResearchBuilder:
         self._set_phase('adding_doc', current_doc=rel_path)
         abs_path = os.path.join(sources_root, rel_path)
         try:
-            doc_entity, chunks = _scan_one_file(abs_path, sources_root)
+            doc_entity, chunks = _scan_one_file(
+                abs_path, sources_root,
+                chunking_profile_id=chunking_profile_id,
+            )
         except FileNotFoundError:
             self._set_phase('idle')
             raise
@@ -987,9 +999,17 @@ class ResearchBuilder:
             self._set_phase('idle')
             logger.exception('add_doc: scanning %s failed', rel_path)
             raise RuntimeError(f'scan failed: {type(e).__name__}: {e}')
-        return self._add_doc_from_chunks(rel_path, doc_entity, chunks)
+        return self._add_doc_from_chunks(
+            rel_path, doc_entity, chunks,
+            chunking_profile_id=chunking_profile_id,
+        )
 
-    def add_doc_pdf(self, rel_path: str) -> dict:
+    def add_doc_pdf(
+        self,
+        rel_path: str,
+        *,
+        chunking_profile_id: str | None = None,
+    ) -> dict:
         """Per-doc add for non-markdown formats (PDF / DOCX / PPTX / HTML).
 
         Parses the source via Docling (`pdf_scanner.scan_pdf`), runs the
@@ -1023,6 +1043,7 @@ class ResearchBuilder:
                 abs_path,
                 repo_root=sources_root,
                 progress_writer=self.progress.update,
+                chunking_profile_id=chunking_profile_id,
             )
         except Exception as e:
             self._set_phase('idle')
@@ -1051,7 +1072,10 @@ class ResearchBuilder:
             },
         )
 
-        out = self._add_doc_from_chunks(rel_path, doc_entity, chunks)
+        out = self._add_doc_from_chunks(
+            rel_path, doc_entity, chunks,
+            chunking_profile_id=chunking_profile_id,
+        )
 
         # Ship the same chunks to noted-rag for embedding + ChromaDB upsert.
         last_modified = datetime.fromtimestamp(mtime, tz=timezone.utc).isoformat()
@@ -1075,6 +1099,7 @@ class ResearchBuilder:
                 chunks=rag_chunks,
                 format=fmt,
                 collection=self.corpus_collection,
+                chunking_profile_id=chunking_profile_id,
             )
             logger.info('add_doc_pdf.rag_upsert: end (%.2fs) indexed=%d skipped=%d deleted_stale=%d',
                         _now() - t0,
@@ -1093,12 +1118,19 @@ class ResearchBuilder:
 
     def _add_doc_from_chunks(
         self, rel_path: str, doc_entity: Entity, chunks: list[MdChunk],
+        *,
+        chunking_profile_id: str | None = None,
     ) -> dict:
         """Shared pipeline used by both `add_doc` (markdown) and
         `add_doc_pdf` (Docling). Takes pre-built doc_entity + chunks,
         runs entity extraction + ArcadeDB merge + cache refresh + sets
         the noted KB's pending_recluster marker.
+
+        `chunking_profile_id` is accepted for symmetry with `add_doc` /
+        `add_doc_pdf` (and may be persisted into chunk metadata later);
+        the actual chunking already happened upstream of this call.
         """
+        _ = chunking_profile_id  # reserved for future per-chunk metadata stamping
         started = datetime.now(timezone.utc)
         t0 = _now()
         # Reset the progress dict so the Monitor's elapsed timer starts

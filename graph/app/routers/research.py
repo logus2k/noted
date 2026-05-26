@@ -551,6 +551,13 @@ async def upload_corpus_doc(
         description="Optional free-text category for tree grouping. "
                     "Empty = uncategorized.",
     ),
+    chunking_profile: str = Query(
+        '',
+        description="Named chunking profile id (see noted-rag "
+                    "/chunking-profiles for the catalog). Persisted in "
+                    "the manifest entry; reused on every re-chunk of "
+                    "this document. Empty = catalog default.",
+    ),
 ):
     """Add a file to the Domain. The file is saved under
     data/domains/<domain_id>/sources/. Sets pending_recluster on the
@@ -563,11 +570,20 @@ async def upload_corpus_doc(
             status_code=400,
             detail=f"invalid mode {mode!r}; must be 'read_only' or 'read_store'",
         )
+    # Validate profile id early so caller gets a clean 400 rather than
+    # a delayed failure inside the background chunker.
+    if chunking_profile:
+        from app.chunking_profiles import resolve_chunking_profile
+        try:
+            resolve_chunking_profile(chunking_profile)
+        except KeyError as e:
+            raise HTTPException(status_code=400, detail=str(e))
     content = await file.read()
     try:
         result = corpus.add_uploaded_file(
             file.filename, content,
             domain_id=domain_id, mode=mode, category=category,
+            chunking_profile_id=chunking_profile or None,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

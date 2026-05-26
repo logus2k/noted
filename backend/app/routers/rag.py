@@ -99,21 +99,40 @@ def _write_sources_unlocked(sources: list[dict]) -> None:
         json.dump({"sources": sources}, f, indent=2)
 
 
-def _upsert_source_local(source_path: str, tags: list[str]) -> dict:
-    """Add or update a source inventory entry. Returns the stored record."""
+def _upsert_source_local(
+    source_path: str,
+    tags: list[str],
+    chunking_profile_id: str | None = None,
+) -> dict:
+    """Add or update a source inventory entry. Returns the stored record.
+
+    `chunking_profile_id` is persisted so a subsequent bulk re-ingest of
+    the parent collection rechunks this source with the same profile
+    that produced its current chunks. Pass None to leave the field
+    untouched on update (existing rows keep their old value); the
+    `chunking_profile_id` key is omitted entirely on new rows when
+    None."""
     with _SOURCES_LOCK:
         sources = _read_sources_unlocked()
         existing = next((s for s in sources if s.get("source_path") == source_path), None)
         if existing:
             existing["tags"] = tags
+            if chunking_profile_id is not None:
+                existing["chunking_profile_id"] = chunking_profile_id
         else:
-            sources.append({
+            entry = {
                 "source_path": source_path,
                 "tags": tags,
                 "added_utc": _now_utc(),
-            })
+            }
+            if chunking_profile_id is not None:
+                entry["chunking_profile_id"] = chunking_profile_id
+            sources.append(entry)
         _write_sources_unlocked(sources)
-    return {"source_path": source_path, "tags": tags}
+    record = {"source_path": source_path, "tags": tags}
+    if chunking_profile_id is not None:
+        record["chunking_profile_id"] = chunking_profile_id
+    return record
 
 
 def _remove_source_local(source_path: str) -> bool:
@@ -211,6 +230,7 @@ async def sources_upload(
     tags: str = Form(...),
     overwrite: str = Form("false"),
     collection: str = Form(""),
+    chunking_profile: str = Form(""),
 ):
     """Upload a markdown file into rag_sources/, add it to the inventory,
     and kick off an asynchronous ingest.
@@ -239,11 +259,22 @@ async def sources_upload(
         f.write(payload)
 
     relative = f"{RAG_UPLOAD_REL}/{base}"
-    record = _upsert_source_local(relative, tag_list)
+    record = _upsert_source_local(
+        relative, tag_list,
+        chunking_profile_id=chunking_profile or None,
+    )
 
     # Fire-and-forget. noted-rag returns the job_id straight away; we hand
     # it to the frontend so it can show progress + refresh on completion.
-    job = await _manager.trigger_ingest(collection=collection or None)
+    # `source_path` scopes the run to JUST the file we wrote — otherwise
+    # noted-rag's /ingest walks the whole inventory and dumps every
+    # source into the target collection (the pre-existing "polluted
+    # cv__corpus" bug, see documents/plans/noted_rag_per_source_ingest.md).
+    job = await _manager.trigger_ingest(
+        collection=collection or None,
+        chunking_profile=chunking_profile or None,
+        source_path=relative,
+    )
     if job.get("status") == "unavailable":
         # Roll back so a phantom inventory entry doesn't point at content
         # that was never indexed.
@@ -303,11 +334,28 @@ async def ingest_stream(job_id: str):
 
 
 @router.post("/ingest")
-async def trigger_reingest():
+async def trigger_reingest(
+    collection: str | None = None,
+    chunking_profile: str | None = None,
+):
     """Kick a fresh ingest pass without an upload. Useful for the user
     who edits a file already on disk and wants the index refreshed.
-    Fire-and-forget; returns the job_id."""
-    return await _manager.trigger_ingest()
+    Fire-and-forget; returns the job_id.
+
+    `chunking_profile` (optional) overrides the run-level default
+    chunking profile for this pass."""
+    return await _manager.trigger_ingest(
+        collection=collection,
+        chunking_profile=chunking_profile,
+    )
+
+
+@router.get("/chunking-profiles")
+async def chunking_profiles():
+    """Proxy the catalog of named chunking profiles from noted-rag so
+    the frontend can populate the Document Import dropdown without
+    needing to know about the noted-rag service."""
+    return await _manager.list_chunking_profiles()
 
 
 @router.delete("/sources/{source_b64}")

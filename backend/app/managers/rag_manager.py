@@ -323,19 +323,59 @@ class RagManager:
             logger.warning("noted-rag unreachable for get_chunk: %s", e)
             return {"status": "unavailable"}
 
-    async def trigger_ingest(self, collection: str | None = None) -> dict:
+    async def trigger_ingest(
+        self,
+        collection: str | None = None,
+        chunking_profile: str | None = None,
+        source_path: str | None = None,
+    ) -> dict:
         """Kick a fire-and-forget ingest. Returns the upstream job_id
         immediately so the caller can stream progress separately. Never
-        blocks the noted API handler on the actual embedding work."""
-        params = {"collection": collection} if collection else None
+        blocks the noted API handler on the actual embedding work.
+
+        `chunking_profile` is an optional named profile id (see
+        noted-rag's chunking_profiles.json). None → noted-rag uses its
+        default profile.
+
+        `source_path` (optional) scopes the run to a single inventory
+        entry. Used by the per-upload path so a single-file import
+        doesn't re-walk the full inventory into the target collection.
+        None → bulk rebuild (walk every entry)."""
+        params: dict[str, str] = {}
+        if collection:
+            params["collection"] = collection
+        if chunking_profile:
+            params["chunking_profile"] = chunking_profile
+        if source_path:
+            params["source_path"] = source_path
         try:
             async with self._get_client() as client:
-                resp = await client.post(f"{self._base_url}/ingest", params=params, timeout=10.0)
+                resp = await client.post(
+                    f"{self._base_url}/ingest",
+                    params=params or None,
+                    timeout=10.0,
+                )
                 resp.raise_for_status()
                 return resp.json()
         except (httpx.HTTPError, OSError) as e:
             logger.warning("noted-rag unreachable for trigger_ingest: %s", e)
             return {"status": "unavailable", "detail": str(e)}
+
+    async def list_chunking_profiles(self) -> dict:
+        """Proxy the catalog of named chunking profiles from noted-rag.
+        Used by the frontend's document-import dropdown."""
+        try:
+            async with self._get_client() as client:
+                resp = await client.get(
+                    f"{self._base_url}/chunking-profiles",
+                    timeout=5.0,
+                )
+                resp.raise_for_status()
+                return resp.json()
+        except (httpx.HTTPError, OSError) as e:
+            logger.warning("noted-rag unreachable for list_chunking_profiles: %s", e)
+            return {"status": "unavailable", "detail": str(e),
+                    "default_profile": None, "profiles": []}
 
     async def get_ingest_status(self, job_id: str) -> dict:
         try:

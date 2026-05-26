@@ -18,11 +18,31 @@ must NOT abort on a None; one bad table per doc is normal.
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 import requests
 
 from app.config import LLM_BASE_URL, LLM_TIMEOUT
+
+
+# The `table_describer` preset may route to a thinking-enabled LLM
+# whose response includes a `<think>...</think>` chain-of-thought
+# block before the actual caption. If we store that raw output as
+# the chunk text, downstream RAG queries return the CoT to the
+# answering LLM, whose own `<think>` protocol collides with it and
+# emits malformed output (no `<voice>` block, unclosed `</think>`,
+# etc.) — the user sees "Diana hangs". Strip the CoT here so only
+# the caption survives. Both closed `<think>...</think>` and
+# unclosed-trailing variants are handled.
+_THINK_BLOCK_RE = re.compile(r'<think>[\s\S]*?</think>\s*', re.IGNORECASE)
+_THINK_OPEN_TRAILING_RE = re.compile(r'<think>[\s\S]*$', re.IGNORECASE)
+
+
+def _strip_think(text: str) -> str:
+    text = _THINK_BLOCK_RE.sub('', text or '')
+    text = _THINK_OPEN_TRAILING_RE.sub('', text)
+    return text.strip()
 
 
 logger = logging.getLogger(__name__)
@@ -107,7 +127,7 @@ def describe_table(
         .get('message', {})
         .get('content', '')
     )
-    text = (content or '').strip()
+    text = _strip_think(content)
     if not text:
         return None
     return text

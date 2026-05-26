@@ -1,0 +1,41 @@
+{
+  "default_profile": "prose-balanced",
+  "profiles": [
+    {
+      "id": "prose-balanced",
+      "name": "Balanced prose (default)",
+      "description": "Articles, manuals, technical papers.",
+      "max_tokens": 1000,
+      "min_tokens": 150,
+      "target_tokens": 700,
+      "overlap_tokens": 80
+    },
+    {
+      "id": "list-dense",
+      "name": "List-dense (CVs, bullet docs)",
+      "description": "Tighter chunks for documents packed with bullets or comma-separated lists.",
+      "max_tokens": 400,
+      "min_tokens": 60,
+      "target_tokens": 200,
+      "overlap_tokens": 40
+    },
+    {
+      "id": "long-form",
+      "name": "Long-form (books, research)",
+      "description": "Larger chunks for dense narrative with long sections.",
+      "max_tokens": 1500,
+      "min_tokens": 200,
+      "target_tokens": 1000,
+      "overlap_tokens": 120
+    },
+    {
+      "id": "code-docs",
+      "name": "Code docs / API reference",
+      "description": "Function-level chunks for reference material.",
+      "max_tokens": 600,
+      "min_tokens": 80,
+      "target_tokens": 300,
+      "overlap_tokens": 60
+    }
+  ]
+}
