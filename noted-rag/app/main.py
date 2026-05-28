@@ -140,6 +140,12 @@ class SearchRequest(BaseModel):
     )
     embed_model: str | None = Field(default=None, description="Phase 12: override embed model id (e.g. 'bge-m3'). Defaults to noted-rag's configured EMBED_MODEL_NAME.")
     rerank_model: str | None = Field(default=None, description="Phase 12: override rerank model id. Defaults to noted-rag's configured RERANK_MODEL_NAME.")
+    rerank_min_score: float | None = Field(
+        default=None,
+        description="Override the global RERANK_MIN_SCORE floor for this request. "
+                    "Conversational queries rerank far lower than keyword queries, "
+                    "so callers like cv-backend pass a lower floor to avoid 0 results.",
+    )
 
 
 class SearchResponse(BaseModel):
@@ -238,6 +244,7 @@ def search(req: SearchRequest) -> SearchResponse:
             req.query, tags=req.tags, top_k=req.top_k,
             collection=req.collection, source_paths=req.source_paths,
             embed_model=req.embed_model, rerank_model=req.rerank_model,
+            rerank_min_score=req.rerank_min_score,
         )
         return SearchResponse(status="ok", chunks=chunks)
     except Exception as e:

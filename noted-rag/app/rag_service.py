@@ -214,17 +214,19 @@ class RagService:
         source_paths: Optional[list[str]] = None,
         embed_model: Optional[str] = None,
         rerank_model: Optional[str] = None,
+        rerank_min_score: Optional[float] = None,
     ) -> list[dict]:
         """Dense retrieve top-N, then cross-encoder rerank down to top_k.
 
         `embed_model` / `rerank_model` (optional) override the configured
         defaults (Phase 12 per-request model selection). Both default to
-        config values for backward compatibility."""
+        config values for backward compatibility. `rerank_min_score`
+        overrides the global RERANK_MIN_SCORE floor for this request."""
         query_vec = self.embed([query], model=embed_model)[0]
         return self.search_by_vector(
             query, query_vec, tags=tags, top_k=top_k,
             collection=collection, source_paths=source_paths,
-            rerank_model=rerank_model,
+            rerank_model=rerank_model, rerank_min_score=rerank_min_score,
         )
 
     def search_by_vector(
@@ -236,6 +238,7 @@ class RagService:
         collection: Optional[str] = None,
         source_paths: Optional[list[str]] = None,
         rerank_model: Optional[str] = None,
+        rerank_min_score: Optional[float] = None,
     ) -> list[dict]:
         """Same shape as search() but takes a pre-computed query vector,
         skipping the bge-m3 embed step. The reranker still needs the
@@ -309,8 +312,13 @@ class RagService:
             reverse=True,
         )
 
-        # Min-score guard: bail out if best match is noise.
-        if not ranked or float(ranked[0][3]) < config.RERANK_MIN_SCORE:
+        # Min-score guard: bail out if best match is noise. Caller may
+        # override the global threshold per-request (e.g. cv-backend
+        # uses a lower floor because conversational queries rerank
+        # much lower than keyword queries).
+        thr = (rerank_min_score if rerank_min_score is not None
+               else config.RERANK_MIN_SCORE)
+        if not ranked or float(ranked[0][3]) < thr:
             return []
 
         ranked = ranked[:top_k]
