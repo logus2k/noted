@@ -32,27 +32,28 @@
       "mode": "read_store",
       "added_at": "2026-05-17T19:14:21.893962+00:00",
       "category": "Legal/EU",
-      "display_name": ""
+      "display_name": "Apply AI Strategy Annexes"
     },
     {
       "path": "eu_apply_ai_strategy.pdf",
       "mode": "read_store",
       "added_at": "2026-05-17T19:14:21.953996+00:00",
       "category": "Legal/EU",
-      "display_name": ""
+      "display_name": "Apply AI Strategy"
     },
     {
       "path": "eu_ai_continent_action_plan_annexes.pdf",
       "mode": "read_store",
       "added_at": "2026-05-17T19:14:22.002536+00:00",
       "category": "Legal/EU",
-      "display_name": ""
+      "display_name": "AI Continent Action Plan Annexes"
     },
     {
       "path": "eu_ai_continent_action_plan.pdf",
       "mode": "read_store",
       "added_at": "2026-05-17T19:14:22.212373+00:00",
-      "category": "Legal/EU"
+      "category": "Legal/EU",
+      "display_name": "AI Continent Action Plan"
     }
   ],
   "arcadedb_database": "eu_ai",

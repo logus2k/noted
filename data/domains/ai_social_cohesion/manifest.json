@@ -1,0 +1,85 @@
+{
+  "domain_id": "ai_social_cohesion",
+  "name": "AI and Social Cohesion",
+  "description": "AI and Social Cohesion",
+  "created_at": "2026-05-29T17:21:02.157220+00:00",
+  "embeddings_model": "bge-m3",
+  "pinned": false,
+  "included_files": [
+    {
+      "path": "1. (2017) Schiefer - van der Noll - The essentials of Social Cohesion.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-29T17:21:29.966022+00:00",
+      "category": "",
+      "display_name": "",
+      "chunking_profile_id": "long-form"
+    },
+    {
+      "path": "2. (2023) Schirch - The Case for Designing Tech for Social Cohesion.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-29T17:21:30.037666+00:00",
+      "category": "",
+      "display_name": "",
+      "chunking_profile_id": "long-form"
+    },
+    {
+      "path": "3. (2024) Castells - Advanced Introduction to Digital Society Caps 7-9.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-29T17:21:31.179648+00:00",
+      "category": "",
+      "display_name": "",
+      "chunking_profile_id": "long-form"
+    },
+    {
+      "path": "4. (2009) Therborn - The_Killing_Fields_of_Inequality.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-29T17:21:31.216371+00:00",
+      "category": "",
+      "display_name": "",
+      "chunking_profile_id": "long-form"
+    },
+    {
+      "path": "5. BIAS IN ALGORITHMS - AI AND DISCRIMINATION.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-29T17:21:32.165227+00:00",
+      "category": "",
+      "display_name": "",
+      "chunking_profile_id": "long-form"
+    },
+    {
+      "path": "6. Blueprint-on-Prosocial-Tech-Design-Governance-May-2025.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-29T17:21:32.253870+00:00",
+      "category": "",
+      "display_name": "",
+      "chunking_profile_id": "long-form"
+    },
+    {
+      "path": "7. EN-Prosocial-Tech-Design-Regulation-a-Practical-Guide.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-29T17:21:32.426987+00:00",
+      "category": "",
+      "display_name": "",
+      "chunking_profile_id": "long-form"
+    },
+    {
+      "path": "8. Mapping LLMs Tools for Public Discourse, Pluralism  Social Cohesion - Oct 2025.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-29T17:21:32.524959+00:00",
+      "category": "",
+      "display_name": "",
+      "chunking_profile_id": "long-form"
+    },
+    {
+      "path": "9. unpd-the-next-great-divergence.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-29T17:21:33.126376+00:00",
+      "category": "",
+      "chunking_profile_id": "long-form"
+    }
+  ],
+  "arcadedb_database": "ai_social_cohesion",
+  "corpus_collection": "ai_social_cohesion__corpus",
+  "entity_cache_collection": "ai_social_cohesion__gr_entities",
+  "summary_cache_collection": "ai_social_cohesion__gr_summaries"
+}

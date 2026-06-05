@@ -11,7 +11,7 @@
       "mode": "read_store",
       "added_at": "2026-05-15T12:52:10.849369+00:00",
       "category": "National AI Agendas",
-      "display_name": "Portugal - National Artificial Intelligence Agenda"
+      "display_name": "Portugal - National Artificial Intelligence Agenda 2026"
     },
     {
       "path": "argentina_anexo_5628461_1.pdf",
@@ -180,6 +180,41 @@
       "added_at": "2026-05-17T12:08:39.212291+00:00",
       "category": "National AI Agendas",
       "display_name": "Japan - AI Strategy 2022"
+    },
+    {
+      "path": "Ghana-AI-Strategy-2025-2035.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-29T19:58:20.327135+00:00",
+      "category": "National AI Agendas",
+      "display_name": "Ghana - National Artificial Intelligence Strategy"
+    },
+    {
+      "path": "South Africa National_AI_Government_Summit.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-29T20:13:22.656889+00:00",
+      "category": "National AI Agendas",
+      "display_name": "South Africa - AI National Government Summit"
+    },
+    {
+      "path": "Nigeria National-Artificial-Intelligence-Strategy-19092025.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-29T20:13:23.651455+00:00",
+      "category": "National AI Agendas",
+      "display_name": "Nigeria - National Artificial Intelligence Strategy 2025"
+    },
+    {
+      "path": "Egypt AIstrategy English 16-1-2025-1.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-29T20:13:24.648078+00:00",
+      "category": "National AI Agendas",
+      "display_name": "Egypt - National Artificial Intelligence Strategy"
+    },
+    {
+      "path": "Kenya AI Strategy 2025 - 2030.pdf",
+      "mode": "read_store",
+      "added_at": "2026-05-29T20:13:26.926401+00:00",
+      "category": "National AI Agendas",
+      "display_name": "Kenya -  Artificial Intelligence Strategy 2025-2030"
     }
   ],
   "arcadedb_database": "national_ai_agendas",

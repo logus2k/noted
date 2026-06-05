@@ -1,0 +1,1850 @@
+SOUTH AFRICA’S ARTIFICIAL INTELLIGENCE (AI) PLANNING: ADOPTION OF AI BY GOVERNMENT
+SOUTH AFRICA’S ARTIFICIAL INTELLIGENCE (AI) PLANNING
+
+
+
+
+Disclaimer – Content, Usage of the Draft Document:
+This draft document is for the general discussion purpose and not for publication or academic use. The legal
+conditions on the use of some quotes borrowed from other sources related to Artificial Intelligence (AI) is
+placed currently as to solicit opinion of participants on their relevance. Some these quotations make it into
+the final draft measures would be taken to demonstrate or indicate correct sourcing and acknowledgement
+once is about to be made an official document. Therefore, seeking legal counsel before acting based on the
+contents of this draft is highly recommended. The omission of trademark or service mark does not imply a
+lack of intellectual property rights associated with the mark or logo. All rights reserved as this draft is for
+policy formulation discussion purposes.
+
+
+
+
+SOUTH AFRICA’S ARTIFICIAL INTELLIGENCE (AI) PLANNING: ADOPTION OF AI BY GOVERNMENT
+                                           Prepared by
+
+
+                Alfred “Ali” Mashishi: Chief Director – ICT Forecasting and Modeling
+                                         On behalf of the
+                 Department of Communications and Digital Technologies (DCDT)
+
+
+                                          October 2023
+
+
+
+
+SOUTH AFRICA’S ARTIFICIAL INTELLIGENCE (AI) PLANNING: ADOPTION OF AI BY GOVERNMENT     i
+Foreword by Minister of Communications and Digital Technologies
+
+There are strong indications that AI has the potential to deliver more benefits to humanity as compared to
+any technology introduced in the last century. As with any technology, these benefits are always matched
+by the ills or harms they carry. The harms requires that they be mitigated and managed through a
+sustainable planning process at all levels of society.
+
+Since the invention of computers or computation machines, their growth has been exponential both in
+terms of capability and task performance. Our understanding is that this was because of humans’ ability
+to have developed the power of computer systems with diverse working domains, speed increase, and
+size reduction and time adjustment.
+
+The global assessment on how countries are addressing AI as a general-purpose technology differs in
+terms of continental, regional and national circumstances. Various permutations range from seeing AI as
+a tool that will bring goodness to humans as outlined by the International Telecommunications Union (ITU),
+or AI being able to bring prosperity for humans’ rights according to the United Nations AI Task Force, or
+AI challenging human ethical foundations. Ours as South Africa is guided by the Presidential Commission
+on the 4th Industrial Revolution (PC4IR) report which looks at AI as a technology tool that will advance our
+social and economic prosperity.
+
+We have witnessed several AI I initiatives around the country emanating from the government, private
+sector, academia, and civil society and decided that the best approach is to devise a plan that would
+encompass all. The plan purpose is to ensure that all the AI key role players can agree on the national
+priorities and objectives that will ensure our prosperity and growth through the adoption of AI.
+
+From the government perspective, two (2) major initiatives are already taken and have been widely
+accepted. The Department of Communications and Digital Technologies (DCDT) has established an AI
+Institute of South Africa (AIISA) in 2022 and the Department of Science and Innovation (DSI) has established
+the Centre for Artificial Intelligence Research (CAIR) in past years.
+
+South African government is now outlining key government AI priorities and putting up some deadlines
+that would ensure that we are not left behind on the AI global race. We understand that this phase of AI
+will grow in leaps and bounds and we will always be guarding against the negative aspects and harness
+the positive one and make the African continent a success story.
+
+Mr Mondli Gungubele, MP
+
+Minister of Communications and Digital Technologies
+
+
+
+
+SOUTH AFRICA’S ARTIFICIAL INTELLIGENCE (AI) PLANNING: ADOPTION OF AI BY GOVERNMENT                       ii
+Executive Summary
+
+The advancement in Artificial Intelligence (AI) as a technology has created a breeding storm and
+necessitates that each sovereign country to have a deep look at its propensity, impact and pitfalls towards
+its citizens and needed governance systems. The AI National Plan approaches the computing system in a
+logical flow that would provide impetus for adoption and provision of direction to all stakeholders.
+
+The plan begins with the provision of an overview of AI landscape and how is viewed from the perspective
+of South Africa’s landscape. Section A outlines the global AI discussion as influenced by trends and drivers.
+Global discourse is influenced by political, economic and militarization of AI. It further points out that this
+discourse brings out global concerns and requires tools and applications. The regional and national
+approaches are assessed and aligned with the South African conceptual framework.
+
+Section B looked at how the South Africa’s landscape has been impacted by the pitfalls and opportunities
+brought by both versions of Applied and Generative AI. It unpacks the PC4IR approach and indicate how
+AI is impacting South Africa through law, governance, and regulatory approaches. It further elaborates by
+sharing localization of the AI approach that will drive South Africa’s aspirations.
+
+Section C outlines South Africa’s AI plan priorities and key enablers. It further provides how the AI
+governance and institutional mechanisms could be guided by the ethical and regulatory approaches. The
+governance structures to manage AI in South Africa is proposed with the incorporation of AI, Big Data and
+IOT (automated services). This is directed by the AI framework which was developed in the aftermath of
+PC4IR report approval. It then points out the key priorities to be adopted and the timelines that are within
+the outlined AI opportunities.
+
+
+
+
+SOUTH AFRICA’S ARTIFICIAL INTELLIGENCE (AI) PLANNING: ADOPTION OF AI BY GOVERNMENT                         iii
+CONTENTS
+
+Foreword by Minister of Communications and Digital Technologies ....................................................................... ii
+Executive Summary................................................................................................................................................................ iii
+Section A: Modelling Artificial Intelligence (AI) within the South African Landscape ......................................... 1
+    A1.1          Introduction and Purpose................................................................................................................................. 1
+    A1: 2         Global Discourse: Politics of AI; Economics of AI; and Militarization of AI......................................... 2
+    A1: 3         Investment in AI Technologies and Applications....................................................................................... 7
+    A1: 4         Global Concerns on AI ..................................................................................................................................... 9
+    A1: 5         Main Types of AI Discourse ............................................................................................................................ 10
+    A1: 6         Components of AI- AI System; Machine Learning; Neural Networks; Deep Learning.................. 11
+    A1. 7         Regional vs National AI Approaches and Frameworks .......................................................................... 14
+    A1: 8         South Africa’s AI Conceptual Framework and Approach ...................................................................... 15
+Section B: AI – South African Landscape, Opportunities and Pitfalls ..................................................................... 16
+    B1.           AI Understanding within South Africa’s Context ...................................................................................... 16
+    B1. 1         Adoption of AI: SA AI Approach PC4IR ...................................................................................................... 17
+    B1. 2         Applied and Generative AI: Impact in South Africa ................................................................................ 18
+    B1: 3         State Considerations in terms of Law, Governance and Regulation................................................... 19
+    B1: 4         South Africa’s Aspirations: Global and Continental ................................................................................ 22
+Section C: South African AI Plan ...................................................................................................................................... 23
+    C1            Priority Focus Areas and Enablers ............................................................................................................... 23
+    C1. 1         Discussion on Enabling Environment ......................................................................................................... 26
+    C1. 2         Focus Areas: What must be in place for AIISA to be Effective and Realistic ................................... 32
+    C1. 3         Data, AI and IOT ............................................................................................................................................... 37
+    C2            AI Governance and Institutional Mechanisms ......................................................................................... 38
+    C2: 1         South Africa’s AI Ethical Considerations .................................................................................................... 38
+    C2: 2         SOUTH AFRICA AI REGULATION APPROACH......................................................................................... 40
+    C2.3          SA AI and DATA Governance Structure ...................................................................................................... 41
+    C3            AI Plan Adoption and Timelines Processing............................................................................................. 43
+
+
+
+
+SOUTH AFRICA’S ARTIFICIAL INTELLIGENCE (AI) PLANNING: ADOPTION OF AI BY GOVERNMENT                                                                                             iv
+Section A:
+Modelling Artificial Intelligence (AI) within the South African Landscape
+
+AI      The International Landscape: AI Global Discourse, Trends and Drivers
+
+AI “is a software that is developed with one or more of the techniques and approaches (…) and can, for a
+given set of human-defined objectives, generate outputs such as content, predictions, recommendations,
+or decisions influencing the environment they interact with”
+
+-European Commission definition
+
+A1.1    Introduction and Purpose
+Countries have historically and continuously navigated a global technological phenomenon because of its
+impact on the social and economic attributes as part of advancement in technological revolution. When
+such navigation signals, it is expected that national governments must direct and plan for adoption of such
+an emergence. AI technology is now such a phenomenon.
+
+The advancement in AI as a technology has created a breeding storm and necessitates that each sovereign
+country to have a deep look at its propensity, impact and pitfalls towards its citizens and needed
+governance systems.
+
+There are various definitions and descriptions of AI from the main global bodies and industries which
+require synergizing and alignment. AI is described “as systems that exhibit intelligent behavior which quickly
+analyse various activities and specific environments, then make independent decisions with the aim to
+achieve specific [socio-economic goals] {own emphasis}” (OECD, 2018).
+
+McKinsey and Company (2023, April 24) define AI as a “machine’s ability to perform the cognitive functions
+usually associated with human minds, such as perceiving, reasoning, learning, interacting with an
+environment, problem solving, and even exercising creativity”.
+
+Boston Consulting Group (BCG) also defines AI as “a field of computer science that aims to create machines
+or systems able to perform tasks that normally require human intelligence – tasks involving reasoning,
+learning, decision-making, or creativity”.
+
+Assessing the various definitions of AI at the global level, the key result from all these definitions is directed
+by the effort to seek a neutral global understanding which will permit for growth for AI for all humanity.
+Blumberg even remarked that “humans and machines are a match made in productivity heaven” (Blumberg,
+et al, 2023).
+
+
+
+SOUTH AFRICA’S ARTIFICIAL INTELLIGENCE (AI) PLANNING: ADOPTION OF AI BY GOVERNMENT                             1
+Historically, the human species has witnessed machine impact since the invention of the wheel that
+revolutionized agriculture, it can be concluded that machines have made the life as it is, possible. It is also
+attributed that the 20th century theoreticians such as Alan Turing, a computer scientist and mathematician
+to envision a future where machines could perform functions faster than humans, but machines would not
+replace humans in any stage of the future.
+
+The overall purpose and objective of this document is to craft a South African National AI Plan. This plan
+will inform the creation of the certainty on the AI legal and governance environment and AI regulatory
+landscape that would be solicited from stakeholder inputs at a collaborative level. It will also contribute
+towards the various African continent coordinated AI activities.
+
+This plan envisages to create a better AI future use through the following:
+
+•       Creation of policy and regulatory experiments
+
+•       A set of positive goals for what South African society requires from AI.
+
+•       Management of negative AI impacts on society and industry.
+
+•       Building an understanding of the AI technological possibilities.
+
+•       Proving certainty to society on this rapidly evolving AI technology through flexibility and
+        accommodation of skills, software, innovations, and applications.
+
+A1: 2    Global Discourse: Politics of AI; Economics of AI; and Militarization of AI
+According to Brynjolfsson and Unger (Oct 2023) “the collective decisions we make today will determine
+how AI affects productivity growth, income inequality, and industrial concentration.” They further state that
+there are good reasons to take seriously the growing potential of AI systems because they exhibit intelligent
+behavior and abilities on learning, reasoning, and problem solving with view to transform the economy as
+opposed to technical advances of the past years.
+
+The advancements on AI globally have created a global discourse for countries who are looking towards
+AI as a tool to advance their global positions aspirations. The AI advancements provides and ability for
+countries to traverse terrains that were previously difficult to navigate.
+
+Agreements are being completed at the global levels to address strategic matters such as Sustainable
+Development Goals (SDGs), COP-17 obligations, and maintenance of the leadership on the global Gross
+Domestic Product (GDP) by the largest economies.
+
+
+
+
+SOUTH AFRICA’S ARTIFICIAL INTELLIGENCE (AI) PLANNING: ADOPTION OF AI BY GOVERNMENT                          2
+AI may affect society as a whole and the economy and other areas such as national security, politics, and
+culture, however the effect on the macroeconomic terrain is on:
+
+•     Productivity growth
+
+•     Labour market, and
+
+•     Industrial concentration
+
+According to updated data on 04 December 2023, the current global GDP is indicated that it has grown
+towards the positive side of $125 trillion. The United States is leading with more than $26, 945 trillion;
+followed by China at more than $17, 786 trillion; Germany by more than $4, 430 trillion; Japan by more
+than $4,231 trillion; India by more than $3.730 trillion and United Kingdom (UK) by $3. 332 trillion (Forbes
+India, 2023). South Africa global GDP position in 2023 is $380, 91 billion which puts it second to Nigeria
+in the African continent at $477, 38 billion.
+
+It is indicated that AI has the potential to impact global productivity growth increase positively, the impact
+on labour market through creation of creation, substitution and complementary situation between humans
+and machines.
+
+Several various debates on AI at a global level touch on the realm of politics related to AI, weaponization
+of AI capabilities and economics emanating from AI. Thomson Reuters Foundation AI Governance toolkit
+(www.trust.org) measured the complexity of AI governance and found that there are several global
+concerns at a country level which are at a different phase and need to be resolved through governance
+instruments.
+
+AI Studies on its Impact on the African Continent
+
+According to the report titled “AI in Africa: Unlocking Potential, Igniting Progress, A Working Paper”
+produced by Access Partnership (September 2023), it is elaborated that “one of the foremost challenges in
+Africa’s AI adoption is the potential to exacerbate the current social and digital divides.” However, the report
+further states that “AI is already being used to address a wide range of African and global humanitarian
+challenges, from predicting floods and earthquakes and improving maternal health outcomes, to protecting
+endangered species and safeguarding food security.”
+
+There is an understanding in the African continent, AI can assist in improving productivity and jobs creation
+outcomes across sectors like manufacturing, agriculture, financial services, and natural resources that are
+key to African economic growth. There is a challenge which remains which is the availability of detailed
+research which practically demonstrates how AI can impact Africa on these sectors.
+
+
+
+SOUTH AFRICA’S ARTIFICIAL INTELLIGENCE (AI) PLANNING: ADOPTION OF AI BY GOVERNMENT                           3
+The impact of AI on society research within the African continent is limited research especially when needed
+to focus on several key AI-related topics as depicted on table below, thus necessitating a need of deeper
+research to understand local impact and inform decision-making.
+
+
+
+
+AI Governance
+
+The Africa continent is witnessing increasing positive advocacy approaches on the future of AI governance
+which outlines various governance instruments. Some of the AI governance instruments considered are
+as follows:
+
+    •   AI Guidelines and Standards – these are frameworks to guide AI developers, users and policy
+        makers on what AI software development and applications comply with the existing AI paradigm.
+
+    •   AI Government Strategy – as a high-level plan or approach that outlines goals, priorities, and
+        actions that the government intends to achieve with AI.
+
+    •   AI Policy and Law – a detailed and specific set of guidelines, rules, principles that will guide decision
+        making and actions in the AI area. This will be road mapping exercises linked to domestic and
+        international AI prescripts.
+
+    •   In terms of the AI Law, there is a codified approach which will be enforceable through rules that
+        discourage non-compliance as it will be accompanied by penalties as evidenced by EU-AI Act.
+
+
+
+
+SOUTH AFRICA’S ARTIFICIAL INTELLIGENCE (AI) PLANNING: ADOPTION OF AI BY GOVERNMENT                            4
+    •    AI Ethical Foundations – this relates to a set of ethical and principles conditions linked to human
+         rights, harmful actions and protection of personal information and data.
+
+At a continental level, particularly in Africa, there is a strong emphasis on AI supporting sustainable
+development goals (SDGs). At the country level evidence is emerging where various domestic actions are
+undertaken by countries such as Mauritius, Egypt, and Rwanda amongst others.
+
+In a bigger picture approach, there has been location of relevant national government departments such
+as communications, science and technology that are playing a role of AI in the areas such as healthcare,
+mining, manufacturing, and agriculture.
+
+The awareness of the pitfalls and benefits of AI is looked at the risks and biases that would sustain digital
+divides, digital inequalities, and data disparity due to lack of adequate digital infrastructure currently
+experienced.
+
+AI is a serious policy concern for the African continent and the African Union (AU) has encouraged the
+need to determine countries AI governance measures. There has been many activities and guiding
+instruments for African countries such as the Smart Africa AI Blueprint, Sharm El Sheikh Declaration, Malabo
+Convention, AU Digital Transformation Strategy, and some reports such as “AI for Africa: AI for Socio-
+Economic Development amongst others.
+
+The are still main questions around AI impact such as “How many jobs are going to be lost because of AI?
+What is the best estimate? What fraction of labour force is exposed due to AI adoption, especially
+Generative AI?
+
+IMF studies report indicates that it varies country to country. The examples demonstrated is in the United
+States and United Kingdom where 60-70% of labour force is exposed to AI.
+
+In India where the large portion of workforce is in Agriculture exposure is around 30% and in Brazil and
+South Africa exposure will be 40%. What can be synthesizes is that in South Africa where the total labour
+force is estimated to be 24 267 566, then 40% means almost 9 707 026 job opportunities will be exposed
+to AI.
+
+AI has the potential to add and create value in the private and public sectors more efficiently. On the
+gender exposure, it is remarked that women who tends to be in retail sector or services industries there
+will be a greater exposure to AI.
+
+
+
+
+SOUTH AFRICA’S ARTIFICIAL INTELLIGENCE (AI) PLANNING: ADOPTION OF AI BY GOVERNMENT                        5
+Countries where agriculture drives economies and women largely employed at such sectors, AI will not do
+much damage. The agriculture sector in South Africa is slightly less than 2,5% but Industry and Services
+are 25% and 62, 61% respectively.
+
+Role of Government in AI
+
+Since the Dartmouth Summer Research Project on Artificial Intelligence in 1956, where the term AI was
+coined by Professor John McCarty, data and AI have mainly been fields of specialists in academic
+institutions, government, and private research organizations. However, recent years have been
+characterized by a shift of interest towards the public sphere to include political actors, the public, and
+private companies in nearly all major sectors.
+
+AI has the potential to deliver more benefits to humanity than any new technology in the last century. This
+AI benefit is also matched by great global and human potential harms.
+
+BCG indicates that “governments need to start looking to learning from the AI leaders when it comes to AI
+implementation. Many governments have begun to implement AI across various small-scale pilots. But
+they are still limited to experimentation, and few have achieved true AI at scale.”
+
+The BCG report further advises that for AI “to implemented effectively and generate benefits for public-
+sector organizations in three ways: smarter policymaking, reimagined service delivery, and more efficient
+operations. Thus, the technology can help governments better meet the needs of their citizens while
+making better use of taxpayer” revenue for growth.
+
+Governments around the world are facing complex challenges ranging from youth bulge, ageing
+population, climate change etc. What comes across clearly is that the public sector in conjunction with the
+other stakeholders such as the academic institutions and the private sector must continually evolve to meet
+the demanding needs of the citizens.
+
+McKinsey study conducted recently, found that almost 80% of public sector transformation initiatives tend
+to fail or faulter. It is however, noted that South Africa is working to buck this trend.
+
+In harnessing AI, governments must build levers that are key to driving the phenomenal absorption of AI
+in the whole of society which are as follows:
+
+•     Expanding connectivity to the Internet and Digital Infrastructure
+
+•     Fostering the plans to investing in people through talent and skills development
+
+•     Enhance an ecosystem that promotes competitive and open markets
+
+
+
+SOUTH AFRICA’S ARTIFICIAL INTELLIGENCE (AI) PLANNING: ADOPTION OF AI BY GOVERNMENT                      6
+•       Accelerating technological innovation and supporting the growth of next-generation technologies,
+        mainly AI and Cloud Computing
+
+A1: 3    Investment in AI Technologies and Applications
+According to AI Media report (2022), AI in Africa is a cross cutting technology that has the potential to
+impact many industry sectors, society, and the future of work in Africa. The global AI market was valued
+at $328 billion in 2021 and is projected to have grown from $387 billion in 2022 and projected to $1,394
+billion by 2029.
+
+This economic growth is exhibiting a Compounded Average Growth Rate (CAGR) of 20.1% with some
+estimates suggesting it will create a $15.7 trillion contribution to the global economy by 2030. With the
+projection that South Africa’s economy will be impacted on a positive economic growth of +1% to national
+GDP increase. A figure below demonstrates a state of play of AI in the African continent.
+
+Also, a figure below demonstrates the funding raised by AI Strat-ups in the African continent since 2019 –
+April 2022.
+
+
+
+
+SOUTH AFRICA’S ARTIFICIAL INTELLIGENCE (AI) PLANNING: ADOPTION OF AI BY GOVERNMENT                     7
+The figure below demonstrates the type of AI Investments taking place in the African continent in terms of
+numbers and categories. These AI investments are enabled by a need for a conducive Technology Foreign
+Direct Investments (TFDIs) and the enabling Visa Regime and related environments.
+
+
+
+
+SOUTH AFRICA’S ARTIFICIAL INTELLIGENCE (AI) PLANNING: ADOPTION OF AI BY GOVERNMENT                     8
+A1: 4    Global Concerns on AI
+Globally it is believed and understood that AI has potential to drive significant advances in so many social
+and economic fields thus making connectivity more meaningful and accessible to everyone.
+
+It is also observed that new business models and many industries are quickly shifting towards the
+implementation and maturity of AI-driven products and services. These product and services are taken
+up at an amazing speed by humanity and have the potential to change the world as we know it.
+
+There are several matters globally, however that need to be addressed substantively when confronting the
+emergence of AI which amongst others are:
+
+-       Data as a meaningful developmental tool.
+
+-       Digital skills and Job Impacts (Employment)
+
+-       Global Bodies Formation and Approaches on AI
+
+
+
+
+SOUTH AFRICA’S ARTIFICIAL INTELLIGENCE (AI) PLANNING: ADOPTION OF AI BY GOVERNMENT                       9
+-       Ethical use of AI
+
+-       Funding and Investments – Protection of Intellectual Property and Patents
+
+-       AI Start-ups and New Emerging Business (Tax and VISA Regime and Maturity Assessment Models)
+
+A1: 5    Main Types of AI Discourse
+Many people in the world currently have knowingly or unknowingly interacted with AI through various
+tools such as voice assistants like Siri and Alexa that are founded on AI technology and applications. Also,
+in the customer service environment there are chatbots that sprung out to help navigate some URLs and
+websites.
+
+Mainly there are two types of AI making rounds in the global discourse, Applied AI (AAI) and Generative
+AI (GAI).
+
+AAI is model or a system where artificial intelligence is used or applied to real world problems or global
+wicked problems and has a serious implication for governments and industries. This type of AI can help
+or assist governments to grow economic and social sectors value-chains through bringing efficiency and
+elimination of human inconveniences. In the industry and business levels, this AI has the potential to make
+them more profitable and introducing new business models.
+
+GAI is an AI model that generates or creates content in a response to prompt. These are AI tools such as
+ChatGPT (Chat Generative Pre-trained Transformer) and DALL-E (art generated tool) amongst others
+(McKinsey, 2023).
+
+Boston Consulting Group (BCG) defines GAI as “a set of algorithms, capable of generating seemingly new,
+realistic content – such as text, images, or audio – from training data.
+
+GAI tools can produce a wide variety of credible writing in seconds, then respond to a user’s critiques to
+make the writing more fit for purpose. This has implications for a broad range of industries, from IT and
+software organizations that can benefit from the instantaneous code generated by AI models to
+organizations in need of marketing copy. Use generative AI resolution versions of medical images, as an
+example with the time and resources saved, government can pursue new business opportunities and the
+chance to create more value.
+
+
+
+
+SOUTH AFRICA’S ARTIFICIAL INTELLIGENCE (AI) PLANNING: ADOPTION OF AI BY GOVERNMENT                      10
+A1: 6    Components of AI- AI System; Machine Learning; Neural Networks; Deep Learning
+AI has largely a common definition available from most of the global recognized organizations and a
+layered approach in terms of the components. It is, however, not to be complacent that everyone in the
+national psychic has the same understanding. The diagram below demonstrates how the understanding
+of AI and related components could be viewed.
+
+
+
+
+Diagram 1: Components of AI Ecosystem
+
+AI is a machine’s ability to perform the cognitive functions we associate with human minds, such as
+perceiving, reasoning, learning, interacting with an environment, problem solving, and even exercising
+creativity.
+
+AI techniques are increasingly using massive amounts of alternative data sources and data analytics
+referred to as ‘big data’. The image below states that Big Data has four (4) variations, volume, variety,
+velocity, and veracity. The image below demonstrates how the four elements of Big Data are considered.
+
+
+
+
+SOUTH AFRICA’S ARTIFICIAL INTELLIGENCE (AI) PLANNING: ADOPTION OF AI BY GOVERNMENT                   11
+AI is a machine’s ability to perform the cognitive functions we associate with human minds, such as
+perceiving, reasoning, learning, interacting with an environment, problem solving, and even exercising
+creativity. AI techniques are increasingly using massive amounts of alternative data sources and data
+analytics referred to as ‘big data’. The image below states that Big Data has four (4) variations, volume,
+variety, velocity, and veracity. The image below demonstrates how the four elements of Big Data are
+considered.
+
+Machine learning is a form of AI based on algorithms that are trained on data. These algorithms can
+detect patterns and learn how to make predictions and recommendations by processing data and
+experiences, rather than by receiving explicit programming instructions. The algorithms also adapt in
+response to new data and experiences to improve their efficacy over time.
+
+The volume and complexity of data that is now being generated, too vast for humans to reasonably reckon
+with, has increased the potential of machine learning, as well as the need for it. In the years since its
+widespread deployment, which began in the 1970s, machine learning has had an impact in several
+industries, including achievements in medical-imaging analysis and high-resolution weather forecasting.
+
+
+
+
+SOUTH AFRICA’S ARTIFICIAL INTELLIGENCE (AI) PLANNING: ADOPTION OF AI BY GOVERNMENT                    12
+Such data feed machine learning (ML) models which use such data to learn and improve predictability and
+performance automatically through experience and data, without being programmed to do so by humans.
+
+Some computers have now crossed the exascale threshold, meaning that they can perform as many
+calculations in a single second as an individual could in 31,688,765,000 years.
+
+But it’s not just about computation. Computers and other devices are now acquiring skills and perception
+that have previously been our sole purview.
+
+Many people have probably interacted with AI even if you didn’t realize it with voice assistants like Siri and
+Alexa are founded on AI technology, as are some customer service chatbots that pop up to help you
+navigate websites.
+
+The neural network can then make determinations about the data, learn whether a determination is correct,
+and use what it has learned to make determinations about new data. For example, once it “learns” what
+an object looks like, it can recognize the object in a new image. Three types of artificial neural networks
+used in machine learning as defined by McKinsey study:
+
+•     Feed-forward neural networks (FfNNs) are simple neural networks first proposed in 1958, information
+      moves in only one direction. Meaning you can feed, or input, data into the model, then “train” the
+      model to predict something about different data sets. They are used in banking, among other
+      industries, to detect fraudulent financial transactions.
+
+•     Convolutional neural networks (CNNs) are type of feed-forward neural network modeled on the
+      makeup of the animal visual cortex, the part of the brain that processes images well suited to
+      perceptual tasks, such as identify bird or plant species based on photographs. It is suited diagnosing
+      diseases from medical scans or detecting a company logo in social media to manage a brand’s
+      reputation or to identify potential joint marketing opportunities.
+
+•     Recurrent neural networks (RNNs) are a neural network whose connections include loops, meaning
+      the model both moves data forward and loops it backward to run again through previous layers
+      helpful for predicting a sentiment or an ending of a sequence, like a large sample of text, speech, or
+      images.
+
+Deep learning is a type of machine learning that can process a wider range of data resources (images, for
+instance, in addition to text), requires even less human intervention, and can often produce more accurate
+results than traditional machine learning. Deep learning uses neural networks based on the ways neurons
+interact in the human brain to ingest data and process it through multiple iterations that learn increasingly
+complex features of the data.
+
+
+
+SOUTH AFRICA’S ARTIFICIAL INTELLIGENCE (AI) PLANNING: ADOPTION OF AI BY GOVERNMENT                        13
+The COVID-19 crisis has accelerated and intensified the digitalization trend that was already observed prior
+to the pandemic, including around the use of AI. Global spending on AI is forecast to double over the
+period 2020-24, growing from USD50 bn in 2020 to more than USD110 bn in 2024 (IDC, 2020).
+
+It is remarked that humans and machines are a match made in productivity heaven. The human species
+wouldn’t have gotten very far without our mechanized workhorses. From the wheel that revolutionized
+agriculture to the screw that held together increasingly complex construction projects to the robot-enabled
+assembly lines of today, machines have made life as we know it possible.
+
+Despite their seemingly endless utility, humans have long feared machines on the possibility that machines
+might someday acquire human intelligence and strike out on their own.
+
+A1. 7   Regional vs National AI Approaches and Frameworks
+There is 70% plus global internet adoption in 2022 and more than 60% online mobile usage across major
+markets (AI Media Group, 2022). Generative AI and ChatGPT in particular, swept into the world’s collective
+consciousness and made us all sit up and take notice The application reached 100 million monthly active
+users just two months after launch and swiftly earned the honour of being the fastest-growing consumer
+application in history (Ekow Duker, co-Founder of Zindi Africa).
+
+According to McKinsey research the real value for the Middle East’s Gulf Cooperation Council (GCC)
+countries could be $150 billion or equivalent to 9 percent or more of those countries combined Gross
+Domestic Product (GDP).
+
+
+
+
+SOUTH AFRICA’S ARTIFICIAL INTELLIGENCE (AI) PLANNING: ADOPTION OF AI BY GOVERNMENT                      14
+The figure above as researched by Access Partnership shows that the Sub-Saharan Africa could gain up to
+$136 billion worth of economic benefits by comparing the AI sector AI impact in South Africa, Ghana, Kenya
+and Nigeria. As previously reported that depending on each country key economic sector contributor, AI
+will determine the value derivative. For example, Nigeria key sectors stands to benefit from AI at a greater
+scale compared to South Africa which its key sectors will be somehow negatively impact to a greater extent.
+However, all these countries will enjoy greater benefits from the adoption of AI.
+
+In adopting AI at a national stage is by creating and understanding and acknowledging of the global digital
+transformation changes happening at the United Nations (UN) levels and many global platforms.
+Secretary-General (SG) of the UN report on the preparation for the Summit of the Future in September
+2024, indicated that a Digital Global Compact (DGC) must be developed encapsulating AI is an embedded
+technology. The DGC will be driven by focus on Digital Transformation and Climate Change as key drivers
+for global changes with AI as the center of gravity.
+
+A1: 8   South Africa’s AI Conceptual Framework and Approach
+
+South Africa (during its African Union Presidency) was instrumental in contributing to a pan-African “AI for
+Africa Blueprint” part of the SMART AFRICA initiative supported by the German Development Cooperation
+(GIZ) and the Smart Africa Secretariat. The AI for Africa Blueprint helps member-states towards developing
+policies, strategies and plans that ensure growth and prosperity within the context of 4IR digital revolution.
+
+In November 202, the Department of Communications and Digital Technologies (DCDT) launched an
+Artificial Intelligence Institute of South Africa (AIISA) [www.aii-sa.co.za] to encourage the take-up of AI and
+localised AI solution.
+
+In addition, the Department of Higher Education, Training, and Innovation (DHET&I) established the WEF
+Affiliated AI Centre which focuses on AI Ethics and the Centre for Artificial Intelligence Research (CAIR)
+which focuses on AI Research.
+
+These current approaches were informed and directed by the several prescripts but mainly from the
+Presidential Commission on the 4th Industrial Revolution (PC4IR) report. It was adopted at Cabinet meeting
+on August 26, 2021. The establishment of the institute sums up the actions that South Africa’s government
+will take to advance the take-up of AI in both private and public sector, to increase the relevant skills and
+research.
+
+
+
+
+SOUTH AFRICA’S ARTIFICIAL INTELLIGENCE (AI) PLANNING: ADOPTION OF AI BY GOVERNMENT                         15
+The envisaged South African National AI plan will rely on the following pillars:
+
+•     Boosting AI in the government, economy, digital skills through research and development. and the
+      legal environment.
+
+•     Government-as-Platform approach to boost uptake of AI in both public sector and wider economy.
+
+•     AI public skilling courses and raising AI awareness.
+
+•     Creation of AI sandboxes for testing AI localised applications.
+
+•     Collaboration with the private sector, academia, and civil society to identify AI opportunities to
+      advance society.
+
+•     Develop designated AI local innovation and development of Start-up grants for developing machine
+      learning based solutions.
+
+•     There is a need for a separate legislation regime that will demonstrate the importance of AI as a field
+      of technology that is becoming increasingly popular.
+
+•     AI has the potential to deliver real value in South Africa.
+
+
+Section B: AI – South African Landscape, Opportunities and Pitfalls
+
+B1.     AI Understanding within South Africa’s Context
+
+The greatest attention currently on AI is because it is now able to perform the functions that were
+exclusively human brain function. AI is a machine’s ability to perform the cognitive functions we usually
+associate with human minds. AI systems are machine-based systems with varying levels of autonomy that
+can, for a given set of human-defined objectives, make predictions, recommendations, or decisions.
+
+The image below demonstrates how the AI system through data accumulation and interpretation can
+perform brain functions as used by many others.
+
+
+
+
+SOUTH AFRICA’S ARTIFICIAL INTELLIGENCE (AI) PLANNING: ADOPTION OF AI BY GOVERNMENT                       16
+In the context of South Africa where there is a challenge with job security and high unemployment, the
+use of AI should be dovetailed with the need to improve such situations. It is remarked that a mere
+adoption of AI within the administration work phase could save South Africa $9 billion an annum through
+improvement of absenteeism.
+
+One of the significant aspects about AI as a general-purpose technology is that is not a standardized
+blanket approach technology. It offers the user or adopter the opportunity to tailor make it to address the
+specific challenges at that moment and in future. For example, there are countries that looked at AI to
+help solve their national problem by addressing the national question which was based on solving the
+aging population crisis.
+
+This was applied with the understanding that AI can provide the ability to analyze, diagnose, predict, and
+automate a problematic situation at a faster speed.
+
+AI is revolutionizing human life and unlocking a whole new world of innovation. Its prevalence will affect
+nearly every society aspect. The AI Industry and developers are required to demonstrate responsible
+behavior and ethical use.
+
+AI solutions and applications must consider that they are designed to ensure safety, reliability, and ethical
+practices. There will be a need to create trustworthy regulatory principles and governance systems that
+will guarantee levels of accountability, inclusivity, and transparency that will promote human life and prevent
+harm.
+
+B1. 1   Adoption of AI: SA AI Approach PC4IR
+In South Africa’s situation, the PC4IR report has outlined 10 national features that need to be understood
+before deciding on AI approach. These features include but not limited to youth bulge, gender inequality,
+internal migration, income disparities, human development index, skewed economic structure, regression
+in energy and water supply, domestic workers dominance, weak economic growth, high corruption,
+reduced global competitiveness, amongst others.
+
+
+
+SOUTH AFRICA’S ARTIFICIAL INTELLIGENCE (AI) PLANNING: ADOPTION OF AI BY GOVERNMENT                         17
+The PC4IR also outlines 8 key dimensions that should guide the development of an AI national plan
+approach which are:
+
+•       service delivery,
+
+•       preparation through experimentation,
+
+•       private sector capabilities,
+
+•       technological clarity and commitment,
+
+•       government as an organizing player,
+
+•       human capital development, and
+
+•       regulation and ethics.
+
+There is also un understanding provided by the PC4IR report when it comes to policy development and
+formulation that outlines required approach:        policy must be inclusive in its process, integrated
+infrastructure framework, financial incentives, adaptiveness, and socio-economic impact assessment.
+
+Companies and organizations in South Africa have started with the implementation of both the applied
+and generative AI technologies in areas such as chatbots, job seeking tools, quantum analysis and data
+traffic management.
+
+B1. 2    Applied and Generative AI: Impact in South Africa
+There is a need to understand the various forms of AI especially in two (2) formats, Applied AI, and
+Generative AI.      Applied AI simply, artificial intelligence applied to real-world problems has serious
+implications for the business world. In this aspect, the value of AI is not in the systems themselves but in
+how companies use those systems to assist humans and their ability to explain to shareholders and the
+public what those systems do in a way that builds and earns trust.
+
+The PC4IR has placed emphasis on the adoption of applied AI in advancing the economic growth prospects
+of South Africa. The key economic sectors such as manufacturing, transportation or network industries
+require an applied AI to function optimally.
+
+Generative AI is an AI model that generates content in response to a prompt. AI tools like ChatGPT and
+DALL-E (a tool for making AI-generated art) have the potential to change how a range of jobs are
+performed.
+
+
+
+
+SOUTH AFRICA’S ARTIFICIAL INTELLIGENCE (AI) PLANNING: ADOPTION OF AI BY GOVERNMENT                      18
+The full scope of that impact, though, is still unknown, as are the risks. Questions that can be answered
+are, how generative-AI models are built, what kinds of problems they are best suited to solve, and how
+they fit into the broader category of AI and machine learning.
+
+Generative-AI tools can produce a wide variety of credible writing in seconds, then respond to a user’s
+critiques to make the writing more fit for purpose. This has implications for a broad range of industries,
+from IT and software organizations that can benefit from the instantaneous code generated by AI models
+to organizations in need of marketing copy. Use generative AI resolution versions of medical images, as
+an example with the time and resources saved, government can pursue new business opportunities and
+the chance to create more value.
+
+Generative AI will have heavy impact on the educational, art and culture, and research and development
+areas. There is a need to shape up and build defensive all the address possibility of fake and misleading
+facts through proper AI regulation mechanisms.
+
+B1: 3    State Considerations in terms of Law, Governance and Regulation
+The deployment of AI in major sectors is expected to increasingly drive competitive advantages through
+two main avenues:
+
+•       Cost reduction, and
+
+•       Productivity enhancement.
+
+Policy makers and regulators have a role in ensuring that the use of AI is consistent with regulatory aims
+of promoting stability, protecting consumers, promoting integrity and competition. Policy makers should
+consider supporting AI innovation in the different sectors.
+
+Emerging risks from the deployment of AI techniques need to be identified and mitigated to support and
+promote the use of responsible AI. Existing regulatory and supervisory requirements may need to be
+clarified and sometimes adjusted, as appropriate, to address some of the perceived incompatibilities of
+existing arrangements with AI applications.
+
+The application of regulatory and supervisory requirements on AI techniques could be looked at under a
+contextual and proportional framework encouraging the use of AI without unnecessarily stifling innovation.
+
+Policy makers should consider sharpening their focus on better data governance. Policy makers should
+consider disclosure requirements around the use of AI techniques in the provision services and that it may
+impact outcome.
+
+
+
+
+SOUTH AFRICA’S ARTIFICIAL INTELLIGENCE (AI) PLANNING: ADOPTION OF AI BY GOVERNMENT                    19
+Regulators should consider how to overcome the perceived incompatibility of the lack of explainable in AI
+with existing laws and regulations.
+
+Policy makers should consider requiring clear AI model governance frameworks and attribution of
+accountability to help build trust in AI-driven systems. Explicit governance frameworks that designate clear
+lines of responsibility for the development and overseeing of AI-based systems throughout their lifecycle,
+from development to deployment, could be put in place. Internal model governance frameworks could
+be adjusted to better capture risks emerging from the use of AI.
+
+What is needed to be in place to Achieve with adoption of AI in South Africa?
+
+The era of Digital Transformation provides states and nations options to navigate. These options are related
+to achieving phenomenal economic and social growth which will yield returns that are realizable. The
+options that are readily applied within the digital transformation are:
+
+•       Digital Economy
+
+•       Gig Economy
+
+•       Circular Economy
+
+A choice or combination of these options have the requirements and yields for when a country or nation
+decides on a particular choice within the digital transformation can provide a springboard. The table below
+shows a snapshot of what each choice has enabling requirements and outcomes that will be realized. It
+should be borne in mind that should a specific option be made further unpacking will become a driving
+policy and strategies that would be compounded by needed regulatory framework.
+
+
+    Choices/Options                   Enabling Requirements            Outcome
+
+
+    Digital Economy                   Robust 80- 100% Internet         Disruptive Development: Remodeled
+                                      Connectivity Access by society   Systems that will provide Global
+                                                                       Leader and Enhanced
+                                                                       Competitiveness
+
+
+    Innovation/Gig Economy            80-100% Funding on               Game Changer Development:
+                                      Invention and Local              Innovation with global reach
+                                      Innovation.
+
+
+
+
+SOUTH AFRICA’S ARTIFICIAL INTELLIGENCE (AI) PLANNING: ADOPTION OF AI BY GOVERNMENT                        20
+ Choices/Options                   Enabling Requirements              Outcome
+
+                                   Large segment of society
+                                   must be of young age with
+                                   government having a lost risk
+                                   appetite.
+
+
+ Circular Economy                  80-100% consumption based          Sustainable Development: Recyclable
+                                   on net importer of goods           and Greening Systems
+
+
+In explaining the table above, will be guided by the understanding of how each option is defined within
+the context of a particular nation. Defining the Digital Economy, a unified definition is that “is a worldwide
+network of economic activities, commercial transactions and professional interactions that are enabled by
+information and communications technologies (ICT), meaning an economy based on digital technologies”
+(www.techtarget.com).
+
+Digital Economy require that a nation or society must have 80-100% must be connected to the Internet,
+meaning that government, industry, academia, and civil society must use Internet in most it’s their activities.
+The outcome is that the current systems must be remodeled, and change must be deep.
+
+Innovation/gig economy is defined as “a field of economic theory and applied/experimental economics that
+emphasizes innovation and entrepreneurship” (www.valuer.ai). The choice of Gig Economy requires that
+the society must be driven by youth bulge where at least 75% of the population is younger than 40 years
+old. In this option, the government must be willing to fund local inventions and innovations with the
+intention to have a game changing innovation that will be globally adopted.
+
+Circular economy is defined as “a model of production and consumption, which involves sharing, leasing,
+reusing, repairing, refurbishing and recycling existing materials and products as long as possible”
+(ww.europarl.europa.eu). The choice of a Circular economy relies on the society which does not actually
+produce goods at a large scale but relies on importing goods from other nations. This means that whatever
+is imported must be made longer term longer and recyclable for longer-term.
+
+South Africa is in the middle strata of these economic models because they possess snippets of elements
+of each and not through the determined thresholds. The acquisition of AI technology determines the
+choice of an economic model pursuant to social and economic growth. South Africa has made a choice
+to pursue a digital economy model as the digital transformation agenda, thus its use and adoption of AI
+will be demonstrated as such.
+
+
+
+
+SOUTH AFRICA’S ARTIFICIAL INTELLIGENCE (AI) PLANNING: ADOPTION OF AI BY GOVERNMENT                         21
+Frameworks for appropriate training, retraining and rigorous testing of AI models could be introduced
+and/or reinforced to ensure that ML model-based decision-making is operating as intended and in
+compliance with applicable rules and regulations.
+
+Regulators should consider promoting the ongoing monitoring and validation of AI models, which are
+fundamental for their risk, as one of the most effective ways to reinforce model resilience, prevent, and
+address model drifts.
+
+Appropriate emphasis could be placed on human primacy in decision making when it comes to higher-
+value use-cases. Policy makers could consider the increased technical complexity of AI, and whether
+resources will need to be deployed to keep pace with advances in technology. The role of policy makers
+is important in supporting innovation in the AI sector and protecting the citizens from consuming AI
+products that are harmful to their privacy, security, and dignity.
+
+B1: 4    South Africa’s Aspirations: Global and Continental
+
+South Africa’s global AI Aspirations are guided by the following objectives:
+
+•       To promote national character as a global shaper in the domain of AI.
+
+•       AI Skills Aspiration - South Africa aims to enhance SA human capital with a steady local supply of
+        AI-empowered talents to cope up with the disruption that will be caused by this technology.
+
+•       AI Policy And Regulation Aspiration – South Africa will be part of legislative national transformation
+        of the African continent in enacting the most welcoming legislation AI businesses and talents.
+
+•       AI Investment Aspiration – South African government will support increase assets and enable the
+        economy by attracting local and foreign investors to identify and fund AI investment opportunities
+        in SA.
+
+•       Research and innovation initiatives will target top human capital talents to nurture their skills through
+        state-of-the-art R&I environment in new/smart cities to spearhead innovation and impact creation.
+
+•       Ecosystem Initiatives aim to stimulate Data & AI adoption across giga projects and across major
+        cities, improving productivity, quality of services and wellbeing
+
+
+
+
+SOUTH AFRICA’S ARTIFICIAL INTELLIGENCE (AI) PLANNING: ADOPTION OF AI BY GOVERNMENT                           22
+Section C: South African AI Plan
+
+C1      Priority Focus Areas and Enablers
+A national AI Plan Mapping Steps
+
+
+
+
+        2023                    2024                     2025                             2026
+
+With foresight and a commitment to act, South Africa can capture the opportunity offered by technology,
+manage the AI risks, and ensure that the gains are broadly shared. There are four core priorities for a bold
+AI national plan of action that is co-owned by government, business, labour and educational leaders.
+Provide the state with predictive maintenance, diagnostic ability, analytical models for policy and regulatory
+systems, and automated service delivery channels.
+
+In terms of AI as a technology tool of choice and the impact it must have on the social and economic
+sectors is to achieve the following outcomes:
+
+•     AI Predictive maintenance abilities.
+
+•     AI Logistics optimization and Automated services
+
+•     AI Diagnostic abilities
+
+•     AI Analytical abilities
+
+AI National Major Initiatives Required to Scale-UP
+
+
+•           Launching and events               AI Insititions
+
+
+
+•              Operationalisation and            Activiting
+
+
+
+•               Building AI Data Achitecture
+
+
+
+
+SOUTH AFRICA’S ARTIFICIAL INTELLIGENCE (AI) PLANNING: ADOPTION OF AI BY GOVERNMENT                        23
+•                AI delibarate investment channels
+
+First, South Africa can shape a smart approach to embrace AI for the benefit of all citizens. The plan can
+help define the country’s AI agenda, including prioritizing AI industries where South Africa has or can
+develop a competitive edge in technology-driven solutions, such as mining and manufacturing.             The
+envisaged national plan AI of action can also scope and size the risks that AI adoption poses to jobs and
+the economy; it can also assist develop the necessary AI national plan.
+
+Second, South Africa can take decisive steps to invest in AI skills generation plan. The plan could help
+rethink the country’s education and learning ecosystem to foster broad participation in the AI opportunities
+of the future. It can create transparency on the AI skills that the economy will need in future, and help
+educational institutions plan to meet that need. It can trigger a review of South Africa’s basic education
+system, to strengthen the focus on teaching quality, literacy, and STEM subjects - science, technology,
+engineering, and mathematics. It can promote a stronger technical and vocational education and training
+(TVET) system to ramp up the development of AI technical skills. And it can help drive improvement in the
+graduate conversion rate of South Africa’s education system.
+
+Third, the AI national plan can set out a national strategy to mitigate the AI impact of adoption. That would
+include identifying jobs that will not be portable and identifying ways to reintegrate displaced workers into
+the AI workforce. For example, South Africa can increase investment in AI to boost employment
+opportunities. That can include providing focused support to AI start-ups that are producing AI products
+for export or import substitution in sectors such as advanced manufacturing and agro-processing, and
+which have prospects for rapid growth. South Africa can also develop support for individuals moving from
+formal employment into the ‘gig’ or “digital” or “circular” economy. Finally, the plan can propose ways to
+rebalance AI social-support funds and mechanisms to support those who cannot be AI integrated into the
+workforce.
+
+Fourth, the AI plan can help foster a step-up scenario, where AI job creation increases over and above a
+trendline scenario because of societal and policy choices enabled by increased productivity and economic
+growth. Closing the AI infrastructure and needed gap will require an increased levels of investment in the
+South African AI sector economy and could be a major as this could be a source of labour demand in
+years to come.
+
+A further opportunity is embracing the transition to clean energy through AI, including increasing the share
+of renewables and making buildings, transportation, and technologies more energy efficient.
+
+
+
+
+SOUTH AFRICA’S ARTIFICIAL INTELLIGENCE (AI) PLANNING: ADOPTION OF AI BY GOVERNMENT                       24
+ AI Dimensions                AI Components                      AI Activities
+
+
+ Skills                       Data and Literacy                  • Instil basic data and AI skills for the
+                                                                    national workforce and students.
+                              Data and AI Specialists
+                                                                 • Build sustainable pool of national
+                              Data and AI Experts                   specialization in data and AI.
+
+                                                                 • Nurture data and AI scientists
+                                                                    through local and international
+                                                                    partnerships at an academic and
+                                                                    professional levels.
+
+
+ Policy and Regulations       Activate policy and regulatory • Data generation AI generative and
+                              frameworks.                           applications.
+
+                                                                 • Attract       local     and      foreign
+                                                                    companies to AI sectors through
+                              Companies’            incentives
+                                                                    incentives programmes.
+                              programmes.
+                                                                 • Attract foreign talents data and AI
+                                                                    sector.
+
+                              Talent’s              incentives
+                              programmes
+
+
+ AI Investment                AI Investment Funds                • Stimulate data and AI investments
+                                                                    through      targeted        investment
+                                                                    funds.
+
+                              Investor support programme
+                                                                 • Activate specialised programme to
+                                                                    support investors.
+
+
+                              Administrative services
+
+
+
+
+SOUTH AFRICA’S ARTIFICIAL INTELLIGENCE (AI) PLANNING: ADOPTION OF AI BY GOVERNMENT                      25
+    Research and Innovation          R&D innovation excellence.         • Elevate        data    and        AI     R&D
+                                                                           innovation           capabilities          in
+                                     National innovation test beds.
+                                                                           universities and research centers.
+
+                                                                        • Create an attractive data and AI
+                                                                           test bed environment in mega-
+                                                                           projects and smart cities.
+
+
+    AI Ecosystem                     Data and AI Sector strategies      • Develop data and AI domain in
+                                                                           sectors    identified       as        priority
+                                     Data and AI Platforms
+                                                                           strategies.
+
+                                     Smart cities                       • Accelerate data and AI technology
+                                                                           adoption        through          accessible
+                                     Government Systems
+                                                                           digital platforms.
+
+                                                                        • Drive the smart city agenda in
+                                                                           towns and cities.
+
+                                                                        • Adopt data management practices
+                                                                           and use of AI in government
+                                                                           organisations
+
+
+C1. 1     Discussion on Enabling Environment
+South Africa is observing three (3) trends in which the adoption of AI is possible:
+
+•       Firstly, technologically, the data from machine learning is tied to the wide availability of large amounts
+        of data that could be used through cheap computing power.
+
+•       Secondly, economically, progress on adopting AI is based on significant investment input and
+        advancement of venture capital in technological companies and start-ups.
+
+•       Thirdly, culturally, the digital content generation drives the digital transformation global agenda as it
+        enables AI platform generation.
+
+Which South African Economic Sectors can benefit from machine learning machine and deep learning?
+
+
+
+
+SOUTH AFRICA’S ARTIFICIAL INTELLIGENCE (AI) PLANNING: ADOPTION OF AI BY GOVERNMENT                                    26
+The image above demonstrates the plethora of sectors that have been advanced in terms of structure and
+size in terms of maturity, semi-maturity, and least maturity.
+
+
+
+
+The McKinsey study collated more than 400 use cases of machine and deep learning across 19 industries
+and nine business functions. Nearly all industries can benefit from machines and deep learning.
+
+The identification of key economic sectors that could benefit from application or adoption of Applied and
+Generative AI should be harnessed and supported through the lens of acknowledging the changing
+business models.
+
+
+     EDUCATION: Integrating Data and AI in education to align the education system with labor
+market needs and improve the student’s journey
+
+    GOVERNMENT: Assimilating Data and AI in Government to create a smarter and more efficient
+public sector
+
+
+    HEALTHCARE: Integrating Data and AI into healthcare to increase access, enhance
+preventative care, and accommodate growing demand
+
+
+
+
+SOUTH AFRICA’S ARTIFICIAL INTELLIGENCE (AI) PLANNING: ADOPTION OF AI BY GOVERNMENT                   27
+       ENERGY: Integrating Data and AI into Energy in increase capacity, enhance efficiency, and
+    develop adjacent industries
+
+           MOBILITY: Incorporating Data and AI in Mobility to build a regional hub, create smart city
+    Mobility technology, and enhance traffic safety in cities
+    APPLYING AI in terms of Process Steps
+
+
+
+
+    The steps that are outlined in the above image demonstrates the number of inputs and planning required
+    to adopt by the various sectors in creating a value-based design that would guide the narration of AI in
+    SA planning process.
+
+    The number of AI Institutes and Centres within SA must endeavor to share a national design data and
+    models that would facilitate the quick adoption of AI within the SA national economic and social footprint.
+
+    AI National Targets in Catapulting and Dovetailing NDP 2030
+
+•         30% of the total workforce trained on basic AI data management and AI literacy skills.
+
+•         20 000 local AI specialists in workforce.
+
+•         5 000 AI experts
+
+•         Top 20 of countries in Applied index
+
+
+
+    SOUTH AFRICA’S ARTIFICIAL INTELLIGENCE (AI) PLANNING: ADOPTION OF AI BY GOVERNMENT                     28
+•         Exemplary AI legislative aspects and regulation
+
+•         100 - 300 AI startups
+
+•         70 Bn Government, local and Foreign Direct investment AI
+
+•         Top 20 countries in peer reviewed SA AI research and development publications
+
+    Why AI Adoption matters in SA?
+
+    South Africa’s position regarding the stack choices mentioned above seems to sit in the middle of the
+    choices. The ambition to make the South Africa to be at the place where AI is made reality goes in parallel
+    with the national priorities under NDP 2030.
+
+    The country is going through an unprecedented transformation, and we are aiming to maximize the
+    benefits provided by AI to support and accelerate this transition. South Africa needs to ensure the
+    continuity of this endeavour throughout the design and implementation of the different phases of the
+    policy and strategy by focusing on six broad dimensions. The dimensions are policy and regulations
+    imperatives, generative skills, needed investment, research and innovation and the data and AI ecosystem.
+
+    These dimensions will support the proposed four (4) phases related to planning for – strategy formulation,
+    activate initiatives, expand execution, and accelerate execution.
+
+    Under the 2030 National Development Plan (NDP) vision of the Republic of South Africa (RSA), the
+    Presidential Commission on the 4th Industrial Revolution (PC4IR) report and strategic framework developed
+    in 2021, Artificial Intelligence (AI) became a key topic to be developed and integrated in the new digital
+    transformation agenda
+
+    and adoption of 4IR technologies. South Africa vision on AI is defined by the intention to establish a
+    national AI Institute that will drive the economic and social policies designed to advance national interest
+    and global competitiveness.
+
+    An AI Framework was developed through the formulation of a Strategic Implementation Programme for
+    the PC4IR report. Below image is the depiction of the components of the AI framework.
+
+
+
+
+    SOUTH AFRICA’S ARTIFICIAL INTELLIGENCE (AI) PLANNING: ADOPTION OF AI BY GOVERNMENT                      29
+As announced on 30 November 2022, the South African government through the Department of
+Communications and Digital Technologies (DCDT) has been actively driving digital innovation by
+establishing an Artificial Intelligence (AI) Institute in partnership with the academic institutions which will be
+the Centers of Excellence and Hubs for the application of AI within the sector economies.
+
+The DCDT in partnership with University of Johannesburg (UJ) and Tshwane University of Technology (TUT)
+embarked on the establishment of an AI Institute was the catalysts for ushering South Africa into the digital
+frontier. There are keyways that must be crafted and driven to ensure the practical success of this initiative
+through ensuring programme approach, championing, funding, and sustainability activities.
+
+Since the past years, the situation across the world economy and society has slowed down due to the
+current pandemic, AI in its applied and generative format provides a key opportunity for South Africa and
+the globe to test its potential.
+
+From South Africa’s perspective, AI has the potential to close the growing digital gap that exists between
+developed and developing nations, which has been made more prominent during this unprecedented
+period.
+
+This vision was part of the discussion about the launch and establishment of AIISA. This requires all of us
+to think and work hard to take advantage of artificial intelligence and unleash its full potential to advance
+our societies and economies.
+
+
+
+
+SOUTH AFRICA’S ARTIFICIAL INTELLIGENCE (AI) PLANNING: ADOPTION OF AI BY GOVERNMENT                           30
+With foresight and a commitment to act, South Africa can capture the opportunity offered by technology,
+manage the risks, and ensure that the gains are broadly shared.
+
+Four core priorities are suggested for a bold national plan of action that is co-owned by government,
+business, labour and educational leaders.
+
+First, South Africa can shape a smart approach to embrace digitisation for the benefit of all citizens. The
+plan can help define the country’s digital agenda, including prioritising industries where South Africa has
+or can develop a competitive edge in technology-driven solutions, such as mining and manufacturing. The
+national plan of action can also scope and size the risks that digital automation poses to jobs and the
+economy; as we discuss below, it can also help develop the necessary mitigation plans.
+
+Second, South Africa can take decisive steps to invest in human capital. The plan we suggest could help
+rethink the country’s education and learning ecosystem to foster broad participation in the work
+opportunities of the future. It can create transparency on the skills that the economy will need in future,
+and help educational institutions plan to meet that need. It can trigger a review of South Africa’s basic
+education system, to strengthen the focus on teaching quality, literacy, and STEM subjects - science,
+technology, engineering, and mathematics. It can promote a stronger technical and vocational education
+and training (TVET) system to ramp up the development of technical skills. And it can help drive
+improvement in the graduate conversion rate of South Africa’s education system.
+
+Just as important in strengthening South Africa’s human capital, the plan can help guide both public and
+private-sector organisations to create ‘retraining engines’ to enable lifelong learning. That will entail several
+fundamental shifts in the country’s current approach to education and training. For example, we might
+need to shift from a focus on once-off degrees to discrete certifications in specific skills.
+
+We might develop a new taxonomy of certified skills to enable workers to ‘brand’ themselves for specific
+capabilities. And, to help training providers rise to the challenge of large-scale reskilling, the plan could
+define a clear accreditation framework and recommend new quality-assurance processes that focus on
+application of skills rather than theoretical understanding.
+
+Third, the plan can set out a national strategy to mitigate the jobs impact of automation. That would include
+identifying jobs that will not be portable, and identifying ways to reintegrate displaced workers into the
+workforce. For example, South Africa can increase investment in SMEs to boost employment opportunities.
+That can include providing focused support to SMEs that are producing products for export or import
+substitution in sectors such as advanced manufacturing and agro-processing, and which have prospects
+for rapid growth. South Africa can also develop support for individuals moving from formal employment
+
+
+
+
+SOUTH AFRICA’S ARTIFICIAL INTELLIGENCE (AI) PLANNING: ADOPTION OF AI BY GOVERNMENT                           31
+into the ‘gig’ economy. Finally, the plan can propose ways to rebalance social-support funds and
+mechanisms to support displaced workers who cannot be reintegrated into the workforce.
+
+Fourth, the plan can help foster a step-up scenario, where job creation increases over and above a
+trendline scenario because of societal and policy choices enabled by increased productivity and economic
+growth. For example, infrastructure systems have not kept up with demand and housing shortages persist
+in many countries – including South Africa. Closing this infrastructure and housing need gap will need
+increased levels of investment in the South African economy and could be a major source of labour
+demand in years to come. A further opportunity is embracing the transition to clean energy, including
+increasing the share of renewables and making buildings, transportation, a
+
+The established AIISA will be addressing several critical AI-related four main areas for consideration and
+direction and themes.
+
+•       Shaping a New Normal through AI
+
+•       AI and Government role
+
+•       AI Governance and Regulation, and
+
+•       The Future of AI.
+
+C1. 2    Focus Areas: What must be in place for AIISA to be Effective and Realistic
+Right Data Architecture
+
+The journey towards digital transformation is the most pressing challenge within the public sphere is
+whether the infrastructure that exists is ready for innovation of tomorrow. In simple terms, the public-
+sector and its partners need to ask the question: Can their existing technology architecture and systems
+effectively store and manage the amount of data volumes that require the effective application of AI
+systems?
+
+Management and ownership of Data in particular, has become an essential developmental resource for
+many countries. It is even remarked that is now “the new oil,”. This illustrates the possibility of immense
+opportunities it can create in terms of efficiency, development of AI solutions, and public services. Major
+ccountries are learning to maximize data collection opportunities, processing, and integration into
+developmental agenda to provide valuable solutions. It is expected that it will gain significance, in the
+short and long term. SA, therefore, has a critical role in developing the Data and AI agenda to position
+the country in the league of data-driven economies.
+
+
+
+
+SOUTH AFRICA’S ARTIFICIAL INTELLIGENCE (AI) PLANNING: ADOPTION OF AI BY GOVERNMENT                     32
+It is reported that by 2025, about 463 exabytes of data would need to be generated globally each day and
+managing this paradigm is a challenge that must be addressed imminently. The MIT Technology Review
+report indicated that despite the great enthusiasm for Artificial Intelligence (AI), it was found that 77% of
+organizations in the
+
+Asia-Pacific and Japan find it difficult to digest, analyze and interpret data. This is the major task the
+Artificial Intelligence Institute of South Africa (AIISA) must face head on and address as the first task.
+
+Effective data analytics first requires a scalable and reliable infrastructure of which the sector government
+departments must understand through the need to lay out public data architecture systems. It is estimated
+that at least R70 billion at minimum should
+
+be dedicated towards 5G innovation and more than R100 billion would need to be set aside to develop AI
+systems and meet national cyber security needs. The public sector will have to upgrade and rebuild legacy
+IT systems to support the seamless storage, retrieval, and analysis of data.
+
+AI Adoption Programme Approach
+
+The management and operations of the AI Institute would require that it be implemented at a programme
+level within the DCDT structure and systems. This would allow for robust business continuity capabilities
+which are able to reach the higher echelons of government and executive suites of the private sector.
+
+South Africa citizens are incrementally and increasingly adopting a digital lifestyle, which means
+government services are expected to be always online. The speed and agility would not sustain the long
+downtime as siloed and legacy IT systems and mundane maintenance and backup processes may be
+catastrophic consequences. What is not to be forgotten is the constant cyber-attacks that always threaten
+the delivery of e-services.
+
+The rationale for the programme level can be elucidated by an example where an essential service such
+as a national water distribution system which requires constant monitoring of water pressure and quality
+distribution is key. The AI Institute would require advice and intervene by identifying leaks and possible
+contaminations as an early warning through real-time data through reduction of human intervention.
+Operating at the programme level is thus critical to the smooth operations of government services, thereby
+increasing timely and trustworthy interventions.
+
+The AI Hubs must be independent on their operations and project management guided by the policy and
+strategy programme of the DCDT.
+
+
+
+
+SOUTH AFRICA’S ARTIFICIAL INTELLIGENCE (AI) PLANNING: ADOPTION OF AI BY GOVERNMENT                           33
+The AI Hubs will develop a report mechanism will will be provided to the DCDT at quarterly intervals to
+allow for proper reporting within government structures.
+
+AI Engagement Strategy and Approach
+
+The purpose of an AI Institute is to assist sector departments at various government levels to effectively
+use AI as digital tools that will advance the value-chains and mandates. Various national, provincial, and
+local governments have indicated the need for accessing and using digital technologies such as AI towards
+solving their challenges.
+
+The AI Hubs have identified catalytical projects related to the sector solutions such as transport, mining,
+farming amongst others. These projects require an ability to provide proof of solution and the ability to
+hit the ground running to those sector clients.
+
+There is a need to develop a planned engagement strategy towards the identified stakeholders through
+the AI Institute. The AI Institute should be the first point of call and set up the required engagement with
+government departments. Once the groundwork has been laid, then the Hubs will take over the projects
+on both the operational and technical elements.
+
+The approach must be based on a solid foundation wherein a sound proposal by the AI Hub on the
+identified solution must be developed as an engagement tool.
+
+AI Advisory Council or AI Panel of Experts
+
+There was a discussion about the need to establish an AI Expert Advisory Council which was facilitated by
+DCDT. The processing of the establishment has faced some constraints internally that would have to be
+resolved soon.
+
+The AI Hubs must also determine how they will have advisory council linked to their areas of focus.
+
+Funding, Investment and Sustainability
+
+The adoption of AI is a general – purpose technology (GPT) will require funding related to aspects such
+setting data architecture, equipment, lab tools etc. There are various
+
+ways for funding the AI Institute and its Hubs. There is a need to ensure that a seed fund plus the launch
+costs must be budgeted to ensure awareness and visibility.
+
+The AI Institute sustainability is paramount to its impact and sustainability because it will have the whole of
+society participation.      Investments must be sourced or accepted from various sources which are
+
+
+
+SOUTH AFRICA’S ARTIFICIAL INTELLIGENCE (AI) PLANNING: ADOPTION OF AI BY GOVERNMENT                         34
+government, academia, private sector, and international donors. These investments would come from the
+influential quarters depending on what area of AI their focus will be based.
+
+The AI Institute and the Hubs must establish a framework to address such investments and a vehicle
+mechanism to manage such investments. The key issue is that for any
+
+sort of investments to flow, there is a need for seed funds that would propel the initial work that must be
+undertaken by the AI Institute.
+
+Structuring and Resources (Governance)
+
+The setting-up of an AI approach by the DCDT is based on having a programme approach wherein to
+avoid a brick-and-mortar physical structure outside the mandate department because AI is a national
+imperative. The AI Institute role is to be the coordinator, facilitator, and policy setting organization rather
+than direct operational implementation. The AI Institute would be made up of a network of AI Centers of
+Excellence or Hubs with a focus on different but interlocutory areas of execution. A decision matrix must
+be put in place which will allow for consistent use of resources.
+
+The structure of the AI Institute must be modelled around the role of the networked AI Hubs or Centers of
+Excellence. It is envisaged that the governance structure must be codified and agreed by all to allow for
+plugging of other initiatives.
+
+The role of the private sector involvement must also be incorporated within the government structure. The
+decision-making matrix must also deal with the distinction between the management, operational and
+technical aspects.
+
+
+
+
+SOUTH AFRICA’S ARTIFICIAL INTELLIGENCE (AI) PLANNING: ADOPTION OF AI BY GOVERNMENT                         35
+The last governance structure agreed to is demonstrated below:
+
+
+
+
+During the preparation of the AI Institute establishment and launch of the UJ Hub there were various
+working committees that were created which can be reviewed to ensure proper governance and required
+resources. The highest decision structure was the
+
+AIISA Launch Preparation Committee which includes the DVCs and the Acting Director-General of the
+DCDT.
+
+Focus Areas of AI Hubs
+
+The UJ and TUT AI Hubs presented catalytical projects aligned with the focus areas which are distinct and
+overlapping. There will be other AI Centers that would be added within the network already created and
+their focus areas would have to be decided upon regarding how they get infused within the existing focus
+areas.
+
+
+
+
+SOUTH AFRICA’S ARTIFICIAL INTELLIGENCE (AI) PLANNING: ADOPTION OF AI BY GOVERNMENT                   36
+There might be a need for the AI Hubs to have a workshop to align the areas of focus and build the
+required engagement plans to the identified sector departments.
+
+Benchmarking and Fact-finding Missions
+
+The exponential rise and global focus on AI as a technology has witnessed a plethora of establishing AI
+Institute or centers by countries and global organisations.         There are also various private sector
+developments and AI platforms being established around the world that have shown interest in the work
+of the AIISA.
+
+The AI initiatives that have approached DCDT are:
+
+•       Saudi Data and Artificial Intelligence Authority (SDAAI) – United Kingdom of Saudi Arabia
+
+•       The AI Institute of the Netherlands – Republic of Netherlands
+
+•       National institute for Transforming India (NITI Aayog) – Republic of India
+
+•       UNESCO AI Ethics Centre
+
+•       AI- Sweden
+
+•       Artificial Intelligence Technology Centre – Republic of Egypt
+
+There is a need to conduct fact-finding missions and benchmarking studies by the AIISA to build global
+cooperation and develop best practice system which will allow AIISA to be competitive and in line with
+current affairs.
+
+C1. 3    Data, AI and IOT
+CORE MANDATE: DCDT’s key role is to Drive and Own the National Data and AI agenda, through the
+following objectives.
+
+1)      Set the overall strategic direction of AI and Data - Define the nation- wide strategic direction of AI
+        and Data
+
+2)      Guide the execution of the AI strategy with government and Entities - Support and guide different
+        entities in strategy execution, without hindering their current Data and AI plans. Address the VISA
+        Regime and Global Investments access path.
+
+
+
+
+SOUTH AFRICA’S ARTIFICIAL INTELLIGENCE (AI) PLANNING: ADOPTION OF AI BY GOVERNMENT                        37
+3)      Execute AIISA led initiative - Achieve and fulfil AIISA initiatives such as AI data consolidation and
+        regulation
+
+4)      Fund AI Local Initiatives, communication, and public awareness – Strategic Funding for Local AI
+        Innovations
+
+
+
+
+C2       AI Governance and Institutional Mechanisms
+C2: 1    South Africa’s AI Ethical Considerations
+
+There are future potential AI harms will require the adoption of a set of human and ethical considerations
+that have been postulated but where it is less clear what the optimal form of regulation is, such as:
+
+•       Anti-competitive behavior should the provision of key AI models, or other enablers, be concentrated
+        in a small number of players.
+
+•       Risks in robotic or autonomous devices that use AI to decide on actions, such as AI-enabled
+        autonomous cars.
+
+•       Aggressive loss of employment leads to social risks.
+
+•       Criminal behavior or other highly dangerous outcomes.
+
+•       Existential risks should AI “get out of control” and pursue goals detrimental to humanity.
+
+
+
+SOUTH AFRICA’S ARTIFICIAL INTELLIGENCE (AI) PLANNING: ADOPTION OF AI BY GOVERNMENT                       38
+•      Risks that AI designed for military purposes “escapes” into the wider world and leads to enhanced
+       criminal behavior or other highly dangerous outcomes. (Access Partnership, 2023)
+
+South Africa is witnessing global numerous calls on the AI ethical dimensions such as
+
+•      OECD – AI Trustworthy and Reliable use
+
+•      UNESCO – AI Ethical use
+
+•      ITU – AI for Good
+
+•      UN – AI for Development
+
+South Africa has to navigate within these global proposals and find a solution that is aligned with the
+developmental state aspirations. The cornerstone of South Africa human rights is located within the
+Chapter 2 of the Constitution and the preamble. Below images demonstrate some of the approaches that
+would guide the consideration of on aspects that should be considered when addressing the AI impact
+and pitfalls.
+
+
+
+
+SOUTH AFRICA’S ARTIFICIAL INTELLIGENCE (AI) PLANNING: ADOPTION OF AI BY GOVERNMENT                  39
+C2: 2   SOUTH AFRICA AI REGULATION APPROACH
+According to Access Partnership AI Policy Lab (2023) [www.accesspartnership.com], “regulators, policy
+bodies, and companies have responded to this clear need with a flurry of proposals to either regulate AI or
+build the evidence base to do so. However, the quality of these proposals varies considerably. Others,
+meanwhile, are considering alternative approaches, such as voluntary ethical frameworks.”
+
+Recently the most concrete regulatory prescript was from the European Commission through a EU’s AI Act.
+(see below image) This has been through many years in development and is now approved by the EU
+structures which is detailed over 100 pages document and includes enforcement mechanisms and more.
+It is regarded as the first comprehensive piece of legislation in the global AI space and became the de
+facto global AI regulation.
+
+
+
+
+                                                                              \
+
+
+
+
+SOUTH AFRICA’S ARTIFICIAL INTELLIGENCE (AI) PLANNING: ADOPTION OF AI BY GOVERNMENT                     40
+The observation is that other countries have varying degrees of regulation and frameworks, while it is not
+clear that whether South Africa and others will follow the same approach or would come up with anything
+materially better based on the environmental conditions.
+
+Any regulatory approach to AI, in terms of South Africa, it should be guided by the following outlined
+factors as per Access Partnership AI Lab:
+
+•      Global practices since AI by its nature cannot be constrained to any country.
+
+•      Responsive to Economic and Social Aspirations because of the need to ensure an all-inclusive
+       approach to ensure that the whole society benefit as the AI harms become apparent in many
+       instances.
+
+•      Built on principles, or ethics, and human rights protection that provide guidance for those working
+       on AI and enable even some degree of self-regulation.
+
+There are other regulatory concerns that should be borne in mind are as follows:
+
+•      Disinformation and fake news generated through Generative AI applications and software.
+
+•      Bias and discrimination that could be exhibited by AI developers and users.
+
+•      Copyright abuse in alignment with World Intellectual Property Organisation (WIPO)
+
+•      Privacy to protect personal, private, and public data.
+
+C2.3      SA AI and DATA Governance Structure
+AI is still quite a novel technology which may not have an immediate economic impact within organisations,
+as it is still being developed. However, the risk of waiting for the technology to mature means lagging
+cannot be tolerated. The support required from government is for the application of governance of AI
+and mitigation of the risks associated with its implementation towards significant economic impact in the
+future.
+
+The implementation of AI governance on applications is a high priority on discussion topics in continental
+and global cooperation groups of the African Union (AU), SADC, BRICS+ and G20 member-states.
+
+The relationship between Data and Cloud, IOT and AI should inform the required governance structure at
+the programme and executive level. The governance structural depiction is informed by the tripartite
+relations of data, IOT and AI as demonstrated below:
+
+
+
+
+SOUTH AFRICA’S ARTIFICIAL INTELLIGENCE (AI) PLANNING: ADOPTION OF AI BY GOVERNMENT                    41
+                                                                             IMC on Digital
+                                                        Cabinet
+                                                                             Transforma�on
+
+
+
+
+                                                        Minister
+
+                                                                                       AI
+                                                                                   Management
+                                                                                     Oﬃce
+
+
+                  Min AI Expert
+                 Advisory Council
+                                                        AIISA
+                                                        Programme
+
+                                                                                   Data and Cloud
+                                                                                       Oﬃce
+
+
+
+
+                                       AI Hubs
+                                                                               IOT & e-Gov
+                                                                                  oﬃce
+
+
+
+
+The governance structure and model of AI from the global perspective is guided by relationship cultivated
+the role of government, private sector and civil society.
+
+Cabinet Role – Approve and guide the execution of the National AI Plan with government entities.
+
+Minister and AI Expert Advisory Council Role - Set the overall strategic direction of Data and AI and define
+the nation-wide strategic direction.
+
+AIISA Programme - Facilitate the execution of plan and strategic initiatives. Achieve and fulfil AIISA
+initiatives such as data consolidation and regulation
+
+AI Hubs – Support and guide different entities in strategy execution by generating AI localised solutions,
+applications, skills, and software development, without hindering their current Data and AI plans.
+
+
+
+
+SOUTH AFRICA’S ARTIFICIAL INTELLIGENCE (AI) PLANNING: ADOPTION OF AI BY GOVERNMENT                      42
+AI Management Office – exists to motivate AI innovation and build capabilities.
+
+Data and Cloud Office – regulate national data and drive compliance.
+
+IOT and e-Government Office - manage national data and draw insights through data processing.
+
+C3        AI Plan Adoption and Timelines Processing
+South Africa’s Action Roadmap and Plan for the implementation of AI
+
+The main presume is that a shift from analogue thinking towards digital thinking requires a redesign of the
+systems and mindsets from the population at large.
+
+The area and the application of AI in South Africa is still in development in phase, as per the global
+developments and like the rest of the world.
+
+A few AI solutions based on machine learning and other technologies have been established and applied
+within South Africa's public and private sector; however, the scope and usefulness of such technologies is
+currently limited. There are principles that guide the need SA Action Plan as follows:
+
+•       AI should be part of the long-term wider National plan or strategy.
+
+•       Balancing act between enabling environment and required governance.
+
+•       The plan must be informed by a process to be undertaken.
+
+•       AI plan must be focused on Actions.
+
+•       AI is created by people for the development of humanity.
+
+•       AI can be used as a tool for communication and public awareness.
+
+The following areas of focus will guide the adoption of the AI National Plan in SA:
+
+
+    Area of Focus                   Activities                            Timelines
+
+
+    Human Capital Development       Basic Education (coding, robotics, Immediately
+                                    critical thinking etc)
+
+
+                                    Incentivizing AI skills initiatives   Immediately
+
+
+
+
+SOUTH AFRICA’S ARTIFICIAL INTELLIGENCE (AI) PLANNING: ADOPTION OF AI BY GOVERNMENT                     43
+                                    Skills knowledge and transfer (global Immediately
+                                    partnership)
+
+
+ Localized AI solutions             AI Innovation Market Access          2025
+
+
+                                    AI venture investments and start-up 2025
+                                    supports
+
+
+                                    Supporting AI start-ups              Immediately
+
+
+ Reinforce Collaboration with Innovation pipeline                        Immediately
+ Academia and Industry
+
+
+                                    Centralised Computing Power          2027
+
+
+                                    Distributed     AI   through   Non- 2025
+                                    traditional data and Open Data
+                                    Regime
+
+
+                                    AI Hyper-scale Data and Large 2028
+                                    Language Model Centre
+
+
+ Capacitating             Artificial 11 AI Hubs/Centers of Excellence    2025
+ Intelligence Institute of SA
+ (AIISA)
+
+
+                                    AI Data Markets and Revenue 2026
+                                    collection system
+
+
+ AI Regulation on                   AI Applications                      2026
+
+
+                                    Data Computing                       2025
+
+
+                                    AI industries                        2027
+
+
+
+
+SOUTH AFRICA’S ARTIFICIAL INTELLIGENCE (AI) PLANNING: ADOPTION OF AI BY GOVERNMENT      44
+                              AI copyrights/patents                    2025
+
+
+                              Protection Intellectual Property         2025
+
+
+                              Unfair Competition                       2025
+
+
+                              AI Standards regulation                  2025
+
+
+ Data Architecture Systems in EDUCATION: Integrating Data and Immediately
+ Key Sectors                  AI   in education to      align the
+                              education system with labor market
+                              needs and improve the student’s
+                              journey
+
+                              GOVERNMENT: Assimilating Data
+                              and AI in Government to create a
+                              smarter
+
+                              and more efficient public sector
+
+                              HEALTHCARE: Integrating Data and
+                              AI into healthcare to increase access,
+                              enhance preventative care and
+                              accommodate growing demand.
+
+                              ENERGY: Integrating Data and AI
+                              into Energy in increase capacity,
+                              enhance
+
+                              efficiency, and develop adjacent
+                              industries.
+
+                              MOBILITY: Incorporating Data and
+                              AI in Mobility to build a regional
+                              hub, create smart city Mobility
+
+
+
+
+SOUTH AFRICA’S ARTIFICIAL INTELLIGENCE (AI) PLANNING: ADOPTION OF AI BY GOVERNMENT   45
+                                  technology, and enhance traffic
+                                  safety in cities
+
+
+ Create    Data      collaborative FDI and domestic investment, both 2025
+ Space in Africa                  from the government and the
+                                  private sector, would be essential to
+                                  support the development of the AI
+                                  support in the AfCFT
+
+
+                                  Global hub for AI skills creation
+                                  centre
+
+
+ AI   Policy   and    Legislation AI Ethics and Governance                   2025
+ Process
+
+
+
+
+ AI    Maturity       Assessment Tool which can be used to measure 2025
+ Framework for SA                 the level of maturity South Africa is
+                                  at, in term of AI
+
+
+
+
+ Set-up AI Ministerial Advisory Deliberate           Targeted    National 2024
+ Council or AI Panel of Experts   Departments         Network   Industries
+                                  and Frontline services
+
+
+
+CONSULATED SOURCES AND ACKNOWLEDGEMENT
+
+Many publication sources on AI are widely available on the websites and published articles. Benchmarking
+and best practice approaches would serve as a guidance towards the development of this draft document
+which will be for discussion purposes solemnly.
+
+South Africa belongs to several international bodies that outline the basic tenants of how AI can be
+approached towards the fulfilment of national priorities such as the United Nations, International
+
+
+
+
+SOUTH AFRICA’S ARTIFICIAL INTELLIGENCE (AI) PLANNING: ADOPTION OF AI BY GOVERNMENT                  46
+Telecommunications Union, UNESCO, and OECD which would have been researched to ensure that proper
+flow of South Africa’s approach is within the global prescripts.
+
+It is important that the contents of the draft document are to guide the SA approach in relations to the
+discourses taking place around the world in order to ensure that as a country we are not gravitating far
+away from the global norm and standards.
+
+Lastly, the SA national policy formulation process is based on extensive consultation as a basic tenant of
+priority setting and this draft document is a measure to ensure that such outcome is always maintained.
+
+
+
+
+SOUTH AFRICA’S ARTIFICIAL INTELLIGENCE (AI) PLANNING: ADOPTION OF AI BY GOVERNMENT                    47
+

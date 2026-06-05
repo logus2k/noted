@@ -1,0 +1,13 @@
+{
+  "domain_id": "pga3",
+  "name": "P\u00f3s-Gradua\u00e7\u00e3o em Aprendizagem Autom\u00e1tica Aplicada",
+  "description": "P\u00f3s-Gradua\u00e7\u00e3o em Aprendizagem Autom\u00e1tica Aplicada",
+  "created_at": "2026-05-28T16:48:32.811472+00:00",
+  "embeddings_model": "bge-m3",
+  "pinned": false,
+  "included_files": [],
+  "arcadedb_database": "pga3",
+  "corpus_collection": "pga3__corpus",
+  "entity_cache_collection": "pga3__gr_entities",
+  "summary_cache_collection": "pga3__gr_summaries"
+}
