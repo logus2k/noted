@@ -2471,12 +2471,18 @@ class ModelSelectRequest(BaseModel):
 
 @router.post("/model")
 async def llm_set_model(request: ModelSelectRequest):
-    """Switch the active LLM model. Non-local models require the noted access key."""
+    """Switch the active LLM model. Cloud (claude-*) models require the noted
+    access key and only change the in-memory selection. A LOCAL model pick asks
+    agent_server to switch its active chat model (restarts llama-vision +
+    agent_server, ~10-20s); the dropdown re-syncs on socket reconnect."""
     if request.model_id.startswith("claude-") and _NOTED_SECRET:
         if request.secret != _NOTED_SECRET:
             raise HTTPException(status_code=403, detail="Invalid access key")
-    llm_mgr.set_model(request.model_id)
-    return {"active_model": request.model_id}
+    try:
+        result = await llm_mgr.select_model(request.model_id)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"model switch failed: {e}")
+    return {"active_model": request.model_id, **(result or {})}
 
 
 @router.get("/health")

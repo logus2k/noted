@@ -140,16 +140,45 @@ class LLMManager:
     # ── Health check ──────────────────────────────────────────────
 
     async def health(self) -> dict:
-        """GET /v1/models - verify agent_server is reachable."""
+        """GET /v1/models - verify agent_server is reachable and list the
+        local CHAT models (kind=="chat"), flagging the active one. agent_server
+        also returns kind=="agent" presets (cv_assistant, router, ...) which we
+        ignore here - those always resolve to the active chat model."""
         session = await self._get_session()
         try:
             async with session.get(f"{self.base_url}/v1/models") as resp:
                 resp.raise_for_status()
                 data = await resp.json()
                 model_list = data.get("data", [])
-                models = [m["id"] for m in model_list]
-                # First model is the base engine; use display_name if available
-                active_model = (model_list[0].get("display_name") or models[0]) if model_list else "unknown"
-                return {"status": "ok", "models": models, "active_model": active_model}
+                # Chat models only. Tolerate the older shape (no "kind"): if no
+                # entry carries kind, treat the first as the sole chat model.
+                chat = [m for m in model_list if m.get("kind") == "chat"]
+                if not chat and model_list:
+                    chat = [model_list[0]]
+                models = [
+                    {
+                        "id": m["id"],
+                        "display_name": m.get("display_name") or m["id"],
+                        "family": m.get("family", ""),
+                        "active": bool(m.get("active")),
+                    }
+                    for m in chat
+                ]
+                active = next((m["id"] for m in models if m["active"]),
+                              models[0]["id"] if models else "unknown")
+                return {"status": "ok", "models": models, "active_model": active}
         except Exception as e:
             return {"status": "error", "message": str(e)}
+
+    async def set_active_model(self, model_id: str) -> dict:
+        """Ask agent_server to switch the active LOCAL chat model. This flips
+        agent_server's config and restarts llama-vision + agent_server (~10-20s
+        downtime) - see agent_server/documents/active_model_switching_sdk.md.
+        Returns agent_server's response ({status:"switching"|"ok", ...})."""
+        session = await self._get_session()
+        async with session.post(
+            f"{self.base_url}/admin/api/active-model",
+            json={"model_id": model_id},
+        ) as resp:
+            resp.raise_for_status()
+            return await resp.json()

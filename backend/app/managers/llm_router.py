@@ -24,9 +24,24 @@ class LLMRouter:
     # ── Model management ──────────────────────────────────────────
 
     def set_model(self, model_id: str):
-        """Switch the active model. Validated against available models."""
+        """Switch the active model (in-memory selection only). Used for the
+        Anthropic path; local picks should go through select_model() so the
+        agent_server active model is switched too."""
         self._active_model = model_id
         logger.info("Active model set to: %s", model_id)
+
+    async def select_model(self, model_id: str) -> dict:
+        """Apply a dropdown selection. For a cloud (claude-*) model this is just
+        the in-memory selection. For a LOCAL model it also asks agent_server to
+        switch its active chat model (which restarts llama-vision + agent_server,
+        ~10-20s) so every consumer - including this one - serves the new model."""
+        self._active_model = model_id
+        if self._is_anthropic(model_id):
+            logger.info("Active model set to cloud model: %s", model_id)
+            return {"backend": "anthropic", "active_model": model_id}
+        logger.info("Switching agent_server active local model to: %s", model_id)
+        result = await self._local.set_active_model(model_id)
+        return {"backend": "local", **(result or {})}
 
     def _is_anthropic(self, model_id: str | None) -> bool:
         return bool(model_id and model_id.startswith("claude-"))
@@ -101,20 +116,32 @@ class LLMRouter:
 
         models = []
 
-        # Local backend: expose only the primary model (display_name from agent_server)
+        # Local backend: expose ALL local chat models (agent_server now lists
+        # them all with display_name/family/active). The active one is the model
+        # the router currently serves; selecting another switches agent_server.
+        local_active = None
         if local_ok:
-            display = local_health.get("active_model") or "Local Model"
-            primary_id = (local_health.get("models") or [display])[0]
-            models.append({"id": primary_id, "display_name": display, "backend": "local"})
+            for m in (local_health.get("models") or []):
+                models.append({
+                    "id": m["id"],
+                    "display_name": m.get("display_name") or m["id"],
+                    "backend": "local",
+                })
+            local_active = local_health.get("active_model")
 
         # Anthropic models (only if key is configured)
         if self._anthropic:
             for m in ANTHROPIC_MODELS:
                 models.append({**m, "backend": "anthropic"})
 
-        # Default active_model to first available model
-        if not self._active_model and models:
-            self._active_model = models[0]["id"]
+        # Effective active model: a cloud pick sticks; otherwise track the REAL
+        # agent_server active local model (so the dropdown reflects switches,
+        # including ones made by other clients/operators, after a reconnect).
+        if self._is_anthropic(self._active_model):
+            effective_active = self._active_model
+        else:
+            effective_active = local_active or (models[0]["id"] if models else None)
+            self._active_model = effective_active
 
         # Overall status: ok if at least one backend is reachable or Anthropic is configured
         overall_ok = local_ok or bool(self._anthropic)
@@ -122,5 +149,5 @@ class LLMRouter:
         return {
             "status": "ok" if overall_ok else "error",
             "models": models,
-            "active_model": self._active_model,
+            "active_model": effective_active,
         }

@@ -672,6 +672,10 @@ export class ChatService {
             onReconnect: () => {
                 console.log('[ChatService] Agent reconnected');
                 this._emitStatus('connected');
+                // agent_server may have restarted to apply an active-model
+                // switch - re-fetch /health so the dropdown reflects the new
+                // active local model (setModels marks it selected).
+                this._checkHealth();
             },
         });
 
