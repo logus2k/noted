@@ -109,12 +109,17 @@ def describe_picture(
     except ValueError:
         logger.warning('picture caption: non-JSON response')
         return None
-    content = (
-        (data.get('choices') or [{}])[0]
-        .get('message', {})
-        .get('content', '')
-    )
+    choice = (data.get('choices') or [{}])[0]
+    content = (choice.get('message') or {}).get('content', '') or ''
     text = _strip_think(content)
     if not text:
+        logger.warning(
+            'picture caption: empty after stripping <think> '
+            '(finish_reason=%s, raw_len=%d, contains_think_open=%s) — '
+            'returning None',
+            choice.get('finish_reason'),
+            len(content),
+            '<think>' in content,
+        )
         return None
     return text

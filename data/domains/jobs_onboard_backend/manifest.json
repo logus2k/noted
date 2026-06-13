@@ -1,0 +1,53 @@
+{
+  "domain_id": "jobs_onboard_backend",
+  "name": "Job Offers Onboard Backend",
+  "description": "Job Offers Onboard Backend",
+  "created_at": "2026-06-11T20:25:12.440046+00:00",
+  "embeddings_model": "bge-m3",
+  "pinned": false,
+  "included_files": [
+    {
+      "path": "apigee_web_api_design.pdf",
+      "mode": "read_store",
+      "added_at": "2026-06-11T20:26:13.602294+00:00",
+      "category": "Job Offers/Onboard/Backend",
+      "display_name": "",
+      "chunking_profile_id": "long-form"
+    },
+    {
+      "path": "mosh_backend_roadmap.pdf",
+      "mode": "read_store",
+      "added_at": "2026-06-11T20:26:13.953900+00:00",
+      "category": "Job Offers/Onboard/Backend",
+      "display_name": "",
+      "chunking_profile_id": "long-form"
+    },
+    {
+      "path": "restful_service_best_practices.pdf",
+      "mode": "read_store",
+      "added_at": "2026-06-11T20:26:13.999103+00:00",
+      "category": "Job Offers/Onboard/Backend",
+      "display_name": "",
+      "chunking_profile_id": "long-form"
+    },
+    {
+      "path": "roadmapsh_backend_roadmap.pdf",
+      "mode": "read_store",
+      "added_at": "2026-06-11T20:26:14.067999+00:00",
+      "category": "Job Offers/Onboard/Backend",
+      "display_name": "",
+      "chunking_profile_id": "long-form"
+    },
+    {
+      "path": "springboot_reference_guide.pdf",
+      "mode": "read_store",
+      "added_at": "2026-06-11T20:26:14.163918+00:00",
+      "category": "Job Offers/Onboard/Backend",
+      "chunking_profile_id": "long-form"
+    }
+  ],
+  "arcadedb_database": "jobs_onboard_backend",
+  "corpus_collection": "jobs_onboard_backend__corpus",
+  "entity_cache_collection": "jobs_onboard_backend__gr_entities",
+  "summary_cache_collection": "jobs_onboard_backend__gr_summaries"
+}

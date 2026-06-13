@@ -1,0 +1,16 @@
+{
+  "accepted_entities": 469,
+  "below_floor": 0,
+  "communities": 42,
+  "community_summaries": 34,
+  "duration_seconds": 168.19821281399982,
+  "entities_written": 455,
+  "extracted_entities": 469,
+  "extraction_chunks": 183,
+  "finished_at": "2026-06-13T13:53:31.103677+00:00",
+  "md_docs": 3,
+  "relationships_written": 1058,
+  "sameas_edges": 0,
+  "similar_to_edges": 406,
+  "started_at": "2026-06-13T13:50:32.745965+00:00"
+}

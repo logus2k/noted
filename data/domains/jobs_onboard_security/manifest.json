@@ -1,0 +1,61 @@
+{
+  "domain_id": "jobs_onboard_security",
+  "name": "Job Offers Onboard Security",
+  "description": "Job Offers Onboard Security",
+  "created_at": "2026-06-11T22:44:14.634561+00:00",
+  "embeddings_model": "bge-m3",
+  "pinned": false,
+  "included_files": [
+    {
+      "path": "cmu_sei_security_engineering_framework.pdf",
+      "mode": "read_store",
+      "added_at": "2026-06-11T22:44:49.515813+00:00",
+      "category": "Job Offers/Onboard/Security",
+      "display_name": "",
+      "chunking_profile_id": "long-form"
+    },
+    {
+      "path": "greece_cybersecurity_handbook.pdf",
+      "mode": "read_store",
+      "added_at": "2026-06-11T22:44:49.626917+00:00",
+      "category": "Job Offers/Onboard/Security",
+      "display_name": "",
+      "chunking_profile_id": "long-form"
+    },
+    {
+      "path": "opentext_owasp_api_top10.pdf",
+      "mode": "read_store",
+      "added_at": "2026-06-11T22:44:49.697607+00:00",
+      "category": "Job Offers/Onboard/Security",
+      "display_name": "",
+      "chunking_profile_id": "long-form"
+    },
+    {
+      "path": "owasp_asvs_4_0_3.pdf",
+      "mode": "read_store",
+      "added_at": "2026-06-11T22:44:49.821065+00:00",
+      "category": "Job Offers/Onboard/Security",
+      "display_name": "",
+      "chunking_profile_id": "long-form"
+    },
+    {
+      "path": "owasp_developer_guide.pdf",
+      "mode": "read_store",
+      "added_at": "2026-06-11T22:44:50.776775+00:00",
+      "category": "Job Offers/Onboard/Security",
+      "display_name": "",
+      "chunking_profile_id": "long-form"
+    },
+    {
+      "path": "owasp_testing_guide_v3.pdf",
+      "mode": "read_store",
+      "added_at": "2026-06-11T22:44:51.229675+00:00",
+      "category": "Job Offers/Onboard/Security",
+      "chunking_profile_id": "long-form"
+    }
+  ],
+  "arcadedb_database": "jobs_onboard_security",
+  "corpus_collection": "jobs_onboard_security__corpus",
+  "entity_cache_collection": "jobs_onboard_security__gr_entities",
+  "summary_cache_collection": "jobs_onboard_security__gr_summaries"
+}

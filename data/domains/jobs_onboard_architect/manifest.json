@@ -1,0 +1,37 @@
+{
+  "domain_id": "jobs_onboard_architect",
+  "name": "Job Offers Onboard Architect",
+  "description": "Job Offers Onboard Architect",
+  "created_at": "2026-06-11T20:17:22.251656+00:00",
+  "embeddings_model": "bge-m3",
+  "pinned": false,
+  "included_files": [
+    {
+      "path": "arxiv_1907_10206_agile_team_onboarding.pdf",
+      "mode": "read_store",
+      "added_at": "2026-06-11T20:18:50.628427+00:00",
+      "category": "Job Offers/Onboard/Architect",
+      "display_name": "",
+      "chunking_profile_id": "long-form"
+    },
+    {
+      "path": "larson_staff_engineer.pdf",
+      "mode": "read_store",
+      "added_at": "2026-06-11T20:18:51.436722+00:00",
+      "category": "Job Offers/Onboard/Architect",
+      "display_name": "",
+      "chunking_profile_id": "long-form"
+    },
+    {
+      "path": "uga_hiring_managers_guide_onboarding.pdf",
+      "mode": "read_store",
+      "added_at": "2026-06-11T20:18:51.804327+00:00",
+      "category": "Job Offers/Onboard/Architect",
+      "chunking_profile_id": "long-form"
+    }
+  ],
+  "arcadedb_database": "jobs_onboard_architect",
+  "corpus_collection": "jobs_onboard_architect__corpus",
+  "entity_cache_collection": "jobs_onboard_architect__gr_entities",
+  "summary_cache_collection": "jobs_onboard_architect__gr_summaries"
+}

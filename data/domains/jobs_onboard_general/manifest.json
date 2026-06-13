@@ -1,0 +1,109 @@
+{
+  "domain_id": "jobs_onboard_general",
+  "name": "Job Offers Onboard General",
+  "description": "Job Offers Onboard General",
+  "created_at": "2026-06-11T22:14:39.839036+00:00",
+  "embeddings_model": "bge-m3",
+  "pinned": false,
+  "included_files": [
+    {
+      "path": "arxiv_2103_05055_onboarding_case_study.pdf",
+      "mode": "read_store",
+      "added_at": "2026-06-11T22:15:24.742789+00:00",
+      "category": "Job Offers/Onboard/General",
+      "display_name": "",
+      "chunking_profile_id": "long-form"
+    },
+    {
+      "path": "berkeley_manager_guide_remote_onboarding.pdf",
+      "mode": "read_store",
+      "added_at": "2026-06-11T22:15:24.816018+00:00",
+      "category": "Job Offers/Onboard/General",
+      "display_name": "",
+      "chunking_profile_id": "long-form"
+    },
+    {
+      "path": "bridgespan_leading_edge_onboarding.pdf",
+      "mode": "read_store",
+      "added_at": "2026-06-11T22:15:24.876381+00:00",
+      "category": "Job Offers/Onboard/General",
+      "display_name": "",
+      "chunking_profile_id": "long-form"
+    },
+    {
+      "path": "codequotient_se_checklist.pdf",
+      "mode": "read_store",
+      "added_at": "2026-06-11T22:15:24.962730+00:00",
+      "category": "Job Offers/Onboard/General",
+      "display_name": "",
+      "chunking_profile_id": "long-form"
+    },
+    {
+      "path": "execonline_modern_onboarding.pdf",
+      "mode": "read_store",
+      "added_at": "2026-06-11T22:15:24.991327+00:00",
+      "category": "Job Offers/Onboard/General",
+      "display_name": "",
+      "chunking_profile_id": "long-form"
+    },
+    {
+      "path": "flarehr_modern_onboarding_guide.pdf",
+      "mode": "read_store",
+      "added_at": "2026-06-11T22:15:25.338410+00:00",
+      "category": "Job Offers/Onboard/General",
+      "display_name": "",
+      "chunking_profile_id": "long-form"
+    },
+    {
+      "path": "gregory_agile_onboarding.pdf",
+      "mode": "read_store",
+      "added_at": "2026-06-11T22:15:25.494280+00:00",
+      "category": "Job Offers/Onboard/General",
+      "display_name": "",
+      "chunking_profile_id": "long-form"
+    },
+    {
+      "path": "icims_employee_onboarding_playbook.pdf",
+      "mode": "read_store",
+      "added_at": "2026-06-11T22:15:25.637755+00:00",
+      "category": "Job Offers/Onboard/General",
+      "display_name": "",
+      "chunking_profile_id": "long-form"
+    },
+    {
+      "path": "sourcegraph_developer_onboarding.pdf",
+      "mode": "read_store",
+      "added_at": "2026-06-11T22:15:26.115288+00:00",
+      "category": "Job Offers/Onboard/General",
+      "display_name": "",
+      "chunking_profile_id": "long-form"
+    },
+    {
+      "path": "terminal_remote_teams_playbook.pdf",
+      "mode": "read_store",
+      "added_at": "2026-06-11T22:15:26.251575+00:00",
+      "category": "Job Offers/Onboard/General",
+      "display_name": "",
+      "chunking_profile_id": "long-form"
+    },
+    {
+      "path": "waterloo_onboarding_guide.pdf",
+      "mode": "read_store",
+      "added_at": "2026-06-11T22:15:26.745714+00:00",
+      "category": "Job Offers/Onboard/General",
+      "display_name": "",
+      "chunking_profile_id": "long-form"
+    },
+    {
+      "path": "yupro_tech_onboarding_roadmap.pdf",
+      "mode": "read_store",
+      "added_at": "2026-06-11T22:15:26.778961+00:00",
+      "category": "Job Offers/Onboard/General",
+      "chunking_profile_id": "long-form"
+    }
+  ],
+  "arcadedb_database": "jobs_onboard_general",
+  "corpus_collection": "jobs_onboard_general__corpus",
+  "entity_cache_collection": "jobs_onboard_general__gr_entities",
+  "summary_cache_collection": "jobs_onboard_general__gr_summaries"
+}

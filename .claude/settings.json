@@ -27,7 +27,8 @@
     "additionalDirectories": [
       "/home/logus/env/iscte/jena_weather/config",
       "/home/logus/env/iscte/jena_weather/src/training",
-      "/home/logus/env/iscte/jena_weather/src/evaluation"
+      "/home/logus/env/iscte/jena_weather/src/evaluation",
+      "/home/logus/env/assets/agent_server/data/agents"
     ]
   }
 }

@@ -1,0 +1,45 @@
+{
+  "domain_id": "jobs_onboard_devops",
+  "name": "Job Offers Onboard DevOps",
+  "description": "Job Offers Onboard DevOps",
+  "created_at": "2026-06-09T00:12:39.553669+00:00",
+  "embeddings_model": "bge-m3",
+  "pinned": false,
+  "included_files": [
+    {
+      "path": "dell_beginner_devops_handbook.pdf",
+      "mode": "read_store",
+      "added_at": "2026-06-09T00:13:19.627421+00:00",
+      "category": "Job Offers/Onboard/DevOps",
+      "display_name": "",
+      "chunking_profile_id": "long-form"
+    },
+    {
+      "path": "devopsinstitute_sre_foundation.pdf",
+      "mode": "read_store",
+      "added_at": "2026-06-09T00:13:20.286898+00:00",
+      "category": "Job Offers/Onboard/DevOps",
+      "display_name": "",
+      "chunking_profile_id": "long-form"
+    },
+    {
+      "path": "google_site_reliability_workbook.pdf",
+      "mode": "read_store",
+      "added_at": "2026-06-09T00:13:21.638229+00:00",
+      "category": "Job Offers/Onboard/DevOps",
+      "display_name": "",
+      "chunking_profile_id": "long-form"
+    },
+    {
+      "path": "newrelic_sre_handbook.pdf",
+      "mode": "read_store",
+      "added_at": "2026-06-09T00:13:22.034085+00:00",
+      "category": "Job Offers/Onboard/DevOps",
+      "chunking_profile_id": "long-form"
+    }
+  ],
+  "arcadedb_database": "jobs_onboard_devops",
+  "corpus_collection": "jobs_onboard_devops__corpus",
+  "entity_cache_collection": "jobs_onboard_devops__gr_entities",
+  "summary_cache_collection": "jobs_onboard_devops__gr_summaries"
+}

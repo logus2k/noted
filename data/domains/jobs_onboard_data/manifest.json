@@ -1,0 +1,37 @@
+{
+  "domain_id": "jobs_onboard_data",
+  "name": "Job Offers Onboard Data Engineering",
+  "description": "Job Offers Onboard Data Engineering",
+  "created_at": "2026-06-11T22:30:54.012068+00:00",
+  "embeddings_model": "bge-m3",
+  "pinned": false,
+  "included_files": [
+    {
+      "path": "3cloud_big_book_data_engineering.pdf",
+      "mode": "read_store",
+      "added_at": "2026-06-11T22:31:34.620727+00:00",
+      "category": "Job Offers/Onboard/Data Engineering",
+      "display_name": "",
+      "chunking_profile_id": "long-form"
+    },
+    {
+      "path": "streamsets_data_engineers_handbook.pdf",
+      "mode": "read_store",
+      "added_at": "2026-06-11T22:31:34.890627+00:00",
+      "category": "Job Offers/Onboard/Data Engineering",
+      "display_name": "",
+      "chunking_profile_id": "long-form"
+    },
+    {
+      "path": "thoughtworks_modern_data_eng_playbook.pdf",
+      "mode": "read_store",
+      "added_at": "2026-06-11T22:31:35.327468+00:00",
+      "category": "Job Offers/Onboard/Data Engineering",
+      "chunking_profile_id": "long-form"
+    }
+  ],
+  "arcadedb_database": "jobs_onboard_data",
+  "corpus_collection": "jobs_onboard_data__corpus",
+  "entity_cache_collection": "jobs_onboard_data__gr_entities",
+  "summary_cache_collection": "jobs_onboard_data__gr_summaries"
+}

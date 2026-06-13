@@ -1,0 +1,45 @@
+{
+  "domain_id": "jobs_onboard_ml_ai",
+  "name": "Job Offers Onboard ML & AI",
+  "description": "Job Offers Onboard ML & AI",
+  "created_at": "2026-06-11T22:21:18.214701+00:00",
+  "embeddings_model": "bge-m3",
+  "pinned": false,
+  "included_files": [
+    {
+      "path": "aws_ml_engineer_exam_guide.pdf",
+      "mode": "read_store",
+      "added_at": "2026-06-11T22:21:58.313565+00:00",
+      "category": "Job Offers/Onboard/ML & AI",
+      "display_name": "",
+      "chunking_profile_id": "long-form"
+    },
+    {
+      "path": "google_ml_engineer_exam_guide.pdf",
+      "mode": "read_store",
+      "added_at": "2026-06-11T22:21:58.354116+00:00",
+      "category": "Job Offers/Onboard/ML & AI",
+      "display_name": "",
+      "chunking_profile_id": "long-form"
+    },
+    {
+      "path": "mosh_ml_engineer_roadmap.pdf",
+      "mode": "read_store",
+      "added_at": "2026-06-11T22:21:58.670893+00:00",
+      "category": "Job Offers/Onboard/ML & AI",
+      "display_name": "",
+      "chunking_profile_id": "long-form"
+    },
+    {
+      "path": "zinkevich_rules_of_ml.pdf",
+      "mode": "read_store",
+      "added_at": "2026-06-11T22:21:58.762587+00:00",
+      "category": "Job Offers/Onboard/ML & AI",
+      "chunking_profile_id": "long-form"
+    }
+  ],
+  "arcadedb_database": "jobs_onboard_ml_ai",
+  "corpus_collection": "jobs_onboard_ml_ai__corpus",
+  "entity_cache_collection": "jobs_onboard_ml_ai__gr_entities",
+  "summary_cache_collection": "jobs_onboard_ml_ai__gr_summaries"
+}
