@@ -1,0 +1,61 @@
+{
+  "domain_id": "jobs_onboard_mobile",
+  "name": "Job Offers Onboard Mobile",
+  "description": "Job Offers Onboard Mobile",
+  "created_at": "2026-06-13T18:43:04.131226+00:00",
+  "embeddings_model": "bge-m3",
+  "pinned": false,
+  "included_files": [
+    {
+      "path": "apple_intro_app_dev_swift_guide.pdf",
+      "mode": "read_store",
+      "added_at": "2026-06-13T18:43:51.594398+00:00",
+      "category": "Job Offers/Onboard/Mobile",
+      "display_name": "",
+      "chunking_profile_id": "long-form"
+    },
+    {
+      "path": "apple_swift_app_design_workbook.pdf",
+      "mode": "read_store",
+      "added_at": "2026-06-13T18:43:57.227970+00:00",
+      "category": "Job Offers/Onboard/Mobile",
+      "display_name": "",
+      "chunking_profile_id": "long-form"
+    },
+    {
+      "path": "commonsware_elements_of_kotlin.pdf",
+      "mode": "read_store",
+      "added_at": "2026-06-13T18:43:57.720162+00:00",
+      "category": "Job Offers/Onboard/Mobile",
+      "display_name": "",
+      "chunking_profile_id": "long-form"
+    },
+    {
+      "path": "maine_sbdc_app_dev.pdf",
+      "mode": "read_store",
+      "added_at": "2026-06-13T18:44:00.712189+00:00",
+      "category": "Job Offers/Onboard/Mobile",
+      "display_name": "",
+      "chunking_profile_id": "long-form"
+    },
+    {
+      "path": "seu1_learning_mobile_app_dev.pdf",
+      "mode": "read_store",
+      "added_at": "2026-06-13T18:44:03.095509+00:00",
+      "category": "Job Offers/Onboard/Mobile",
+      "display_name": "",
+      "chunking_profile_id": "long-form"
+    },
+    {
+      "path": "swift_programming_language_5_7.pdf",
+      "mode": "read_store",
+      "added_at": "2026-06-13T18:44:04.179672+00:00",
+      "category": "Job Offers/Onboard/Mobile",
+      "chunking_profile_id": "long-form"
+    }
+  ],
+  "arcadedb_database": "jobs_onboard_mobile",
+  "corpus_collection": "jobs_onboard_mobile__corpus",
+  "entity_cache_collection": "jobs_onboard_mobile__gr_entities",
+  "summary_cache_collection": "jobs_onboard_mobile__gr_summaries"
+}

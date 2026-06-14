@@ -1,0 +1,10 @@
+{
+  "caching_kind": "entities",
+  "collection": "jobs_onboard_mobile__gr_entities",
+  "failed_chunk": 1,
+  "failed_rows": "0-4999",
+  "last_error": "noted-rag /cache/upsert HTTP 500: {\"detail\":\"ReadTimeout: timed out\"}",
+  "suspended_at": "2026-06-13T20:27:10.121107+00:00",
+  "suspended_phase": "caching",
+  "total_chunks": 2
+}

@@ -1,0 +1,53 @@
+{
+  "domain_id": "jobs_eng_culture",
+  "name": "Job Offers Engineering Culture",
+  "description": "Job Offers Engineering Culture",
+  "created_at": "2026-06-14T14:13:55.946017+00:00",
+  "embeddings_model": "bge-m3",
+  "pinned": false,
+  "included_files": [
+    {
+      "path": "culture.md",
+      "mode": "read_store",
+      "added_at": "2026-06-14T14:27:55.311052+00:00",
+      "category": "Job Offers/Culture",
+      "display_name": "",
+      "chunking_profile_id": "long-form"
+    },
+    {
+      "path": "arcadia_engineering_strategy_values.pdf",
+      "mode": "read_store",
+      "added_at": "2026-06-14T14:31:48.590637+00:00",
+      "category": "Job Offers/Culture",
+      "display_name": "",
+      "chunking_profile_id": "long-form"
+    },
+    {
+      "path": "engineering_culture_index.pdf",
+      "mode": "read_store",
+      "added_at": "2026-06-14T14:31:52.901743+00:00",
+      "category": "Job Offers/Culture",
+      "display_name": "",
+      "chunking_profile_id": "long-form"
+    },
+    {
+      "path": "smartly_culture_handbook.pdf",
+      "mode": "read_store",
+      "added_at": "2026-06-14T14:31:54.614887+00:00",
+      "category": "Job Offers/Culture",
+      "display_name": "",
+      "chunking_profile_id": "long-form"
+    },
+    {
+      "path": "virta_culture_handbook_2024.pdf",
+      "mode": "read_store",
+      "added_at": "2026-06-14T14:31:54.944582+00:00",
+      "category": "Job Offers/Culture",
+      "chunking_profile_id": "long-form"
+    }
+  ],
+  "arcadedb_database": "jobs_eng_culture",
+  "corpus_collection": "jobs_eng_culture__corpus",
+  "entity_cache_collection": "jobs_eng_culture__gr_entities",
+  "summary_cache_collection": "jobs_eng_culture__gr_summaries"
+}

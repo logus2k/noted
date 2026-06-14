@@ -1,0 +1,13 @@
+{
+  "domain_id": "jobs_candidates",
+  "name": "Candidate CVs",
+  "description": "Internal candidate corpus for Diana's candidate matching (vector-only).",
+  "created_at": "2026-06-14T19:07:51.091876+00:00",
+  "embeddings_model": "bge-m3",
+  "pinned": false,
+  "included_files": [],
+  "arcadedb_database": "jobs_candidates",
+  "corpus_collection": "jobs_candidates__corpus",
+  "entity_cache_collection": "jobs_candidates__gr_entities",
+  "summary_cache_collection": "jobs_candidates__gr_summaries"
+}

@@ -36,4 +36,5 @@ COPY app/ app/
 
 EXPOSE 5523
 
-CMD ["python3.12", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "5523"]
+# Serve the Socket.IO-wrapped ASGI app (REST API + live-progress channel).
+CMD ["python3.12", "-m", "uvicorn", "app.main:asgi_app", "--host", "0.0.0.0", "--port", "5523"]

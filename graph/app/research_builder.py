@@ -43,6 +43,7 @@ from app.graph_storage import GraphStorage
 from app.models import Entity, Relationship
 from app.rag_client import RagClient, RagClientError
 from app.scanners.md_scanner import MdChunk, MdScanner, _process_file as _scan_one_file
+from app.progress_events import emit_progress
 
 
 # Cache collection names. retriever.py reads these.
@@ -262,6 +263,8 @@ class ResearchBuilder:
                 'phase[%s]: %s -> %s%s',
                 self.kb_id, old_phase, phase, extras_str,
             )
+        # Live progress to subscribers (Socket.IO room kb:<domain>); best-effort.
+        emit_progress(self.kb_id, self.progress)
 
     def build(
         self,
@@ -587,6 +590,8 @@ class ResearchBuilder:
                         'Extraction progress: %d/%d chunks (%.1f%%), %d entities accepted so far',
                         n_done, n_total, pct, accepted_count,
                     )
+                    # Push the same cadence to Socket.IO subscribers (best-effort).
+                    emit_progress(self.kb_id, self.progress)
 
         # Sort each entity's mentioned_in_chunks by descending strength so
         # the retriever's top-N pick is the strongest evidence first.
@@ -1487,7 +1492,12 @@ def _merge_sameas_identity_classes(
     list before calling.
     """
     if not sameas_rels:
-        return thematic_entities, sameas_rels, mention_rels
+        # Return COPIES, not the caller's own lists. The caller repopulates via
+        # `thematic_entities.clear(); thematic_entities.extend(survivors)` — if
+        # survivors aliased thematic_entities, clear() would empty it and the
+        # extend() would add nothing, silently wiping every entity (and likewise
+        # mention_rels). This only bit domains with zero sameAs edges.
+        return list(thematic_entities), sameas_rels, list(mention_rels)
 
     by_id = {e.id: e for e in thematic_entities}
 

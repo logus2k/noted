@@ -5,10 +5,12 @@ to build a navigable graph of all noted entities and their relationships.
 """
 
 import logging
+import socketio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.migration import run_migration_if_needed
+from app.progress_events import sio, set_loop
 from app.routers import graph as graph_router
 from app.routers import domain as domain_router
 from app.routers import research as research_router
@@ -46,7 +48,21 @@ def health():
     return {'status': 'ok', 'service': 'knowledge-graph'}
 
 
+@app.on_event("startup")
+async def _capture_event_loop():
+    """Hand the running ASGI loop to the progress channel so the build's worker
+    threads can schedule Socket.IO emits onto it."""
+    import asyncio
+    set_loop(asyncio.get_running_loop())
+
+
+# Serve the REST API and the Socket.IO live-progress channel on the same port.
+# Clients connect at /socket.io and subscribe to a domain's progress room.
+# The container CMD runs `app.main:asgi_app`.
+asgi_app = socketio.ASGIApp(sio, other_asgi_app=app, socketio_path="socket.io")
+
+
 if __name__ == "__main__":
     import uvicorn
     from app.config import HOST, PORT
-    uvicorn.run(app, host=HOST, port=PORT)
+    uvicorn.run(asgi_app, host=HOST, port=PORT)

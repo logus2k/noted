@@ -76,6 +76,42 @@
         "kb_smoke2"
       ],
       "added_utc": "2026-06-13T15:21:48.833466+00:00"
+    },
+    {
+      "source_path": "data/documents/rag_sources/readme.md",
+      "tags": [
+        "jobs_does_not_exist_6deb2"
+      ],
+      "added_utc": "2026-06-14T14:19:10.375482+00:00"
+    },
+    {
+      "source_path": "data/documents/rag_sources/culture.md",
+      "tags": [
+        "jobs_eng_culture"
+      ],
+      "added_utc": "2026-06-14T14:27:55.306841+00:00",
+      "chunking_profile_id": "long-form"
+    },
+    {
+      "source_path": "data/documents/rag_sources/p.md",
+      "tags": [
+        "kbprog_3316cf"
+      ],
+      "added_utc": "2026-06-14T15:26:50.750537+00:00"
+    },
+    {
+      "source_path": "data/documents/rag_sources/r.md",
+      "tags": [
+        "relay_5fa342"
+      ],
+      "added_utc": "2026-06-14T15:34:45.859457+00:00"
+    },
+    {
+      "source_path": "data/documents/rag_sources/f.md",
+      "tags": [
+        "fixtest_2789af"
+      ],
+      "added_utc": "2026-06-14T16:15:31.096095+00:00"
     }
   ]
 }

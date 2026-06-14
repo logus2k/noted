@@ -529,6 +529,189 @@ def upsert_chunks(req: UpsertChunksRequest) -> UpsertChunksResponse:
     )
 
 
+class UpsertRecord(BaseModel):
+    id: str = Field(..., min_length=1)
+    text: str
+    metadata: dict = Field(default_factory=dict)
+
+
+class UpsertRecordsRequest(BaseModel):
+    """Bulk vector upsert for pre-structured corpora (e.g. the candidate-CV
+    ingest). Unlike /upsert_chunks — which is scoped to ONE source_path and
+    re-derives a FIXED metadata schema for re-chunkable documents — this
+    embeds an arbitrary batch of (id, text, metadata) records in one shot and
+    stamps the caller's OWN flat metadata verbatim, so structured fields
+    (e.g. Primary Keyword, English Level, Experience Years) survive into
+    Chroma for later `where` pre-filtering. Idempotent on id; `skip_existing`
+    makes a crashed run cheaply resumable — already-present ids are neither
+    re-embedded nor re-written."""
+    collection: str = Field(..., min_length=1)
+    records: list[UpsertRecord]
+    embed_batch: int = Field(default=64, ge=1, le=512,
+        description="Hard cap on records per /v1/embeddings call (count).")
+    embed_token_budget: int = Field(default=4000, ge=256, le=7000,
+        description="Soft cap on estimated tokens per /v1/embeddings call. "
+                    "The embedder (bge-m3) runs with batch=ubatch=8192 and "
+                    "cls pooling (no chunked prefill), so it sizes — and "
+                    "RETAINS — its attention buffer to the largest batch it "
+                    "ever sees. An oversized request (e.g. 128 long CVs at "
+                    "once) pushed that high-water mark to ~84GB and got the "
+                    "child OOM-killed. Batching by token budget keeps every "
+                    "embed call well under the 8192 window so memory stays "
+                    "bounded (~1GB).")
+    skip_existing: bool = True
+
+
+class UpsertRecordsResponse(BaseModel):
+    status: str
+    collection: str
+    indexed: int
+    skipped_existing: int
+    empty: int
+
+
+def _clean_meta(meta: dict) -> dict:
+    """Chroma metadata must be flat scalars (str/int/float/bool), non-null.
+    Drop None and empty strings, coerce anything exotic to str so one stray
+    nested value can't 500 the whole batch. Chroma rejects an empty metadata
+    dict, so guarantee at least one key."""
+    out: dict = {}
+    for k, v in (meta or {}).items():
+        if v is None:
+            continue
+        if isinstance(v, bool) or isinstance(v, (int, float)):
+            out[str(k)] = v
+        elif isinstance(v, str):
+            if v != "":
+                out[str(k)] = v
+        else:
+            out[str(k)] = str(v)
+    if not out:
+        out["_empty_meta"] = True
+    return out
+
+
+@app.post("/upsert_records", response_model=UpsertRecordsResponse)
+def upsert_records(req: UpsertRecordsRequest) -> UpsertRecordsResponse:
+    """Embed + upsert a batch of (id, text, metadata) records into `collection`.
+    Embeds in slices of `embed_batch` to keep the llama-server request bounded.
+    See UpsertRecordsRequest for why this exists alongside /upsert_chunks."""
+    client = rag._get_client()
+    collection = client.get_or_create_collection(
+        name=req.collection,
+        metadata={"hnsw:space": "cosine"},
+    )
+
+    # De-dup ids within the request (last wins) and drop empty text.
+    seen: dict = {}
+    empty = 0
+    for r in req.records:
+        if not (r.text or "").strip():
+            empty += 1
+            continue
+        seen[r.id] = r
+    records = list(seen.values())
+
+    skipped = 0
+    if req.skip_existing and records:
+        ids = [r.id for r in records]
+        existing_ids: set = set()
+        for s in range(0, len(ids), 512):
+            got = collection.get(ids=ids[s:s + 512])
+            existing_ids.update(got.get("ids") or [])
+        if existing_ids:
+            before = len(records)
+            records = [r for r in records if r.id not in existing_ids]
+            skipped = before - len(records)
+
+    # Sub-batch by BOTH a token budget and a count cap so the embedder never
+    # receives an oversized physical batch (see embed_token_budget docs). ~4
+    # chars/token is a rough but safe estimate for English CVs.
+    def _sub_batches(recs):
+        cur: list = []
+        cur_tok = 0
+        for r in recs:
+            est = max(1, len(r.text) // 4)
+            if cur and (cur_tok + est > req.embed_token_budget
+                        or len(cur) >= req.embed_batch):
+                yield cur
+                cur, cur_tok = [], 0
+            cur.append(r)
+            cur_tok += est
+        if cur:
+            yield cur
+
+    indexed = 0
+    for batch in _sub_batches(records):
+        embeddings = rag.embed([r.text for r in batch])
+        collection.upsert(
+            ids=[r.id for r in batch],
+            documents=[r.text for r in batch],
+            embeddings=embeddings,
+            metadatas=[_clean_meta(r.metadata) for r in batch],
+        )
+        indexed += len(batch)
+
+    logger.info(
+        "upsert_records: collection=%s indexed=%d skipped_existing=%d empty=%d",
+        req.collection, indexed, skipped, empty,
+    )
+    return UpsertRecordsResponse(
+        status="ok", collection=req.collection,
+        indexed=indexed, skipped_existing=skipped, empty=empty,
+    )
+
+
+class ListRecordsRequest(BaseModel):
+    """Browse/lookup raw records of a collection (no embedding). Powers
+    list/detail UIs over a corpus — e.g. job2cool's Candidates browser over
+    `jobs_candidates__corpus`. Either page through with limit/offset (+ an
+    optional metadata `where` filter) or fetch specific `ids`."""
+    collection: str = Field(..., min_length=1)
+    ids: list[str] | None = None
+    where: dict | None = None
+    limit: int = Field(default=50, ge=1, le=500)
+    offset: int = Field(default=0, ge=0)
+    include_text: bool = True
+
+
+@app.post("/list_records")
+def list_records(req: ListRecordsRequest) -> dict:
+    """Return records (id + metadata [+ document]) plus a `total` count for
+    pagination. `ids` short-circuits to a direct lookup; otherwise paginate
+    with limit/offset over the (optionally where-filtered) collection."""
+    client = rag._get_client()
+    try:
+        col = client.get_collection(req.collection)
+    except Exception:
+        return {"collection": req.collection, "total": 0, "records": []}
+
+    include = ["metadatas"] + (["documents"] if req.include_text else [])
+    if req.ids:
+        got = col.get(ids=req.ids, include=include)
+        total = len(got.get("ids") or [])
+    else:
+        if req.where:
+            # Exact filtered total (ids only — no docs/embeddings fetched).
+            total = len(col.get(where=req.where, include=[]).get("ids") or [])
+            got = col.get(where=req.where, limit=req.limit, offset=req.offset,
+                          include=include)
+        else:
+            total = col.count()
+            got = col.get(limit=req.limit, offset=req.offset, include=include)
+
+    ids = got.get("ids") or []
+    metas = got.get("metadatas") or []
+    docs = got.get("documents") or []
+    records = []
+    for i, _id in enumerate(ids):
+        rec = {"id": _id, "metadata": metas[i] if i < len(metas) else {}}
+        if req.include_text:
+            rec["text"] = docs[i] if i < len(docs) else ""
+        records.append(rec)
+    return {"collection": req.collection, "total": total, "records": records}
+
+
 @app.post("/ingest")
 async def trigger_ingest(
     background_tasks: BackgroundTasks,
