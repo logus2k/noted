@@ -54,6 +54,10 @@ services:
       - NOTED_TERMINAL_SECRET=${NOTED_TERMINAL_SECRET:-}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - NOTED_MAX_UPLOAD_MB=${NOTED_MAX_UPLOAD_MB:-20}
+      # E2B-tuned assistant agent (matches the active gemma-4-e2b model; the
+      # E4B "noted" agent collapses to voice-only on E2B → empty answers).
+      # Revert to "noted" if the active model goes back to gemma-4 (E4B).
+      - LLM_AGENT_NAME=${LLM_AGENT_NAME:-noted_e2b}
     volumes:
       - ../data:/app/data
       - ../.noted:/app/.noted
@@ -66,6 +70,9 @@ services:
       # Include with: -f ../data/docker-compose.mounts.yml
     networks:
       - noted-network
+      # Also on the shared edge network (proxy + monitoring); survives
+      # Docker/WSL restarts and is reachable by name for health monitoring.
+      - logus2k_network
     restart: unless-stopped
 
   # ===================== PostgreSQL (Airflow metadata) =====================
@@ -482,6 +489,10 @@ services:
 networks:
   noted-network:
     name: noted-network
+  # Shared edge network owned by the proxy stack; joined so the `noted`
+  # front service is reachable by the monitor and survives Docker/WSL restarts.
+  logus2k_network:
+    external: true
 
 volumes:
   postgres-data:

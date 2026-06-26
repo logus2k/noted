@@ -7,14 +7,6 @@
   "pinned": false,
   "included_files": [
     {
-      "path": "culture.md",
-      "mode": "read_store",
-      "added_at": "2026-06-14T14:27:55.311052+00:00",
-      "category": "Job Offers/Culture",
-      "display_name": "",
-      "chunking_profile_id": "long-form"
-    },
-    {
       "path": "arcadia_engineering_strategy_values.pdf",
       "mode": "read_store",
       "added_at": "2026-06-14T14:31:48.590637+00:00",
@@ -43,6 +35,7 @@
       "mode": "read_store",
       "added_at": "2026-06-14T14:31:54.944582+00:00",
       "category": "Job Offers/Culture",
+      "display_name": "",
       "chunking_profile_id": "long-form"
     }
   ],

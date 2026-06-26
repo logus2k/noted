@@ -112,6 +112,13 @@
         "fixtest_2789af"
       ],
       "added_utc": "2026-06-14T16:15:31.096095+00:00"
+    },
+    {
+      "source_path": "data/documents/rag_sources/antonio_cruz_cv.md",
+      "tags": [
+        "cv"
+      ],
+      "added_utc": "2026-06-25T11:56:46.006563+00:00"
     }
   ]
 }

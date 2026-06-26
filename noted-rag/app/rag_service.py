@@ -87,6 +87,43 @@ def _sigmoid(x: float) -> float:
     return z / (1.0 + z)
 
 
+def _extract_locator(meta: dict | None) -> dict:
+    """Pull the (page_no, bbox, regions[]) PDF locator triple out of a
+    chunk's Chroma metadata. Returns a dict with keys page_no/bbox/regions;
+    every field is optional and may be None / empty list.
+
+    `regions_json` is the canonical multi-rectangle form (docling can emit
+    multiple rectangles per chunk for page-break wrap or body+figure).
+    `bbox_x0/y0/x1/y1` + `page_no` is the legacy single-region denormalized
+    form, kept so existing readers don't break.
+    """
+    if not meta:
+        return {"page_no": None, "bbox": None, "regions": None}
+    out: dict = {"page_no": None, "bbox": None, "regions": None}
+    if "page_no" in meta and meta["page_no"] is not None:
+        try: out["page_no"] = int(meta["page_no"])
+        except Exception: pass
+    if all(k in meta for k in ("bbox_x0", "bbox_y0", "bbox_x1", "bbox_y1")):
+        try:
+            out["bbox"] = [float(meta["bbox_x0"]), float(meta["bbox_y0"]),
+                           float(meta["bbox_x1"]), float(meta["bbox_y1"])]
+        except Exception:
+            pass
+    if "regions_json" in meta and meta["regions_json"]:
+        try:
+            import json as _json
+            regs = _json.loads(meta["regions_json"])
+            if isinstance(regs, list) and regs:
+                out["regions"] = regs
+        except Exception:
+            pass
+    # If the chunker didn't emit regions_json but did emit a single bbox,
+    # synthesize a one-element regions list so callers have a uniform shape.
+    if out["regions"] is None and out["page_no"] is not None and out["bbox"]:
+        out["regions"] = [{"page_no": out["page_no"], "bbox": out["bbox"]}]
+    return out
+
+
 class RagService:
     def __init__(self) -> None:
         self._client: Optional[chromadb.ClientAPI] = None
@@ -331,6 +368,7 @@ class RagService:
                 "doc_type": (meta or {}).get("doc_type", ""),
                 "score": float(score),
                 "text": text,
+                **_extract_locator(meta),
             }
             for id_, text, meta, score in ranked
         ]
@@ -480,6 +518,7 @@ class RagService:
                 "score": float(score),
                 "text": doc,
                 "kb_id": kb_id,
+                **_extract_locator(meta),
             })
         logger.info(
             'SEARCH_MULTI_TIMING %s n_coll=%d total_ms=%.1f embed_ms=%.1f '

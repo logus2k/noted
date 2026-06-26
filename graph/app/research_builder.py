@@ -936,6 +936,7 @@ class ResearchBuilder:
                 'text': c.text,
                 'page_no': c.page_no,
                 'bbox': c.bbox,
+                'regions': getattr(c, 'regions', None),
                 'section_level': c.section_level,
             } for c in doc_chunks]
             try:
@@ -1091,6 +1092,7 @@ class ResearchBuilder:
             'text': c.text,
             'page_no': c.page_no,
             'bbox': c.bbox,
+            'regions': getattr(c, 'regions', None),
             'section_level': c.section_level,
         } for c in chunks]
         try:

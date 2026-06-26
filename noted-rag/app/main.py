@@ -29,6 +29,7 @@ from pydantic import BaseModel, Field
 
 from . import config, ingest
 from .ingest import COLLECTION_NAME, ChunkRecord, _content_hash, _slug
+from .rag_service import _extract_locator
 from .rag_service import RagService
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -392,6 +393,10 @@ class UpsertChunk(BaseModel):
     text: str
     page_no: int | None = None
     bbox: list[float] | None = None  # [x0, y0, x1, y1] in PDF coords
+    regions: list[dict] | None = None  # docling per-region locators:
+    # [{"page_no": int, "bbox": [x0,y0,x1,y1]}, ...]. Lets a single
+    # chunk highlight multiple rectangles (page-break wrap, body+figure).
+    # Stored as a JSON string in Chroma metadata under `regions_json`.
     section_level: int | None = None
 
 
@@ -476,6 +481,16 @@ def upsert_chunks(req: UpsertChunksRequest) -> UpsertChunksResponse:
             meta["bbox_y0"] = float(c.bbox[1])
             meta["bbox_x1"] = float(c.bbox[2])
             meta["bbox_y1"] = float(c.bbox[3])
+        if c.regions:
+            # Chroma metadata is flat (str/int/float/bool only), so the
+            # regions list is JSON-encoded. Read path decodes it back.
+            import json as _json
+            meta["regions_json"] = _json.dumps(
+                [{"page_no": int(r.get("page_no")),
+                  "bbox": [float(v) for v in (r.get("bbox") or [])]}
+                 for r in c.regions
+                 if r.get("page_no") is not None and r.get("bbox")]
+            )
         if c.section_level is not None:
             meta["section_level"] = int(c.section_level)
         # Section paths can repeat across long-section splits; suffix the
@@ -568,6 +583,11 @@ class UpsertRecordsResponse(BaseModel):
     indexed: int
     skipped_existing: int
     empty: int
+    # Read-back acknowledgement: how many of `indexed` were confirmed present in
+    # ChromaDB by a get(ids=...) AFTER the upsert, before this response is sent.
+    # Under normal operation verified == indexed; a shortfall means a write did
+    # not persist and the caller should treat the batch as failed.
+    verified: int
 
 
 def _clean_meta(meta: dict) -> dict:
@@ -642,23 +662,32 @@ def upsert_records(req: UpsertRecordsRequest) -> UpsertRecordsResponse:
             yield cur
 
     indexed = 0
+    verified = 0
     for batch in _sub_batches(records):
         embeddings = rag.embed([r.text for r in batch])
+        ids_b = [r.id for r in batch]
         collection.upsert(
-            ids=[r.id for r in batch],
+            ids=ids_b,
             documents=[r.text for r in batch],
             embeddings=embeddings,
             metadatas=[_clean_meta(r.metadata) for r in batch],
         )
         indexed += len(batch)
+        # Read-back: confirm the just-written ids are actually queryable before
+        # we count them as acknowledged. ids only (no docs/embeddings) so it's a
+        # cheap presence check.
+        got = collection.get(ids=ids_b, include=[])
+        present = set(got.get("ids") or [])
+        verified += sum(1 for i in ids_b if i in present)
 
+    status = "ok" if verified == indexed else "partial"
     logger.info(
-        "upsert_records: collection=%s indexed=%d skipped_existing=%d empty=%d",
-        req.collection, indexed, skipped, empty,
+        "upsert_records: collection=%s indexed=%d verified=%d skipped_existing=%d empty=%d status=%s",
+        req.collection, indexed, verified, skipped, empty, status,
     )
     return UpsertRecordsResponse(
-        status="ok", collection=req.collection,
-        indexed=indexed, skipped_existing=skipped, empty=empty,
+        status=status, collection=req.collection,
+        indexed=indexed, skipped_existing=skipped, empty=empty, verified=verified,
     )
 
 
@@ -980,6 +1009,7 @@ async def index_source_chunks(source_b64: str, collection: str | None = None) ->
             "tags": tags,
             "doc_type": meta.get("doc_type") or (tags[0] if tags else ""),
             "last_modified_utc": meta.get("last_modified") or "",
+            **_extract_locator(meta),
         })
     chunks.sort(key=lambda c: c["section_path"].lower())
     return {
@@ -1026,4 +1056,5 @@ async def index_chunk(chunk_b64: str, collection: str | None = None) -> dict:
         "token_count": len(text) // 4,
         "text": text,
         "last_modified_utc": meta.get("last_modified") or "",
+        **_extract_locator(meta),
     }

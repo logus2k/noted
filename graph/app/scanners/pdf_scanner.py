@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable
@@ -208,6 +209,20 @@ def scan_pdf(
     # know which orphan items still need standalone chunks at the end.
     consumed_self_refs: set[str] = set()
 
+    # Docling's PDF parser frequently flattens the heading hierarchy:
+    # every visual header lands at `level=1`, and HybridChunker's
+    # `raw.meta.headings` returns only the chunk's immediate parent.
+    # That loses real ancestry — a bullet under "## Certifications →
+    # ### AI, Machine Learning, Data" ends up with section_path
+    # "AI, Machine Learning, Data" alone, with no trace of the
+    # "Certifications" parent. Diana then can't match a "certifications"
+    # query against those chunks because the word never appears in any
+    # of them. _build_heading_hierarchy walks the doc once to recover
+    # parent/child links from positional cues (a heading immediately
+    # followed by another heading is a container of the next one), and
+    # the section_path computation below uses that map.
+    heading_ancestors = _build_heading_hierarchy(doc)
+
     chunks: list[MdChunk] = []
     n_toc_dropped = 0
     for i, raw in enumerate(_chunker.chunk(doc)):
@@ -230,7 +245,15 @@ def scan_pdf(
 
         first_item = raw.meta.doc_items[0] if raw.meta.doc_items else None
         prov = first_item.prov[0] if first_item and first_item.prov else None
-        section_path = ' > '.join(raw.meta.headings or []) or '(root)'
+        raw_headings = list(raw.meta.headings or [])
+        # Enrich the heading chain with reconstructed ancestors so the
+        # section_path carries the full parent → child path Docling lost.
+        direct_heading = raw_headings[-1] if raw_headings else None
+        if direct_heading and direct_heading in heading_ancestors:
+            full_chain = heading_ancestors[direct_heading] + raw_headings
+        else:
+            full_chain = raw_headings
+        section_path = ' > '.join(full_chain) or '(root)'
 
         # HybridChunker(merge_peers=True) merges adjacent doc_items into one
         # chunk. Three consequences for bbox computation:
@@ -280,9 +303,21 @@ def scan_pdf(
                     first_page_seen = page_int
         if text_bboxes_per_page or picture_bboxes_per_page:
             # Region order: first page seen first (matches reading order),
-            # then any other pages sorted ascending. Within each page,
-            # text-region first (chunks usually start with prose), then
-            # picture regions in encounter order.
+            # then any other pages sorted ascending. Within each page emit
+            # ONE region per text item (in encounter order) plus one region
+            # per picture item.
+            #
+            # Earlier this unioned all text items per page into a single
+            # bbox. That works when the items are contiguous, but docling
+            # sometimes lumps geometrically-distant items into the same
+            # chunk (e.g. a stray right-column header at the top of a page
+            # ending up bagged with the actual content lower in the column).
+            # The union then spans both items and the white space between,
+            # producing a "highlight that doesn't enclose any concrete
+            # text" effect. Per-item regions outline each actual line/
+            # paragraph instead, so the user sees the precise text the
+            # chunk references — even when an item is misgrouped, it shows
+            # up as its own small box, not as part of a giant rectangle.
             all_pages = set(text_bboxes_per_page) | set(picture_bboxes_per_page)
             other_pages = sorted(p for p in all_pages if p != first_page_seen)
             ordered_pages = (
@@ -291,13 +326,10 @@ def scan_pdf(
             )
             regions = []
             for p_page in ordered_pages:
-                text_bbs = text_bboxes_per_page.get(p_page) or []
-                if text_bbs:
-                    xs0 = [b[0] for b in text_bbs]; ys0 = [b[1] for b in text_bbs]
-                    xs1 = [b[2] for b in text_bbs]; ys1 = [b[3] for b in text_bbs]
+                for tb in (text_bboxes_per_page.get(p_page) or []):
                     regions.append({
                         'page_no': p_page,
-                        'bbox': [min(xs0), min(ys0), max(xs1), max(ys1)],
+                        'bbox': [tb[0], tb[1], tb[2], tb[3]],
                     })
                 for pb in (picture_bboxes_per_page.get(p_page) or []):
                     regions.append({
@@ -305,6 +337,10 @@ def scan_pdf(
                         'bbox': [pb[0], pb[1], pb[2], pb[3]],
                     })
             if regions:
+                # `page_no` / `bbox` denormalised fields on the chunk now
+                # mirror the FIRST region for callers that still consume
+                # the legacy single-rect fields. The full geometry lives
+                # in regions[].
                 page_no = regions[0]['page_no']
                 bbox = regions[0]['bbox']
 
@@ -373,12 +409,264 @@ def scan_pdf(
         ))
         next_idx += 1
 
+    # ── Per-bullet split for list-only chunks ─────────────────────────
+    # Docling's HybridChunker bags a whole bulleted list into ONE chunk
+    # (each bullet too short on its own to pass min_tokens). The bbox/
+    # regions per chunk then point to ALL bullets in the list — clicking
+    # "Azure AI Fundamentals AI-901" highlights the entire 7-bullet cert
+    # list, and Diana cites a single tag (e.g. "1") for all 7 items.
+    #
+    # Split each bullet-only chunk into N per-bullet chunks: each carries
+    # ONE bullet's text + ONE region. We only split when the line count
+    # matches the region count (1-to-1 docling mapping); otherwise we
+    # keep the chunk intact rather than guess which region goes with
+    # which bullet.
+    chunks = _split_bullet_chunks(chunks, _chunker.tokenizer)
+
+    # ── Super-parent chunks across sibling subsections ────────────────
+    # The per-subsection parent + per-bullet sub-chunks are precise but
+    # short. Verbose queries like "antónio certifications and
+    # qualifications" rerank short list-shaped chunks poorly even when
+    # the right hierarchy is in their text. The fix is to also emit one
+    # WIDER chunk per top-level container heading (e.g. "CERTIFICATIONS"
+    # spans AI/ML/Data + Architecture + PM/Agile, "Vision-Box · Portugal"
+    # spans CDO + CTO + R&D Director). Its text concatenates every
+    # sibling subsection's content; its regions[] is the union of every
+    # sibling's regions — so clicking the citation still highlights real
+    # rectangles, just many of them at once. The reranker then chooses
+    # the right granularity per query: broad questions favour the
+    # super-parent (~all bullets in one place), specific questions still
+    # win with the per-bullet sub-chunk.
+    chunks = _add_super_parent_chunks(chunks, _chunker.tokenizer)
+
     logger.info(
         'pdf scan: %s -> %d chunks across %d pages (toc_dropped=%d, ratio=%.2f, captions=%d)',
         rel_path, len(chunks), page_count, n_toc_dropped, TOC_FILTER_RATIO,
         sum(1 for c in chunks if c.kind in ('picture_caption', 'table_caption')),
     )
     return chunks
+
+
+# Lines starting with a bullet glyph (hyphen, asterisk, bullet, en-dash)
+# plus a space, optionally indented. Matches the bullet shapes Docling
+# emits when normalising lists to markdown.
+_BULLET_LINE_RE = re.compile(r'^\s*(?:[-*•–]|[•‣◦])\s+\S')
+
+
+def _add_super_parent_chunks(chunks: list[MdChunk], tokenizer) -> list[MdChunk]:
+    """Emit one extra wide chunk per top-level container heading.
+
+    For each unique outermost ancestor (the part of section_path before
+    the first ' > '), gather every direct subsection-parent chunk that
+    sits under it and produce one combined chunk whose text is all
+    sibling content stitched together and whose regions[] is the union
+    of every sibling's bbox list. This is the level of detail the old
+    HTML/markdown pipeline produced naturally and that PDF ingestion
+    fragmented — it gives the reranker a high-signal, multi-sentence
+    target for category-wide questions ("what are his certifications").
+
+    Sub-chunks emitted by `_split_bullet_chunks` are excluded from the
+    fanout — their text already starts with `<section_path>\\n` so they
+    are easy to identify, and including them would double-count bullets.
+
+    Groups of size < 2 are skipped: a container with only one child
+    already has a subsection-parent chunk that covers the same span.
+
+    chunk_index is renumbered globally so downstream chunk_id stays
+    unique. Token count uses the chunker's tokenizer for honest sizing
+    even when text concatenation pushes a chunk past the usual target.
+    """
+    from collections import defaultdict
+
+    groups: dict[str, list[MdChunk]] = defaultdict(list)
+    for c in chunks:
+        if c.kind != 'text' or not c.section_path or ' > ' not in c.section_path:
+            continue
+        # Sub-chunks created by _split_bullet_chunks start with the
+        # section_path heading line; skip them so we only union the
+        # subsection-PARENT chunks (which contain the whole bullet list
+        # in one block).
+        if c.text.startswith(c.section_path + '\n'):
+            continue
+        top = c.section_path.split(' > ', 1)[0]
+        groups[top].append(c)
+
+    extras: list[MdChunk] = []
+    for top, siblings in groups.items():
+        if len(siblings) < 2:
+            continue
+        combined_text = top + '\n\n' + '\n\n'.join(s.text for s in siblings)
+        combined_regions: list[dict] = []
+        for s in siblings:
+            for r in (s.regions or []):
+                combined_regions.append(r)
+        if not combined_regions:
+            continue
+        first_region = combined_regions[0]
+        extras.append(MdChunk(
+            doc_path=siblings[0].doc_path,
+            chunk_index=0,
+            section_path=top,
+            text=combined_text,
+            token_count=tokenizer.count_tokens(combined_text),
+            page_no=first_region.get('page_no'),
+            bbox=first_region.get('bbox'),
+            regions=combined_regions,
+            section_level=siblings[0].section_level,
+            kind='text',
+            caption_for=None,
+        ))
+
+    out = chunks + extras
+    for i, c in enumerate(out):
+        c.chunk_index = i
+    return out
+
+
+def _build_heading_hierarchy(doc) -> dict[str, list[str]]:
+    """Reconstruct heading ancestry from positional cues.
+
+    Docling's PDF backend assigns the same `level` to every section_header
+    in CV-style documents, so the chunker can't tell that
+    "AI, Machine Learning, Data" is a child of "Certifications". This
+    walks the doc body once and treats two patterns as ancestry signals:
+
+    1. **Containers.** A heading whose IMMEDIATELY-following body item
+       is also a heading has no content of its own and is therefore a
+       parent of that next heading (and likely of further siblings
+       until the section ends).
+    2. **All-uppercase section markers.** ALL-CAPS headings (e.g.
+       "EDUCATION", "CERTIFICATIONS") are treated as top-level section
+       boundaries — they reset the container stack so that the next
+       set of containers belongs to the new section, not the previous
+       one.
+
+    A container's "range" extends from its own position to the next
+    container OR the next all-uppercase heading (whichever comes
+    first). Every heading inside that range is treated as a descendant
+    of the container.
+
+    Returns: { heading_text → [ancestor1_text, ancestor2_text, ...] }
+    ordered outermost-first. Self is NEVER included.
+
+    Note: deep nesting where a container's child is itself a container
+    of further siblings (e.g. EDUCATION > ISCTE > {Postgraduate,
+    Coimbra}) is approximate — without true level info we'll sometimes
+    attach a sibling as a deeper child. That's still a strict
+    improvement over docling's flat single-heading output for the
+    queries that actually matter (cert + role lookups).
+    """
+    items = []
+    for item, _depth in doc.iterate_items():
+        label = str(getattr(item, 'label', ''))
+        is_h = 'header' in label.lower() or 'title' in label.lower()
+        text = (getattr(item, 'text', '') or '').strip()
+        items.append((is_h, text))
+
+    # Containers: heading positions whose next item is also a heading.
+    container_positions = set()
+    for i, (is_h, _t) in enumerate(items):
+        if is_h and i + 1 < len(items) and items[i + 1][0]:
+            container_positions.add(i)
+
+    # Pre-compute each container's range end: the next position j > i
+    # that is either another container OR an all-uppercase heading.
+    def _range_end(i: int) -> int:
+        for j in range(i + 1, len(items)):
+            is_h, text = items[j]
+            if not is_h:
+                continue
+            if j in container_positions or text.isupper():
+                return j
+        return len(items)
+
+    container_range = {i: _range_end(i) for i in container_positions}
+
+    # For every heading, gather ancestor containers whose range covers
+    # it, ordered by position (outermost-first).
+    out: dict[str, list[str]] = {}
+    for i, (is_h, text) in enumerate(items):
+        if not is_h or not text:
+            continue
+        ancestors: list[str] = []
+        for c_pos in sorted(container_positions):
+            if c_pos >= i:
+                break
+            if c_pos < i < container_range[c_pos]:
+                ancestors.append(items[c_pos][1])
+        # Drop accidental self-reference (a container heading would
+        # otherwise see itself as its own ancestor through any outer
+        # container that wraps it — that's fine, but exclude its own
+        # text just in case of a repeated label).
+        ancestors = [a for a in ancestors if a != text]
+        out[text] = ancestors
+    return out
+
+
+def _split_bullet_chunks(chunks: list[MdChunk], tokenizer) -> list[MdChunk]:
+    """Post-process: for each bulleted-list chunk, KEEP the parent chunk
+    (whole list, rich retrieval signal) AND emit one sub-chunk per bullet
+    (single-region precise highlight target).
+
+    The model picks which tag to cite at runtime:
+      * If it's listing the whole category ("his AI/ML certs are X, Y, Z")
+        it cites the parent — click highlights every bullet's region.
+      * If it's talking about ONE specific bullet ("he holds Azure AI-901")
+        it cites the sub-chunk — click highlights only that bullet's region.
+
+    Tolerance: one non-bullet "stray" line is allowed (docling sometimes
+    mis-bags an adjacent item from another column into the chunk — e.g.
+    the ISCTE "Oct 2025 - Present" date landing in the Architecture certs
+    chunk). The stray line is DROPPED from the sub-chunk fanout; it stays
+    in the parent's text (we don't rewrite the parent here).
+
+    Each sub-chunk's text prepends the section_path as a heading line so
+    the reranker has topical context — without it, a bare bullet like
+    "- Machine Learning (Stanford University)" scores poorly for a query
+    like "certifications and qualifications".
+
+    chunk_index is renumbered globally so chunk_id (built downstream as
+    `<doc>#<section-slug>#<index>`) stays unique.
+    """
+    out: list[MdChunk] = []
+    for c in chunks:
+        out.append(c)  # KEEP the parent chunk regardless of splitting
+        if c.kind != 'text' or not c.regions:
+            continue
+        lines = [l for l in (c.text or '').split('\n') if l.strip()]
+        if len(lines) < 2 or len(c.regions) != len(lines):
+            continue
+        # Match each line to its region by position. Bullets become
+        # sub-chunks; non-bullet lines (typically one mis-bagged item)
+        # are skipped at the sub-chunk fanout.
+        bullet_indices = [i for i, l in enumerate(lines) if _BULLET_LINE_RE.match(l)]
+        if len(bullet_indices) < 2:
+            continue
+        # Allow at most one non-bullet line (the stray-contamination case).
+        # If more than one, the chunk isn't actually a clean bullet list —
+        # leave it as the parent only.
+        if len(lines) - len(bullet_indices) > 1:
+            continue
+        for i in bullet_indices:
+            line = lines[i]
+            region = c.regions[i]
+            ctx_text = f'{c.section_path}\n{line}' if c.section_path else line
+            out.append(MdChunk(
+                doc_path=c.doc_path,
+                chunk_index=0,                  # renumbered below
+                section_path=c.section_path,
+                text=ctx_text,
+                token_count=tokenizer.count_tokens(ctx_text),
+                page_no=region.get('page_no'),
+                bbox=region.get('bbox'),
+                regions=[region],
+                section_level=c.section_level,
+                kind='text',
+                caption_for=None,
+            ))
+    for i, c in enumerate(out):
+        c.chunk_index = i
+    return out
 
 
 # ── Caption manifest helpers ─────────────────────────────────────────

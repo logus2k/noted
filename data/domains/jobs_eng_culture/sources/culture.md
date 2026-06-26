@@ -1,3 +1,0 @@
-# Culture
-
-Team culture content.
