@@ -51,3 +51,5 @@ data/tenants/*/user_tools/
 # same exclusion pattern is already applied to user_tools/_archive
 # implicitly via the parent wildcard above.
 data/skills/_archive/
+
+data/domains/bulario/

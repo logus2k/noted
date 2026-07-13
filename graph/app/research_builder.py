@@ -876,6 +876,22 @@ class ResearchBuilder:
         takes the empty-cache branch ("No thematic entities. Trigger a
         rebuild first.") regardless. The `ml` domain spent 24h in this
         state with a fully-built graph behind a silently-empty cache."""
+        # Dedup by id before caching. The same entity recurs across a
+        # document's chunks and `_canonical_key` collapses case/whitespace
+        # variants, so one build can carry the same id more than once.
+        # ChromaDB's cache_upsert requires unique ids per request; the
+        # /rebuild path dedups upstream (unique_entities) but the incremental
+        # doc/add path does not — collapse to one entity per id here so both
+        # paths are safe (keep first occurrence; mention aggregation lives on
+        # the graph side, not the vector cache).
+        _seen: set[str] = set()
+        _unique: list[Entity] = []
+        for _e in thematic_entities:
+            if _e.id in _seen:
+                continue
+            _seen.add(_e.id)
+            _unique.append(_e)
+        thematic_entities = _unique
         ent_ids = [e.id for e in thematic_entities]
         ent_texts = [
             f"{(e.properties.get('canonical_name') or e.label)}. "
