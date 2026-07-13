@@ -206,6 +206,17 @@ class RagService:
             (t_http - t_client) * 1000,
             (t_done - t_http) * 1000,
         )
+        # Fail loudly if the server returned fewer vectors than inputs (e.g. it
+        # skipped an over-context input and still answered 200). Silently
+        # returning a short list would misalign embeddings against chunk ids in
+        # the caller (upsert_chunks zips them positionally) — a silent data-
+        # corruption hole. Never return a partial result.
+        if len(out) != len(texts):
+            raise ValueError(
+                f"embed count mismatch: {len(out)} embeddings for {len(texts)} "
+                f"inputs — server dropped input(s); refusing to return "
+                f"misaligned vectors"
+            )
         return out
 
     def _rerank(self, query: str, documents: list[str], model: Optional[str] = None) -> list[float]:

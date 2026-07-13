@@ -23,6 +23,7 @@ import os
 import re
 
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import replace
 from typing import Any, Callable
 
 from app.config import (
@@ -439,12 +440,51 @@ def scan_pdf(
     # win with the per-bullet sub-chunk.
     chunks = _add_super_parent_chunks(chunks, _chunker.tokenizer)
 
+    # Guarantee no chunk exceeds the embedder. Docling keeps an atomic element
+    # (a large table/list) as one chunk, and _add_super_parent_chunks can
+    # concatenate siblings — either can blow past bge-m3's context. Since
+    # noted-rag embeds a doc's chunks in one ATOMIC call, a single oversized
+    # chunk fails the WHOLE document's embed (it lands in the graph but never
+    # the vector corpus). Hard-split the oversized tail so that can't happen.
+    chunks = _split_oversized_chunks(chunks)
+
     logger.info(
         'pdf scan: %s -> %d chunks across %d pages (toc_dropped=%d, ratio=%.2f, captions=%d)',
         rel_path, len(chunks), page_count, n_toc_dropped, TOC_FILTER_RATIO,
         sum(1 for c in chunks if c.kind in ('picture_caption', 'table_caption')),
     )
     return chunks
+
+
+# Conservative CHARACTER cap (tokens are always fewer than chars here, so this
+# stays well under bge-m3's 4096-token slot even for token-dense tables).
+# Only the ~0.4% oversized tail is affected; normal chunks (p99 ~3.9k chars)
+# pass through untouched.
+_MAX_CHUNK_CHARS = int(os.environ.get('MAX_CHUNK_CHARS', '6000'))
+_CHUNK_SPLIT_OVERLAP = int(os.environ.get('CHUNK_SPLIT_OVERLAP', '400'))
+
+
+def _split_oversized_chunks(chunks: list[MdChunk]) -> list[MdChunk]:
+    """Window any chunk whose text exceeds `_MAX_CHUNK_CHARS` into overlapping
+    sub-chunks so no single chunk can exceed the embedder. Sub-chunks inherit
+    the parent's provenance (page/bbox/regions approximate to the parent's span
+    — a split table still highlights its region). `chunk_index` is re-sequenced
+    so per-doc chunk ids stay unique."""
+    cap, overlap = _MAX_CHUNK_CHARS, _CHUNK_SPLIT_OVERLAP
+    step = max(1, cap - overlap)
+    out: list[MdChunk] = []
+    for c in chunks:
+        t = c.text or ''
+        if len(t) <= cap:
+            out.append(c)
+            continue
+        for start in range(0, len(t), step):
+            part = t[start:start + cap]
+            if part.strip():
+                out.append(replace(c, text=part, token_count=len(part) // 4))
+            if start + cap >= len(t):
+                break
+    return [replace(c, chunk_index=i) for i, c in enumerate(out)]
 
 
 # Lines starting with a bullet glyph (hyphen, asterisk, bullet, en-dash)
