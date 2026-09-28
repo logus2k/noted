@@ -115,6 +115,42 @@ def _ensure_loaded() -> None:
     )
 
 
+_ocr_converter = None
+# A scanned/image PDF extracts to near-empty text when do_ocr is off. Below
+# this many characters we treat the extraction as failed and retry with OCR.
+_OCR_FALLBACK_MIN_CHARS = int(os.environ.get('DOCLING_OCR_FALLBACK_MIN_CHARS', '500'))
+
+
+def _get_ocr_converter():
+    """Lazy OCR-enabled converter, built only when a near-empty extraction
+    triggers the scanned-PDF fallback (so normal text PDFs never load OCR).
+    Same options as the main converter but do_ocr=True. RapidOCR weights load
+    on first use."""
+    global _ocr_converter
+    if _ocr_converter is not None:
+        return _ocr_converter
+    from docling.datamodel.base_models import InputFormat
+    from docling.datamodel.pipeline_options import PdfPipelineOptions
+    from docling.document_converter import DocumentConverter, PdfFormatOption
+    # NB: do NOT pin artifacts_path here — the on-disk cache holds the layout
+    # models but NOT the RapidOCR weights, so pinning it makes OCR fail with a
+    # missing-model error. Leaving it unset lets Docling resolve RapidOCR (and
+    # the layout models, already in the HF cache) from their default locations —
+    # the config proven to work in the standalone OCR test.
+    pdf_opts = PdfPipelineOptions(
+        do_ocr=True,
+        generate_picture_images=ENABLE_DOC_DESCRIPTIONS,
+        images_scale=2.0 if ENABLE_DOC_DESCRIPTIONS else 1.0,
+    )
+    _ocr_converter = DocumentConverter(
+        allowed_formats=[InputFormat.PDF, InputFormat.DOCX,
+                         InputFormat.PPTX, InputFormat.HTML],
+        format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=pdf_opts)},
+    )
+    logger.info('Docling OCR-fallback converter loaded (do_ocr=True)')
+    return _ocr_converter
+
+
 def _get_chunker(max_tokens: int):
     """Return a HybridChunker for the given max_tokens, cached for the
     lifetime of the process. Tokenizer init (bge-m3) is the expensive
@@ -185,6 +221,20 @@ def scan_pdf(
 
     result = _converter.convert(abs_path)
     doc = result.document  # DoclingDocument
+
+    # Self-healing OCR fallback: scanned/image PDFs extract to near-empty text
+    # when do_ocr is off. Retry THIS doc with OCR (targeted — text PDFs never
+    # pay the OCR cost). Skipped when OCR is already global.
+    if not DOCLING_OCR:
+        try:
+            _txt = (doc.export_to_markdown() or '').strip()
+        except Exception:
+            _txt = ''
+        if len(_txt) < _OCR_FALLBACK_MIN_CHARS:
+            logger.info('scan_pdf: near-empty extraction (%d chars) for %s '
+                        '-> retrying with OCR', len(_txt), rel_path)
+            result = _get_ocr_converter().convert(abs_path)
+            doc = result.document
 
     page_count = len(getattr(doc, 'pages', []) or [])
     if DOCLING_MAX_PAGES and page_count > DOCLING_MAX_PAGES:

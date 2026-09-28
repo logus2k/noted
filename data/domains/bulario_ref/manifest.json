@@ -1,0 +1,20 @@
+{
+  "domain_id": "bulario_ref",
+  "name": "Bul\u00e1rio \u2014 Refer\u00eancia (FTN)",
+  "description": "Formul\u00e1rio Terap\u00eautico Nacional 2010 \u2014 grounding conceitual (Carlos)",
+  "created_at": "2026-07-13T14:24:46.776264+00:00",
+  "embeddings_model": "bge-m3",
+  "pinned": false,
+  "included_files": [
+    {
+      "path": "ftn-2010-br.pdf",
+      "mode": "read_store",
+      "added_at": "2026-07-13T14:25:04.551684+00:00",
+      "category": ""
+    }
+  ],
+  "arcadedb_database": "bulario_ref",
+  "corpus_collection": "bulario_ref__corpus",
+  "entity_cache_collection": "bulario_ref__gr_entities",
+  "summary_cache_collection": "bulario_ref__gr_summaries"
+}

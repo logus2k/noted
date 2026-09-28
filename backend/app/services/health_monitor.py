@@ -119,40 +119,10 @@ async def _probe_graph_db(client: httpx.AsyncClient) -> tuple[str, Optional[str]
     return await _probe_get(client, f'{NOTED_GRAPH_URL}/domains')
 
 
-async def _probe_gemma4(client: httpx.AsyncClient) -> tuple[str, Optional[str], Optional[int]]:
-    """Real chat-completion call against gemma-4. Conceptually redundant
-    with the LLM Proxy probe — ideally the proxy's `/health` would
-    itself verify all child models are responsive. But upstream
-    `llama-server` doesn't probe its children, so a green proxy
-    doesn't prove gemma-4 hasn't zombied (same failure mode bge-m3
-    hit). Cost: one tiny generation per cycle (~50-200ms GPU).
-    Captioning + chat both depend on this; without an active probe
-    a zombied gemma-4 would silently break image/table descriptions
-    AND every chat response while the LLM Proxy LED stayed green."""
-    import time
-    t0 = time.perf_counter()
-    try:
-        r = await client.post(
-            f'{LLAMA_VISION_URL}/v1/chat/completions',
-            json={
-                'model': 'gemma-4',
-                'messages': [{'role': 'user', 'content': 'ok'}],
-                'max_tokens': 1,
-                'temperature': 0,
-            },
-            timeout=PROBE_TIMEOUT_SECONDS,
-        )
-        latency_ms = int((time.perf_counter() - t0) * 1000)
-        if r.status_code != 200:
-            return 'fail', f'HTTP {r.status_code}: {r.text[:120]}', latency_ms
-        body = r.json()
-        choices = body.get('choices') or []
-        if choices and 'message' in choices[0]:
-            return 'ok', None, latency_ms
-        return 'fail', f'malformed completion response: {str(body)[:120]}', latency_ms
-    except httpx.RequestError as e:
-        latency_ms = int((time.perf_counter() - t0) * 1000)
-        return 'fail', f'{type(e).__name__}: {e}'[:160], latency_ms
+# No gemma-4 generation probe (removed 2026-09-28): a chat completion every 30 s put work on the GPU that
+# Cortex's live transcription shares, and while both ran each slowed by hundreds of times (a 1-token 'ok'
+# took 221 s; the 5 s client timeout does not stop llama-server's processing). The LLM Proxy probe
+# (/health) still reports the proxy; a stuck gemma-4 child shows up as failed chat requests.
 
 
 async def _probe_bge_reranker(client: httpx.AsyncClient) -> tuple[str, Optional[str], Optional[int]]:
@@ -204,7 +174,6 @@ PROBES = [
     ('agent_server',    'Agent Server',        _probe_agent_server),
     ('bge_m3',          'Embeddings Service',  _probe_bge_m3),
     ('bge_reranker',    'Reranker Service',    _probe_bge_reranker),
-    ('gemma_4',         'Generation Service',  _probe_gemma4),
 ]
 
 

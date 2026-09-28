@@ -109,8 +109,8 @@ export class ServiceHealthStrip {
         const ids = Object.keys(services).filter(k => !k.startsWith('__'));
         // Stable order — match the backend PROBES list:
         // Vector DB, Graph DB, LLM Proxy, Agent Server, Embeddings,
-        // Reranker, Generation.
-        const order = ['noted_rag', 'noted_graph', 'llama_vision', 'agent_server', 'bge_m3', 'bge_reranker', 'gemma_4'];
+        // Reranker.
+        const order = ['noted_rag', 'noted_graph', 'llama_vision', 'agent_server', 'bge_m3', 'bge_reranker'];
         const sorted = order.filter(k => ids.includes(k))
             .concat(ids.filter(k => !order.includes(k)));
 

@@ -519,13 +519,39 @@ def upsert_chunks(req: UpsertChunksRequest) -> UpsertChunksResponse:
     skipped = len(records) - len(to_embed)
 
     if to_embed:
-        embeddings = rag.embed([r.document for r in to_embed])
-        collection.upsert(
-            ids=[r.id for r in to_embed],
-            documents=[r.document for r in to_embed],
-            embeddings=embeddings,
-            metadatas=[r.metadata for r in to_embed],
-        )
+        # Sub-batch the embed so a large document (e.g. a ~1000-page PDF that
+        # chunks into ~19k pieces) never sends one oversized /v1/embeddings
+        # request. bge-m3 runs batch=ubatch=8192, cls-pooled with no chunked
+        # prefill, so it sizes — and retains — its attention buffer to the
+        # largest batch it ever sees; an unbounded call pushes that high-water
+        # mark until the embedder child is OOM-killed (the exact hazard
+        # /upsert_records guards against). Bound each call by BOTH a token
+        # budget and a count cap. ~4 chars/token is a rough but safe estimate.
+        _EMBED_COUNT_CAP = 64
+        _EMBED_TOKEN_BUDGET = 4000
+
+        def _embed_batches(recs):
+            cur: list = []
+            cur_tok = 0
+            for r in recs:
+                est = max(1, len(r.document) // 4)
+                if cur and (cur_tok + est > _EMBED_TOKEN_BUDGET
+                            or len(cur) >= _EMBED_COUNT_CAP):
+                    yield cur
+                    cur, cur_tok = [], 0
+                cur.append(r)
+                cur_tok += est
+            if cur:
+                yield cur
+
+        for batch in _embed_batches(to_embed):
+            embeddings = rag.embed([r.document for r in batch])
+            collection.upsert(
+                ids=[r.id for r in batch],
+                documents=[r.document for r in batch],
+                embeddings=embeddings,
+                metadatas=[r.metadata for r in batch],
+            )
 
     produced_ids = {r.id for r in records}
     stale_ids = list(existing_ids - produced_ids)
